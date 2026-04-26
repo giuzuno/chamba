@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import NegociacionTrabajo from './NegociacionTrabajo'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -14,45 +15,38 @@ const CATEGORIAS_ICONS = {
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
 }
 
-export default function VistaTrabajador({ onLogout, userEmail }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [trabajos, setTrabajos] = useState([])
+  const [misTrabajos, setMisTrabajos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [trabajoSeleccionado, setTrabajoSeleccionado] = useState(null)
-  const [aceptando, setAceptando] = useState(false)
   const [exitoAceptar, setExitoAceptar] = useState(false)
+  const [negociando, setNegociando] = useState(null)
+  const [pestana, setPestana] = useState('disponibles')
 
   useEffect(() => {
     cargarTrabajos()
+    cargarMisTrabajos()
   }, [])
 
   async function cargarTrabajos() {
     setCargando(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('trabajos')
       .select('*')
       .eq('status', 'publicado')
       .order('creado_en', { ascending: false })
-
     if (data) setTrabajos(data)
     setCargando(false)
   }
 
-  async function aceptarTrabajo(trabajo) {
-    setAceptando(true)
-    const { error } = await supabase
+  async function cargarMisTrabajos() {
+    const { data } = await supabase
       .from('trabajos')
-      .update({ status: 'aceptado' })
-      .eq('id', trabajo.id)
-
-    if (!error) {
-      setExitoAceptar(true)
-      setTimeout(() => {
-        setExitoAceptar(false)
-        setTrabajoSeleccionado(null)
-        cargarTrabajos()
-      }, 2000)
-    }
-    setAceptando(false)
+      .select('*')
+      .eq('status', 'aceptado')
+      .order('creado_en', { ascending: false })
+    if (data) setMisTrabajos(data)
   }
 
   function tiempoTranscurrido(fecha) {
@@ -62,6 +56,24 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
     const hrs = Math.floor(min / 60)
     if (hrs < 24) return `hace ${hrs} hrs`
     return `hace ${Math.floor(hrs / 24)} días`
+  }
+
+  // ── Negociación — siempre va primero ──
+  if (negociando) {
+    return (
+      <NegociacionTrabajo
+        trabajo={negociando}
+        userId={userId}
+        onVolver={() => setNegociando(null)}
+        onAceptado={() => {
+          setNegociando(null)
+          setTrabajoSeleccionado(null)
+          cargarTrabajos()
+          cargarMisTrabajos()
+          setPestana('mis')
+        }}
+      />
+    )
   }
 
   // ── Detalle del trabajo ──
@@ -111,7 +123,7 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
                     {trabajoSeleccionado.categoria}
                   </h3>
                   <span style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>
-                    ${trabajoSeleccionado.presupuesto} MXN
+                    ${trabajoSeleccionado.ultima_oferta || trabajoSeleccionado.presupuesto} MXN
                   </span>
                 </div>
               </div>
@@ -142,7 +154,7 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
                 </div>
               </div>
 
-              {/* Nota de seguridad */}
+              {/* Nota escrow */}
               <div style={{
                 background: 'rgba(255,255,255,0.03)',
                 border: '0.5px solid rgba(255,255,255,0.08)',
@@ -152,20 +164,15 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
                 🔒 Al aceptar, el pago queda protegido en escrow. Lo recibes cuando el cliente confirme que el trabajo quedó bien.
               </div>
 
-              {/* Botón aceptar */}
-              <button
-                type="button"
-                onClick={() => aceptarTrabajo(trabajoSeleccionado)}
-                disabled={aceptando}
+              <button type="button"
+                onClick={() => setNegociando(trabajoSeleccionado)}
                 style={{
                   width: '100%', padding: '16px',
-                  background: aceptando ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                  color: 'white', border: 'none', borderRadius: '14px',
-                  fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-                  fontFamily: 'sans-serif'
-                }}
-              >
-                {aceptando ? 'Aceptando...' : '✅ Aceptar este trabajo'}
+                  background: '#1D9E75', color: 'white', border: 'none',
+                  borderRadius: '14px', fontSize: '16px', fontWeight: '600',
+                  cursor: 'pointer', fontFamily: 'sans-serif'
+                }}>
+                💬 Ver y negociar precio
               </button>
 
               <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{
@@ -184,7 +191,7 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
     )
   }
 
-  // ── Lista de trabajos ──
+  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -196,7 +203,9 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
       }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Trabajos disponibles cerca</p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+            {pestana === 'disponibles' ? 'Trabajos disponibles cerca' : 'Mis trabajos aceptados'}
+          </p>
         </div>
         <button type="button" onClick={onLogout} style={{
           background: 'transparent', color: 'rgba(255,255,255,0.4)',
@@ -207,63 +216,137 @@ export default function VistaTrabajador({ onLogout, userEmail }) {
         </button>
       </div>
 
-      {/* Lista */}
+      {/* Pestañas */}
+      <div style={{
+        display: 'flex', gap: '8px', padding: '10px 16px',
+        borderBottom: '0.5px solid rgba(255,255,255,0.08)',
+        background: '#0D0D0D'
+      }}>
+        <button type="button" onClick={() => setPestana('disponibles')} style={{
+          flex: 1, padding: '9px',
+          background: pestana === 'disponibles' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+          color: pestana === 'disponibles' ? 'white' : 'rgba(255,255,255,0.5)',
+          border: 'none', borderRadius: '10px',
+          fontSize: '13px', fontWeight: pestana === 'disponibles' ? '600' : '400',
+          cursor: 'pointer', fontFamily: 'sans-serif'
+        }}>
+          🔍 Disponibles {trabajos.length > 0 && `(${trabajos.length})`}
+        </button>
+        <button type="button" onClick={() => setPestana('mis')} style={{
+          flex: 1, padding: '9px',
+          background: pestana === 'mis' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+          color: pestana === 'mis' ? 'white' : 'rgba(255,255,255,0.5)',
+          border: 'none', borderRadius: '10px',
+          fontSize: '13px', fontWeight: pestana === 'mis' ? '600' : '400',
+          cursor: 'pointer', fontFamily: 'sans-serif'
+        }}>
+          ✅ Mis trabajos {misTrabajos.length > 0 && `(${misTrabajos.length})`}
+        </button>
+      </div>
+
+      {/* Contenido */}
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {cargando && (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
-            Buscando trabajos cerca...
-          </div>
-        )}
-
-        {!cargando && trabajos.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
-            <p>No hay trabajos publicados ahorita.</p>
-            <p style={{ fontSize: '13px', marginTop: '8px' }}>Regresa más tarde o activa notificaciones.</p>
-          </div>
-        )}
-
-        {trabajos.map(trabajo => (
-          <button
-            key={trabajo.id}
-            type="button"
-            onClick={() => setTrabajoSeleccionado(trabajo)}
-            style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '0.5px solid rgba(255,255,255,0.08)',
-              borderRadius: '16px', padding: '16px 18px',
-              cursor: 'pointer', fontFamily: 'sans-serif',
-              textAlign: 'left', width: '100%',
-              transition: 'border-color 0.15s'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <span style={{ fontSize: '36px' }}>
-                {CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>
-                    {trabajo.categoria}
-                  </span>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>
-                    ${trabajo.presupuesto}
-                  </span>
-                </div>
-                <p style={{
-                  fontSize: '13px', color: 'rgba(255,255,255,0.5)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                }}>
-                  {trabajo.descripcion}
-                </p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>
-                  🕐 {tiempoTranscurrido(trabajo.creado_en)} · 📍 Salina Cruz
-                </p>
+        {/* ── Pestaña disponibles ── */}
+        {pestana === 'disponibles' && (
+          <>
+            {cargando && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
+                Buscando trabajos cerca...
               </div>
-            </div>
-          </button>
-        ))}
+            )}
+            {!cargando && trabajos.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
+                <p>No hay trabajos publicados ahorita.</p>
+                <p style={{ fontSize: '13px', marginTop: '8px' }}>Regresa más tarde.</p>
+              </div>
+            )}
+            {trabajos.map(trabajo => (
+              <button key={trabajo.id} type="button"
+                onClick={() => setTrabajoSeleccionado(trabajo)}
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '0.5px solid rgba(255,255,255,0.08)',
+                  borderRadius: '16px', padding: '16px 18px',
+                  cursor: 'pointer', fontFamily: 'sans-serif',
+                  textAlign: 'left', width: '100%'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ fontSize: '36px' }}>
+                    {CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>
+                        {trabajo.categoria}
+                      </span>
+                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>
+                        ${trabajo.ultima_oferta || trabajo.presupuesto}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {trabajo.descripcion}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>
+                      🕐 {tiempoTranscurrido(trabajo.creado_en)} · 📍 Salina Cruz
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </>
+        )}
+
+        {/* ── Pestaña mis trabajos ── */}
+        {pestana === 'mis' && (
+          <>
+            {misTrabajos.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔧</div>
+                <p>No has aceptado trabajos todavía.</p>
+                <p style={{ fontSize: '13px', marginTop: '8px' }}>Busca trabajos disponibles y acepta uno.</p>
+              </div>
+            )}
+            {misTrabajos.map(trabajo => (
+              <div key={trabajo.id} style={{
+                background: 'rgba(29,158,117,0.06)',
+                border: '0.5px solid rgba(29,158,117,0.2)',
+                borderRadius: '16px', padding: '16px 18px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ fontSize: '36px' }}>
+                    {CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>
+                        {trabajo.categoria}
+                      </span>
+                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>
+                        ${trabajo.precio_acordado || trabajo.presupuesto}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {trabajo.descripcion}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                      <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>
+                        ✅ Aceptado
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>·</span>
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
+                        Pago en escrow al confirmar
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
       </div>
     </div>
   )
