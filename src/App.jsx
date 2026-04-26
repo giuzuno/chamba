@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import MapaChamba from './MapaChamba'
 
 export default function App() {
   const [email, setEmail] = useState('')
@@ -39,44 +40,13 @@ export default function App() {
     await supabase.auth.signOut()
   }
 
-  // ── Pantalla principal si hay sesión ──
+  // ── Pantalla principal con mapa ──
   if (session) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#0D0D0D',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'sans-serif',
-        color: 'white'
-      }}>
-        <h1 style={{ color: '#1D9E75', fontSize: '32px', fontWeight: '800', marginBottom: '8px' }}>
-          chamba
-        </h1>
-        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
-          Bienvenido 👋
-        </p>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '32px' }}>
-          {session.user.email}
-        </p>
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            background: 'transparent',
-            color: '#F09595',
-            border: '1px solid #F09595',
-            borderRadius: '12px',
-            padding: '10px 24px',
-            fontSize: '14px',
-            cursor: 'pointer'
-          }}
-        >
-          Cerrar sesión
-        </button>
-      </div>
+      <MapaChamba
+        onLogout={handleLogout}
+        userEmail={session.user.email}
+      />
     )
   }
 
