@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
+import VistaTrabajador from './VistaTrabajador'
 
 export default function App() {
   const [email, setEmail] = useState('')
@@ -8,6 +9,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
+  const [modoTrabajador, setModoTrabajador] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,15 +40,60 @@ export default function App() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
+    setModoTrabajador(false)
   }
 
-  // ── Pantalla principal con mapa ──
+  // ── Pantalla principal con sesión ──
   if (session) {
+
+    if (modoTrabajador) {
+      return (
+        <div style={{ position: 'relative' }}>
+          <VistaTrabajador
+            onLogout={handleLogout}
+            userId={session.user.id}
+            userEmail={session.user.email}
+          />
+          <button
+            type="button"
+            onClick={() => setModoTrabajador(false)}
+            style={{
+              position: 'fixed', bottom: '80px', right: '16px',
+              background: '#378ADD', color: 'white', border: 'none',
+              borderRadius: '100px', padding: '10px 18px',
+              fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              fontFamily: 'sans-serif', zIndex: 9999,
+              boxShadow: '0 4px 20px rgba(55,138,221,0.4)'
+            }}
+          >
+            🗺️ Soy cliente
+          </button>
+        </div>
+      )
+    }
+
     return (
-      <MapaChamba
-        onLogout={handleLogout}
-        userEmail={session.user.email}
-      />
+      <div style={{ position: 'relative' }}>
+        <MapaChamba
+          onLogout={handleLogout}
+          userId={session.user.id}
+          userEmail={session.user.email}
+        />
+        <button
+          type="button"
+          onClick={() => setModoTrabajador(true)}
+          style={{
+            position: 'fixed', bottom: '80px', right: '16px',
+            background: '#1D9E75', color: 'white', border: 'none',
+            borderRadius: '100px', padding: '10px 18px',
+            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+            fontFamily: 'sans-serif', zIndex: 9999,
+            boxShadow: '0 4px 20px rgba(29,158,117,0.4)'
+          }}
+        >
+          🔧 Soy trabajador
+        </button>
+      </div>
     )
   }
 
