@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import PublicarTrabajo from './PublicarTrabajo'
+import MisPublicaciones from './MisPublicaciones'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -74,6 +75,15 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
   if (pantalla === 'publicar') {
     return (
       <PublicarTrabajo
+        onVolver={() => setPantalla('mapa')}
+        userId={userId}
+      />
+    )
+  }
+
+  if (pantalla === 'publicaciones') {
+    return (
+      <MisPublicaciones
         onVolver={() => setPantalla('mapa')}
         userId={userId}
       />
@@ -162,14 +172,18 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         padding: '12px 0', background: '#0D0D0D',
         borderTop: '0.5px solid rgba(255,255,255,0.1)'
       }}>
-        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['💬', 'Chats'], ['👤', 'Perfil']].map(([icon, label]) => (
+        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['💬', 'Chats'], ['👤', 'Mis trabajos']].map(([icon, label]) => (
           <button key={label} type="button"
-            onClick={() => label === 'Publicar' && setPantalla('publicar')}
+            onClick={() => {
+              if (label === 'Publicar') setPantalla('publicar')
+              if (label === 'Mis trabajos') setPantalla('publicaciones')
+              if (label === 'Mapa') setPantalla('mapa')
+            }}
             style={{
               background: 'transparent', border: 'none',
-              color: pantalla === 'publicar' && label === 'Publicar' ? '#1D9E75' :
-                     label === 'Mapa' && pantalla === 'mapa' ? '#1D9E75' :
-                     'rgba(255,255,255,0.5)',
+              color: (pantalla === 'publicar' && label === 'Publicar') ||
+                     (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
+                     (pantalla === 'mapa' && label === 'Mapa') ? '#1D9E75' : 'rgba(255,255,255,0.5)',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', gap: '4px',
               cursor: 'pointer', fontSize: '20px',
