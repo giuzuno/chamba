@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AgendarCita from './AgendarCita'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -28,6 +38,26 @@ export default function MisPublicaciones({ onVolver, userId }) {
   useEffect(() => {
     cargarMisTrabajos()
   }, [])
+
+  // Realtime — escuchar cambios en trabajos
+  useEffect(() => {
+    const channel = supabase
+      .channel('tracking-cliente')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'trabajos'
+      }, (payload) => {
+        setTrabajos(prev => prev.map(t =>
+          t.id === payload.new.id ? { ...t, ...payload.new } : t
+        ))
+        if (trabajoSeleccionado?.id === payload.new.id) {
+          setTrabajoSeleccionado(prev => ({ ...prev, ...payload.new }))
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [trabajoSeleccionado])
 
   async function cargarMisTrabajos() {
     setCargando(true)
@@ -120,7 +150,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
   }
 
-  // ── Agendar cita ── va primero
+  // ── Agendar cita ──
   if (agendando) {
     return (
       <AgendarCita
@@ -169,14 +199,11 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
           {/* Header */}
           <div style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '0.5px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
             borderRadius: '16px', padding: '18px',
             display: 'flex', alignItems: 'center', gap: '14px'
           }}>
-            <span style={{ fontSize: '44px' }}>
-              {CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}
-            </span>
+            <span style={{ fontSize: '44px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: '19px', fontWeight: '700', marginBottom: '4px' }}>
                 {trabajoSeleccionado.categoria}
@@ -196,8 +223,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
           {/* Precios */}
           <div style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '0.5px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
             borderRadius: '16px', overflow: 'hidden'
           }}>
             <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
@@ -264,18 +290,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 El trabajador pide <strong style={{ color: '#E8A030' }}>${trabajoSeleccionado.ultima_oferta} MXN</strong> — ¿qué decides?
               </p>
               <button type="button" onClick={() => aceptarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{
-                width: '100%', padding: '15px',
-                background: '#1D9E75', color: 'white', border: 'none',
-                borderRadius: '14px', fontSize: '15px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif'
+                width: '100%', padding: '15px', background: '#1D9E75', color: 'white', border: 'none',
+                borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
                 ✅ Aceptar ${trabajoSeleccionado.ultima_oferta} MXN
               </button>
               <button type="button" onClick={() => rechazarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{
-                width: '100%', padding: '14px',
-                background: 'transparent', color: '#E8A030',
-                border: '1px solid rgba(186,117,23,0.4)',
-                borderRadius: '14px', fontSize: '15px',
+                width: '100%', padding: '14px', background: 'transparent', color: '#E8A030',
+                border: '1px solid rgba(186,117,23,0.4)', borderRadius: '14px', fontSize: '15px',
                 cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
                 ↩ Rechazar y pedir otro precio
@@ -283,22 +305,66 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
-          {/* Trabajo aceptado — agendar y confirmar */}
+          {/* Trabajo aceptado */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-              {/* Botón agendar o cita confirmada */}
+              {/* Tracking en tiempo real */}
+              {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
+                <div style={{
+                  background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75',
+                  borderRadius: '14px', overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1D9E75' }} />
+                    <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '600' }}>
+                      🚗 El trabajador está en camino — ubicación en tiempo real
+                    </p>
+                  </div>
+                  {trabajoSeleccionado.trabajador_lat && trabajoSeleccionado.trabajador_lng && (
+                    <div style={{ height: '220px' }}>
+                      <MapContainer
+                        center={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]}
+                        zoom={15}
+                        style={{ height: '100%', width: '100%' }}
+                      >
+                        <TileLayer
+                          attribution='&copy; OpenStreetMap'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <Marker position={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]}>
+                          <Popup>🚗 Trabajador en camino</Popup>
+                        </Marker>
+                        {trabajoSeleccionado.lat && trabajoSeleccionado.lng && (
+                          <Marker position={[trabajoSeleccionado.lat, trabajoSeleccionado.lng]}>
+                            <Popup>🏠 Tu domicilio</Popup>
+                          </Marker>
+                        )}
+                      </MapContainer>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Trabajador llegó */}
+              {trabajoSeleccionado.trabajador_llego && (
+                <div style={{
+                  background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)',
+                  borderRadius: '12px', padding: '14px', textAlign: 'center',
+                  fontSize: '14px', color: '#1D9E75', fontWeight: '600'
+                }}>
+                  🏠 ¡El trabajador llegó a tu domicilio!
+                </div>
+              )}
+
+              {/* Agendar o mostrar cita */}
               {!trabajoSeleccionado.fecha_cita ? (
-                <button type="button"
-                  onClick={() => setAgendando(trabajoSeleccionado)}
-                  style={{
-                    width: '100%', padding: '14px',
-                    background: 'transparent', color: '#1D9E75',
-                    border: '1.5px solid #1D9E75',
-                    borderRadius: '12px', fontSize: '15px', fontWeight: '600',
-                    cursor: 'pointer', fontFamily: 'sans-serif'
-                  }}
-                >
+                <button type="button" onClick={() => setAgendando(trabajoSeleccionado)} style={{
+                  width: '100%', padding: '14px',
+                  background: 'transparent', color: '#1D9E75',
+                  border: '1.5px solid #1D9E75', borderRadius: '12px',
+                  fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                }}>
                   📅 Agendar fecha y hora
                 </button>
               ) : (
@@ -307,11 +373,11 @@ export default function MisPublicaciones({ onVolver, userId }) {
                   borderRadius: '10px', padding: '12px 16px',
                   fontSize: '13px', color: '#1D9E75', textAlign: 'center'
                 }}>
-                  📅 Cita agendada: {trabajoSeleccionado.fecha_cita} a las {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs
+                  📅 Cita: {trabajoSeleccionado.fecha_cita} a las {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs
                 </div>
               )}
 
-              {/* Trabajo en progreso */}
+              {/* Confirmar completado */}
               <div style={{
                 background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)',
                 borderRadius: '14px', padding: '16px', textAlign: 'center'
@@ -323,24 +389,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
                   Cuando el trabajador termine, confirma aquí para liberar el pago de ${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN.
                 </p>
                 <button type="button"
-  onClick={() => confirmarCompletado(trabajoSeleccionado)}
-  disabled={loadingAccion || !trabajoSeleccionado.fecha_cita || trabajoSeleccionado.status !== 'aceptado'}
-  style={{
-    width: '100%', padding: '14px',
-    background: !trabajoSeleccionado.fecha_cita
-      ? 'rgba(255,255,255,0.08)'
-      : loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-    color: !trabajoSeleccionado.fecha_cita ? 'rgba(255,255,255,0.3)' : 'white',
-    border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600',
-    cursor: !trabajoSeleccionado.fecha_cita ? 'not-allowed' : 'pointer',
-    fontFamily: 'sans-serif'
-  }}
->
-  {!trabajoSeleccionado.fecha_cita
-    ? '🔒 Agenda primero la cita'
-    : loadingAccion ? 'Procesando...' : '🏁 Confirmar trabajo completado'}
-</button>
+                  onClick={() => confirmarCompletado(trabajoSeleccionado)}
+                  disabled={loadingAccion || !trabajoSeleccionado.fecha_cita}
+                  style={{
+                    width: '100%', padding: '14px',
+                    background: !trabajoSeleccionado.fecha_cita ? 'rgba(255,255,255,0.08)' : loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
+                    color: !trabajoSeleccionado.fecha_cita ? 'rgba(255,255,255,0.3)' : 'white',
+                    border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600',
+                    cursor: !trabajoSeleccionado.fecha_cita ? 'not-allowed' : 'pointer',
+                    fontFamily: 'sans-serif'
+                  }}
+                >
+                  {!trabajoSeleccionado.fecha_cita ? '🔒 Agenda primero la cita' : loadingAccion ? 'Procesando...' : '🏁 Confirmar trabajo completado'}
+                </button>
               </div>
+
             </div>
           )}
 
@@ -409,14 +472,10 @@ export default function MisPublicaciones({ onVolver, userId }) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span style={{ fontSize: '36px' }}>
-                  {CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}
-                </span>
+                <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>
-                      {trabajo.categoria}
-                    </span>
+                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
                     <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>
                       ${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}
                     </span>
@@ -424,10 +483,31 @@ export default function MisPublicaciones({ onVolver, userId }) {
                   <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>
                     {trabajo.descripcion}
                   </p>
+                  {/* Badge de trabajador en camino */}
+                  {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
+                    <span style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '100px',
+                      background: 'rgba(29,158,117,0.2)', color: '#1D9E75',
+                      border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600',
+                      marginBottom: '4px', display: 'inline-block'
+                    }}>
+                      🚗 Trabajador en camino
+                    </span>
+                  )}
+                  {trabajo.trabajador_llego && (
+                    <span style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '100px',
+                      background: 'rgba(29,158,117,0.2)', color: '#1D9E75',
+                      border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600',
+                      marginBottom: '4px', display: 'inline-block'
+                    }}>
+                      🏠 Trabajador llegó
+                    </span>
+                  )}
                   <span style={{
                     fontSize: '11px', padding: '2px 8px', borderRadius: '100px',
                     background: badge.bg, color: badge.color, border: `0.5px solid ${badge.border}`,
-                    fontWeight: '500'
+                    fontWeight: '500', display: 'inline-block'
                   }}>
                     {badge.texto}
                   </span>

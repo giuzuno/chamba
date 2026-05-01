@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import NegociacionTrabajo from './NegociacionTrabajo'
+import TrackingTrabajador from './TrackingTrabajador'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -24,6 +25,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [negociando, setNegociando] = useState(null)
   const [pestana, setPestana] = useState('disponibles')
   const [loadingCompletar, setLoadingCompletar] = useState(null)
+  const [tracking, setTracking] = useState(null)
 
   useEffect(() => {
     cargarTrabajos()
@@ -68,7 +70,17 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     return `hace ${Math.floor(hrs / 24)} días`
   }
 
-  // ── Negociación — siempre va primero ──
+  // ── Tracking — va primero ──
+  if (tracking) {
+    return (
+      <TrackingTrabajador
+        trabajo={tracking}
+        onVolver={() => { setTracking(null); cargarMisTrabajos() }}
+      />
+    )
+  }
+
+  // ── Negociación ──
   if (negociando) {
     return (
       <NegociacionTrabajo
@@ -300,15 +312,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {trabajo.descripcion}
                     </p>
-
-                    {/* Fecha cita */}
                     {trabajo.fecha_cita && (
                       <p style={{ fontSize: '11px', color: '#1D9E75', marginTop: '4px' }}>
                         📅 {trabajo.fecha_cita} a las {trabajo.hora_cita?.slice(0, 5)} hrs
                       </p>
                     )}
-
-                    {/* Status */}
                     <div style={{ marginTop: '6px' }}>
                       {trabajo.status === 'en_revision' ? (
                         <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>
@@ -322,6 +330,38 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                     </div>
                   </div>
                 </div>
+
+                {/* Botón ir al trabajo — tracking */}
+                {trabajo.status === 'aceptado' && trabajo.fecha_cita && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
+                  <button type="button"
+                    onClick={() => setTracking(trabajo)}
+                    style={{
+                      width: '100%', padding: '10px',
+                      background: 'rgba(55,138,221,0.2)', color: '#378ADD',
+                      border: '1px solid rgba(55,138,221,0.4)',
+                      borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                      cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
+                    }}
+                  >
+                    🚗 Ir al trabajo — compartir ubicación
+                  </button>
+                )}
+
+                {/* En camino */}
+                {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
+                  <button type="button"
+                    onClick={() => setTracking(trabajo)}
+                    style={{
+                      width: '100%', padding: '10px',
+                      background: 'rgba(29,158,117,0.2)', color: '#1D9E75',
+                      border: '1px solid rgba(29,158,117,0.4)',
+                      borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                      cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
+                    }}
+                  >
+                    🟢 En camino — ver mapa
+                  </button>
+                )}
 
                 {/* Botón marcar completado */}
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && (
@@ -340,7 +380,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                   </button>
                 )}
 
-                {/* Sin cita aún */}
+                {/* Sin cita */}
                 {trabajo.status === 'aceptado' && !trabajo.fecha_cita && (
                   <div style={{
                     padding: '8px 12px', background: 'rgba(255,255,255,0.04)',
@@ -355,7 +395,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             ))}
           </>
         )}
-
       </div>
     </div>
   )
