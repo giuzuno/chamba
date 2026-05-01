@@ -5,10 +5,23 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
 delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+
+const iconoTrabajador = L.divIcon({
+  html: `<div style="
+    background:#1D9E75;border:3px solid white;border-radius:50%;
+    width:42px;height:42px;display:flex;align-items:center;
+    justify-content:center;font-size:22px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
+  className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
+})
+
+const iconoDestino = L.divIcon({
+  html: `<div style="
+    background:#378ADD;border:3px solid white;border-radius:50%;
+    width:42px;height:42px;display:flex;align-items:center;
+    justify-content:center;font-size:22px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
+  className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
 })
 
 export default function TrackingTrabajador({ trabajo, onVolver }) {
@@ -19,13 +32,8 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
   const [watchId, setWatchId] = useState(null)
 
   useEffect(() => {
-    // Si ya estaba en camino, reanudar tracking
-    if (enCamino && !llego) {
-      iniciarTracking()
-    }
-    return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId)
-    }
+    if (enCamino && !llego) iniciarTracking()
+    return () => { if (watchId) navigator.geolocation.clearWatch(watchId) }
   }, [])
 
   function iniciarTracking() {
@@ -33,8 +41,6 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
       async (pos) => {
         const { latitude, longitude } = pos.coords
         setPosicion([latitude, longitude])
-
-        // Actualizar posición en Supabase cada vez que se mueve
         await supabase.from('trabajos').update({
           trabajador_lat: latitude,
           trabajador_lng: longitude,
@@ -48,9 +54,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
 
   async function activarEnCamino() {
     setLoading(true)
-    await supabase.from('trabajos').update({
-      trabajador_en_camino: true,
-    }).eq('id', trabajo.id)
+    await supabase.from('trabajos').update({ trabajador_en_camino: true }).eq('id', trabajo.id)
     setEnCamino(true)
     iniciarTracking()
     setLoading(false)
@@ -73,11 +77,9 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
-      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '16px 20px',
-        borderBottom: '0.5px solid rgba(255,255,255,0.1)'
+        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
       }}>
         <button type="button" onClick={onVolver} style={{
           background: 'transparent', color: 'rgba(255,255,255,0.6)',
@@ -88,10 +90,8 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
         </h2>
       </div>
 
-      {/* Info del trabajo */}
       <div style={{
-        padding: '14px 20px',
-        background: 'rgba(29,158,117,0.08)',
+        padding: '14px 20px', background: 'rgba(29,158,117,0.08)',
         borderBottom: '0.5px solid rgba(29,158,117,0.2)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
@@ -106,30 +106,20 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
         </span>
       </div>
 
-      {/* Mapa */}
       <div style={{ height: '350px', position: 'relative' }}>
         <MapContainer center={centro} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          {/* Tu posición */}
+          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {posicion && (
-            <Marker position={posicion}>
-              <Popup>📍 Tu ubicación</Popup>
+            <Marker position={posicion} icon={iconoTrabajador}>
+              <Popup>👷 Tu ubicación</Popup>
             </Marker>
           )}
-
-          {/* Destino del cliente */}
           {destino && (
-            <Marker position={destino}>
-              <Popup>🏠 Destino del cliente</Popup>
+            <Marker position={destino} icon={iconoDestino}>
+              <Popup>🏠 Domicilio del cliente</Popup>
             </Marker>
           )}
         </MapContainer>
-
-        {/* Badge en camino */}
         {enCamino && !llego && (
           <div style={{
             position: 'absolute', top: '10px', left: '50%',
@@ -143,25 +133,22 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
         )}
       </div>
 
-      {/* Acciones */}
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
         {!enCamino && !llego && (
           <>
             <div style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '0.5px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
               borderRadius: '12px', padding: '14px 16px',
               fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6'
             }}>
-              📍 Al tocar "Estoy en camino" el cliente verá tu ubicación en tiempo real en su mapa y recibirá una notificación.
+              📍 Al tocar "Estoy en camino" el cliente verá tu ubicación en tiempo real en su mapa.
             </div>
             <button type="button" onClick={activarEnCamino} disabled={loading} style={{
               width: '100%', padding: '16px',
               background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75',
               color: 'white', border: 'none', borderRadius: '14px',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-              fontFamily: 'sans-serif'
+              fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
             }}>
               {loading ? 'Activando...' : '🚗 Estoy en camino'}
             </button>
@@ -171,8 +158,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
         {enCamino && !llego && (
           <>
             <div style={{
-              background: 'rgba(29,158,117,0.08)',
-              border: '0.5px solid rgba(29,158,117,0.3)',
+              background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)',
               borderRadius: '12px', padding: '14px 16px',
               fontSize: '13px', color: '#1D9E75', textAlign: 'center'
             }}>
@@ -182,8 +168,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
               width: '100%', padding: '16px',
               background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75',
               color: 'white', border: 'none', borderRadius: '14px',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-              fontFamily: 'sans-serif'
+              fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
             }}>
               {loading ? 'Confirmando...' : '✅ Llegué al domicilio'}
             </button>
@@ -192,8 +177,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
 
         {llego && (
           <div style={{
-            background: 'rgba(29,158,117,0.12)',
-            border: '0.5px solid rgba(29,158,117,0.4)',
+            background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)',
             borderRadius: '14px', padding: '20px', textAlign: 'center'
           }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏠</div>
