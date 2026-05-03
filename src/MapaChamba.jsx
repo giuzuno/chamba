@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
+import Perfil from './Perfil'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -73,26 +74,21 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
     : trabajadores.filter(t => t.oficio === categoriaFiltro)
 
   if (pantalla === 'publicar') {
-    return (
-      <PublicarTrabajo
-        onVolver={() => setPantalla('mapa')}
-        userId={userId}
-      />
-    )
+    return <PublicarTrabajo onVolver={() => setPantalla('mapa')} userId={userId} />
   }
 
   if (pantalla === 'publicaciones') {
-    return (
-      <MisPublicaciones
-        onVolver={() => setPantalla('mapa')}
-        userId={userId}
-      />
-    )
+    return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
+  }
+
+  if (pantalla === 'perfil') {
+    return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
   }
 
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
 
+      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 20px', background: '#0D0D0D',
@@ -109,6 +105,7 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         </button>
       </div>
 
+      {/* Filtros */}
       <div style={{
         display: 'flex', gap: '8px', padding: '10px 16px',
         overflowX: 'auto', background: '#0D0D0D',
@@ -131,6 +128,7 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         ))}
       </div>
 
+      {/* Mapa */}
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
           <TileLayer
@@ -167,23 +165,26 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         </div>
       </div>
 
+      {/* Bottom bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-around',
         padding: '12px 0', background: '#0D0D0D',
         borderTop: '0.5px solid rgba(255,255,255,0.1)'
       }}>
-        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['💬', 'Chats'], ['👤', 'Mis trabajos']].map(([icon, label]) => (
+        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
           <button key={label} type="button"
             onClick={() => {
+              if (label === 'Mapa') setPantalla('mapa')
               if (label === 'Publicar') setPantalla('publicar')
               if (label === 'Mis trabajos') setPantalla('publicaciones')
-              if (label === 'Mapa') setPantalla('mapa')
+              if (label === 'Perfil') setPantalla('perfil')
             }}
             style={{
               background: 'transparent', border: 'none',
-              color: (pantalla === 'publicar' && label === 'Publicar') ||
+              color: (pantalla === 'mapa' && label === 'Mapa') ||
+                     (pantalla === 'publicar' && label === 'Publicar') ||
                      (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
-                     (pantalla === 'mapa' && label === 'Mapa') ? '#1D9E75' : 'rgba(255,255,255,0.5)',
+                     (pantalla === 'perfil' && label === 'Perfil') ? '#1D9E75' : 'rgba(255,255,255,0.5)',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', gap: '4px',
               cursor: 'pointer', fontSize: '20px',
