@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import NegociacionTrabajo from './NegociacionTrabajo'
 import TrackingTrabajador from './TrackingTrabajador'
+import Calificacion from './Calificacion'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -26,6 +27,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [pestana, setPestana] = useState('disponibles')
   const [loadingCompletar, setLoadingCompletar] = useState(null)
   const [tracking, setTracking] = useState(null)
+  const [calificando, setCalificando] = useState(null)
 
   useEffect(() => {
     cargarTrabajos()
@@ -54,11 +56,10 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
 
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
-    await supabase.from('trabajos').update({
-      status: 'en_revision'
-    }).eq('id', trabajo.id)
+    await supabase.from('trabajos').update({ status: 'en_revision' }).eq('id', trabajo.id)
     await cargarMisTrabajos()
     setLoadingCompletar(null)
+    setCalificando(trabajo)
   }
 
   function tiempoTranscurrido(fecha) {
@@ -70,7 +71,19 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     return `hace ${Math.floor(hrs / 24)} días`
   }
 
-  // ── Tracking — va primero ──
+  // ── Calificación — va primero ──
+  if (calificando) {
+    return (
+      <Calificacion
+        trabajo={calificando}
+        userId={userId}
+        rolCalificador="trabajador"
+        onCompletado={() => { setCalificando(null); cargarMisTrabajos() }}
+      />
+    )
+  }
+
+  // ── Tracking ──
   if (tracking) {
     return (
       <TrackingTrabajador
@@ -104,8 +117,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '16px 20px',
-          borderBottom: '0.5px solid rgba(255,255,255,0.1)'
+          padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
         }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{
             background: 'transparent', color: 'rgba(255,255,255,0.6)',
@@ -127,8 +139,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             <>
               <div style={{
                 background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)',
-                borderRadius: '16px', padding: '20px',
-                display: 'flex', alignItems: 'center', gap: '16px'
+                borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px'
               }}>
                 <span style={{ fontSize: '48px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
                 <div>
@@ -161,19 +172,15 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
               </div>
 
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{
-                width: '100%', padding: '16px',
-                background: '#1D9E75', color: 'white', border: 'none',
-                borderRadius: '14px', fontSize: '16px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif'
+                width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none',
+                borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
                 💬 Ver y negociar precio
               </button>
 
               <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{
-                width: '100%', padding: '14px',
-                background: 'transparent', color: 'rgba(255,255,255,0.4)',
-                border: '0.5px solid rgba(255,255,255,0.15)',
-                borderRadius: '14px', fontSize: '15px',
+                width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)',
+                border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px',
                 cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
                 Ver otros trabajos
@@ -191,8 +198,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
 
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px',
-        borderBottom: '0.5px solid rgba(255,255,255,0.1)'
+        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
       }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
@@ -209,26 +215,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
         </button>
       </div>
 
-      {/* Pestañas */}
       <div style={{
         display: 'flex', gap: '8px', padding: '10px 16px',
         borderBottom: '0.5px solid rgba(255,255,255,0.08)', background: '#0D0D0D'
       }}>
         <button type="button" onClick={() => setPestana('disponibles')} style={{
-          flex: 1, padding: '9px',
+          flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
           background: pestana === 'disponibles' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
           color: pestana === 'disponibles' ? 'white' : 'rgba(255,255,255,0.5)',
-          border: 'none', borderRadius: '10px',
           fontSize: '13px', fontWeight: pestana === 'disponibles' ? '600' : '400',
           cursor: 'pointer', fontFamily: 'sans-serif'
         }}>
           🔍 Disponibles {trabajos.length > 0 && `(${trabajos.length})`}
         </button>
         <button type="button" onClick={() => setPestana('mis')} style={{
-          flex: 1, padding: '9px',
+          flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
           background: pestana === 'mis' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
           color: pestana === 'mis' ? 'white' : 'rgba(255,255,255,0.5)',
-          border: 'none', borderRadius: '10px',
           fontSize: '13px', fontWeight: pestana === 'mis' ? '600' : '400',
           cursor: 'pointer', fontFamily: 'sans-serif'
         }}>
@@ -238,14 +241,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* Disponibles */}
         {pestana === 'disponibles' && (
           <>
-            {cargando && (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
-                Buscando trabajos cerca...
-              </div>
-            )}
+            {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
             {!cargando && trabajos.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
@@ -253,16 +251,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
               </div>
             )}
             {trabajos.map(trabajo => (
-              <button key={trabajo.id} type="button"
-                onClick={() => setTrabajoSeleccionado(trabajo)}
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '0.5px solid rgba(255,255,255,0.08)',
-                  borderRadius: '16px', padding: '16px 18px',
-                  cursor: 'pointer', fontFamily: 'sans-serif',
-                  textAlign: 'left', width: '100%'
-                }}
-              >
+              <button key={trabajo.id} type="button" onClick={() => setTrabajoSeleccionado(trabajo)} style={{
+                background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
+                borderRadius: '16px', padding: '16px 18px', cursor: 'pointer',
+                fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -283,7 +276,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
           </>
         )}
 
-        {/* Mis trabajos */}
         {pestana === 'mis' && (
           <>
             {misTrabajos.length === 0 && (
@@ -294,10 +286,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             )}
             {misTrabajos.map(trabajo => (
               <div key={trabajo.id} style={{
-                background: trabajo.status === 'en_revision'
-                  ? 'rgba(186,117,23,0.08)' : 'rgba(29,158,117,0.06)',
-                border: `0.5px solid ${trabajo.status === 'en_revision'
-                  ? 'rgba(186,117,23,0.3)' : 'rgba(29,158,117,0.2)'}`,
+                background: trabajo.status === 'en_revision' ? 'rgba(186,117,23,0.08)' : 'rgba(29,158,117,0.06)',
+                border: `0.5px solid ${trabajo.status === 'en_revision' ? 'rgba(186,117,23,0.3)' : 'rgba(29,158,117,0.2)'}`,
                 borderRadius: '16px', padding: '16px 18px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
@@ -305,9 +295,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
-                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>
-                        ${trabajo.precio_acordado || trabajo.presupuesto}
-                      </span>
+                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {trabajo.descripcion}
@@ -319,51 +307,34 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                     )}
                     <div style={{ marginTop: '6px' }}>
                       {trabajo.status === 'en_revision' ? (
-                        <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>
-                          ⏳ Esperando confirmación del cliente
-                        </span>
+                        <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>
-                          ✅ Aceptado · Pago en escrow al confirmar
-                        </span>
+                        <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow al confirmar</span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Botón ir al trabajo — tracking */}
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
-                  <button type="button"
-                    onClick={() => setTracking(trabajo)}
-                    style={{
-                      width: '100%', padding: '10px',
-                      background: 'rgba(55,138,221,0.2)', color: '#378ADD',
-                      border: '1px solid rgba(55,138,221,0.4)',
-                      borderRadius: '10px', fontSize: '13px', fontWeight: '600',
-                      cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
-                    }}
-                  >
+                  <button type="button" onClick={() => setTracking(trabajo)} style={{
+                    width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD',
+                    border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px',
+                    fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
+                  }}>
                     🚗 Ir al trabajo — compartir ubicación
                   </button>
                 )}
 
-                {/* En camino */}
                 {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
-                  <button type="button"
-                    onClick={() => setTracking(trabajo)}
-                    style={{
-                      width: '100%', padding: '10px',
-                      background: 'rgba(29,158,117,0.2)', color: '#1D9E75',
-                      border: '1px solid rgba(29,158,117,0.4)',
-                      borderRadius: '10px', fontSize: '13px', fontWeight: '600',
-                      cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
-                    }}
-                  >
+                  <button type="button" onClick={() => setTracking(trabajo)} style={{
+                    width: '100%', padding: '10px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75',
+                    border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px', fontSize: '13px',
+                    fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px'
+                  }}>
                     🟢 En camino — ver mapa
                   </button>
                 )}
 
-                {/* Botón marcar completado */}
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && (
                   <button type="button"
                     onClick={() => marcarCompletado(trabajo)}
@@ -371,26 +342,19 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                     style={{
                       width: '100%', padding: '10px',
                       background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                      color: 'white', border: 'none',
-                      borderRadius: '10px', fontSize: '13px', fontWeight: '600',
-                      cursor: 'pointer', fontFamily: 'sans-serif'
+                      color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px',
+                      fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
                     }}
                   >
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Marcar trabajo como completado'}
                   </button>
                 )}
 
-                {/* Sin cita */}
                 {trabajo.status === 'aceptado' && !trabajo.fecha_cita && (
-                  <div style={{
-                    padding: '8px 12px', background: 'rgba(255,255,255,0.04)',
-                    borderRadius: '8px', fontSize: '12px',
-                    color: 'rgba(255,255,255,0.3)', textAlign: 'center'
-                  }}>
+                  <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
                     ⏳ Esperando que el cliente agende la cita
                   </div>
                 )}
-
               </div>
             ))}
           </>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AgendarCita from './AgendarCita'
+import Calificacion from './Calificacion'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -8,20 +9,12 @@ import L from 'leaflet'
 delete L.Icon.Default.prototype._getIconUrl
 
 const iconoTrabajador = L.divIcon({
-  html: `<div style="
-    background:#1D9E75;border:3px solid white;border-radius:50%;
-    width:42px;height:42px;display:flex;align-items:center;
-    justify-content:center;font-size:22px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
+  html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
   className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
 })
 
 const iconoCliente = L.divIcon({
-  html: `<div style="
-    background:#378ADD;border:3px solid white;border-radius:50%;
-    width:42px;height:42px;display:flex;align-items:center;
-    justify-content:center;font-size:22px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
+  html: `<div style="background:#378ADD;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
   className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
 })
 
@@ -47,6 +40,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [exitoAccion, setExitoAccion] = useState('')
   const [agendando, setAgendando] = useState(null)
   const [citaConfirmada, setCitaConfirmada] = useState(null)
+  const [calificando, setCalificando] = useState(null)
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -117,6 +111,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     setExitoAccion(`✅ Pago de $${trabajo.precio_acordado || trabajo.presupuesto} MXN liberado al trabajador. ¡Gracias por usar Chamba!`)
     await cargarMisTrabajos()
     setLoadingAccion(false)
+    setCalificando(trabajo)
   }
 
   function tiempoTranscurrido(fecha) {
@@ -141,6 +136,18 @@ export default function MisPublicaciones({ onVolver, userId }) {
     if (s === 'cancelado')
       return { texto: '❌ Cancelado', bg: 'rgba(240,149,149,0.1)', color: '#F09595', border: 'rgba(240,149,149,0.3)' }
     return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
+  }
+
+  // ── Calificación — va primero ──
+  if (calificando) {
+    return (
+      <Calificacion
+        trabajo={calificando}
+        userId={userId}
+        rolCalificador="cliente"
+        onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
+      />
+    )
   }
 
   if (agendando) {
@@ -252,7 +259,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-              {/* Tracking en tiempo real */}
               {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
                 <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75', borderRadius: '14px', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
