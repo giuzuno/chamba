@@ -4,6 +4,7 @@ import NegociacionTrabajo from './NegociacionTrabajo'
 import TrackingTrabajador from './TrackingTrabajador'
 import Calificacion from './Calificacion'
 import PerfilPublico from './PerfilPublico'
+import ChatTrabajo from './ChatTrabajo'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -18,7 +19,7 @@ const CATEGORIAS_ICONS = {
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
 }
 
-export default function VistaTrabajador({ onLogout, userEmail, userId }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -31,6 +32,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [tracking, setTracking] = useState(null)
   const [calificando, setCalificando] = useState(null)
   const [verPerfilCliente, setVerPerfilCliente] = useState(null)
+  const [chatAbierto, setChatAbierto] = useState(null)
 
   useEffect(() => {
     cargarTrabajos()
@@ -40,26 +42,21 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
 
   async function cargarTrabajos() {
     setCargando(true)
-    const { data } = await supabase
-      .from('trabajos').select('*').eq('status', 'publicado')
-      .order('creado_en', { ascending: false })
+    const { data } = await supabase.from('trabajos').select('*')
+      .eq('status', 'publicado').order('creado_en', { ascending: false })
     if (data) setTrabajos(data)
     setCargando(false)
   }
 
   async function cargarMisTrabajos() {
-    const { data } = await supabase
-      .from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision'])
-      .order('creado_en', { ascending: false })
+    const { data } = await supabase.from('trabajos').select('*')
+      .in('status', ['aceptado', 'en_revision']).order('creado_en', { ascending: false })
     if (data) setMisTrabajos(data)
   }
 
   async function cargarHistorial() {
-    const { data } = await supabase
-      .from('trabajos').select('*')
-      .in('status', ['completado', 'cancelado'])
-      .order('creado_en', { ascending: false })
+    const { data } = await supabase.from('trabajos').select('*')
+      .in('status', ['completado', 'cancelado']).order('creado_en', { ascending: false })
     if (data) setHistorial(data)
   }
 
@@ -81,69 +78,42 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     return `hace ${Math.floor(hrs / 24)} días`
   }
 
-  // ── Perfil público del cliente ──
-  if (verPerfilCliente) {
-    return (
-      <PerfilPublico
-        usuarioId={verPerfilCliente}
-        rolVisto="cliente"
-        onVolver={() => setVerPerfilCliente(null)}
-      />
-    )
+  if (chatAbierto) {
+    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   }
 
-  // ── Calificación ──
+  if (verPerfilCliente) {
+    return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
+  }
+
   if (calificando) {
     return (
-      <Calificacion
-        trabajo={calificando}
-        userId={userId}
-        rolCalificador="trabajador"
+      <Calificacion trabajo={calificando} userId={userId} rolCalificador="trabajador"
         onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }}
       />
     )
   }
 
-  // ── Tracking ──
   if (tracking) {
-    return (
-      <TrackingTrabajador
-        trabajo={tracking}
-        onVolver={() => { setTracking(null); cargarMisTrabajos() }}
-      />
-    )
+    return <TrackingTrabajador trabajo={tracking} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
   }
 
-  // ── Negociación ──
   if (negociando) {
     return (
-      <NegociacionTrabajo
-        trabajo={negociando}
-        userId={userId}
-        onVolver={() => setNegociando(null)}
+      <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
         onAceptado={() => {
-          setNegociando(null)
-          setTrabajoSeleccionado(null)
-          cargarTrabajos()
-          cargarMisTrabajos()
-          setPestana('mis')
+          setNegociando(null); setTrabajoSeleccionado(null)
+          cargarTrabajos(); cargarMisTrabajos(); setPestana('mis')
         }}
       />
     )
   }
 
-  // ── Detalle del trabajo disponible ──
   if (trabajoSeleccionado) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-        }}>
-          <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{
-            background: 'transparent', color: 'rgba(255,255,255,0.6)',
-            border: 'none', fontSize: '20px', cursor: 'pointer'
-          }}>←</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+          <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Detalle del trabajo</h2>
         </div>
 
@@ -152,16 +122,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             <div style={{ textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
               <div style={{ fontSize: '60px' }}>🎉</div>
               <h3 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '700' }}>¡Trabajo aceptado!</h3>
-              <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '280px' }}>
-                El cliente fue notificado. Prepárate para ir al trabajo.
-              </p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '280px' }}>El cliente fue notificado.</p>
             </div>
           ) : (
             <>
-              <div style={{
-                background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)',
-                borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px'
-              }}>
+              <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <span style={{ fontSize: '48px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '4px' }}>{trabajoSeleccionado.categoria}</h3>
@@ -178,9 +143,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                 </div>
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>UBICACIÓN</p>
-                  <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
-                    📍 {trabajoSeleccionado.lat?.toFixed(4)}, {trabajoSeleccionado.lng?.toFixed(4)}
-                  </p>
+                  <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>📍 {trabajoSeleccionado.lat?.toFixed(4)}, {trabajoSeleccionado.lng?.toFixed(4)}</p>
                 </div>
                 <div style={{ padding: '16px 18px' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>PUBLICADO</p>
@@ -188,30 +151,34 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                 </div>
               </div>
 
-              {/* Ver perfil del cliente */}
               {trabajoSeleccionado.cliente_id && (
-                <button type="button"
-                  onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)}
-                  style={{
-                    width: '100%', padding: '13px',
-                    background: 'rgba(55,138,221,0.1)', color: '#378ADD',
-                    border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px',
-                    fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-                  }}
-                >
+                <button type="button" onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)} style={{
+                  width: '100%', padding: '13px', background: 'rgba(55,138,221,0.1)', color: '#378ADD',
+                  border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px',
+                  fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                }}>
                   👤 Ver perfil del cliente
                 </button>
               )}
 
+              <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
+                width: '100%', padding: '13px',
+                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)',
+                border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px',
+                fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
+              }}>
+                ❓ Pedir más detalles al cliente
+              </button>
+
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                🔒 Al aceptar, el pago queda protegido en escrow. Lo recibes cuando el cliente confirme.
+                🔒 Al aceptar, el pago queda protegido en escrow.
               </div>
 
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{
                 width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none',
                 borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
-                💬 Ver y negociar precio
+                💰 Ver y negociar precio
               </button>
 
               <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{
@@ -228,39 +195,42 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     )
   }
 
-  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-      }}>
+      {/* Header con botón de cambiar a cliente */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
             {pestana === 'disponibles' ? 'Trabajos disponibles' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
           </p>
         </div>
-        <button type="button" onClick={onLogout} style={{
-          background: 'transparent', color: 'rgba(255,255,255,0.4)',
-          border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
-          padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
-        }}>
-          Salir
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button type="button" onClick={onCambiarModo} style={{
+            background: 'rgba(29,158,117,0.15)', color: '#1D9E75',
+            border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px',
+            padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+          }}>
+            🗺️ Modo cliente
+          </button>
+          <button type="button" onClick={onLogout} style={{
+            background: 'transparent', color: 'rgba(255,255,255,0.4)',
+            border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
+            padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
+          }}>
+            Salir
+          </button>
+        </div>
       </div>
 
-      {/* Pestañas — 3 ahora */}
-      <div style={{
-        display: 'flex', gap: '6px', padding: '10px 16px',
-        borderBottom: '0.5px solid rgba(255,255,255,0.08)', background: '#0D0D0D'
-      }}>
+      {/* Pestañas */}
+      <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {[
-          ['disponibles', '🔍', trabajos.length],
-          ['mis', '✅', misTrabajos.length],
-          ['historial', '🏁', historial.length],
-        ].map(([key, icon, count]) => (
+          ['disponibles', '🔍', 'Disponibles', trabajos.length],
+          ['mis', '✅', 'Activos', misTrabajos.length],
+          ['historial', '🏁', 'Historial', historial.length],
+        ].map(([key, icon, label, count]) => (
           <button key={key} type="button" onClick={() => setPestana(key)} style={{
             flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px',
             background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
@@ -268,15 +238,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             fontSize: '12px', fontWeight: pestana === key ? '600' : '400',
             cursor: 'pointer', fontFamily: 'sans-serif'
           }}>
-            {icon} {key === 'disponibles' ? 'Disponibles' : key === 'mis' ? 'Activos' : 'Historial'}
-            {count > 0 && ` (${count})`}
+            {icon} {label} {count > 0 && `(${count})`}
           </button>
         ))}
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* ── Disponibles ── */}
         {pestana === 'disponibles' && (
           <>
             {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
@@ -299,12 +267,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                       <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.ultima_oferta || trabajo.presupuesto}</span>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {trabajo.descripcion}
-                    </p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>
-                      🕐 {tiempoTranscurrido(trabajo.creado_en)} · 📍 Salina Cruz
-                    </p>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>🕐 {tiempoTranscurrido(trabajo.creado_en)} · 📍 Salina Cruz</p>
                   </div>
                 </div>
               </button>
@@ -312,7 +276,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
           </>
         )}
 
-        {/* ── Mis trabajos activos ── */}
         {pestana === 'mis' && (
           <>
             {misTrabajos.length === 0 && (
@@ -334,34 +297,35 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                       <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {trabajo.descripcion}
-                    </p>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
                     {trabajo.fecha_cita && (
-                      <p style={{ fontSize: '11px', color: '#1D9E75', marginTop: '4px' }}>
-                        📅 {trabajo.fecha_cita} a las {trabajo.hora_cita?.slice(0, 5)} hrs
-                      </p>
+                      <p style={{ fontSize: '11px', color: '#1D9E75', marginTop: '4px' }}>📅 {trabajo.fecha_cita} a las {trabajo.hora_cita?.slice(0, 5)} hrs</p>
                     )}
                     <div style={{ marginTop: '6px' }}>
-                      {trabajo.status === 'en_revision' ? (
-                        <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
-                      ) : (
-                        <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
-                      )}
+                      {trabajo.status === 'en_revision'
+                        ? <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
+                        : <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
+                      }
                     </div>
                   </div>
                 </div>
 
+                <button type="button" onClick={() => setChatAbierto(trabajo)} style={{
+                  width: '100%', padding: '8px', marginBottom: '8px',
+                  background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
+                  border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px',
+                  fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                }}>
+                  💬 Chat con el cliente
+                </button>
+
                 {trabajo.cliente_id && (
-                  <button type="button"
-                    onClick={() => setVerPerfilCliente(trabajo.cliente_id)}
-                    style={{
-                      width: '100%', padding: '8px', marginBottom: '8px',
-                      background: 'rgba(55,138,221,0.08)', color: '#378ADD',
-                      border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px',
-                      fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
-                    }}
-                  >
+                  <button type="button" onClick={() => setVerPerfilCliente(trabajo.cliente_id)} style={{
+                    width: '100%', padding: '8px', marginBottom: '8px',
+                    background: 'rgba(55,138,221,0.08)', color: '#378ADD',
+                    border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px',
+                    fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
+                  }}>
                     👤 Ver perfil del cliente
                   </button>
                 )}
@@ -387,16 +351,12 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                 )}
 
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && (
-                  <button type="button"
-                    onClick={() => marcarCompletado(trabajo)}
-                    disabled={loadingCompletar === trabajo.id}
-                    style={{
-                      width: '100%', padding: '10px',
-                      background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                      color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px',
-                      fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-                    }}
-                  >
+                  <button type="button" onClick={() => marcarCompletado(trabajo)} disabled={loadingCompletar === trabajo.id} style={{
+                    width: '100%', padding: '10px',
+                    background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75',
+                    color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px',
+                    fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                  }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Marcar trabajo como completado'}
                   </button>
                 )}
@@ -411,7 +371,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
           </>
         )}
 
-        {/* ── Historial ── */}
         {pestana === 'historial' && (
           <>
             {historial.length === 0 && (
@@ -435,9 +394,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                         ${trabajo.precio_acordado || trabajo.presupuesto}
                       </span>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
-                      {trabajo.descripcion}
-                    </p>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>{trabajo.descripcion}</p>
                     <span style={{
                       fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block',
                       background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)',
@@ -456,6 +413,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
             ))}
           </>
         )}
+
       </div>
     </div>
   )

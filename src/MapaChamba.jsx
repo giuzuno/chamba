@@ -24,7 +24,7 @@ const TRABAJADORES_PRUEBA = [
   { id: 5, nombre: 'Luis Torres', oficio: 'Pintor', rating: 4.6, lat: 16.1810, lng: -95.1990 },
 ]
 
-export default function MapaChamba({ onLogout, userEmail, userId }) {
+export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
   const [trabajadores, setTrabajadores] = useState(TRABAJADORES_PRUEBA)
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
@@ -32,25 +32,13 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
-  useEffect(() => {
-    cargarTrabajadores()
-  }, [])
+  useEffect(() => { cargarTrabajadores() }, [])
 
   async function cargarTrabajadores() {
     setCargando(true)
     const { data } = await supabase
       .from('trabajadores')
-      .select(`
-        id,
-        categorias,
-        rating_promedio,
-        disponible,
-        usuarios (
-          nombre,
-          lat,
-          lng
-        )
-      `)
+      .select(`id, categorias, rating_promedio, disponible, usuarios(nombre, lat, lng)`)
       .eq('disponible', true)
 
     if (data && data.length > 0) {
@@ -112,17 +100,12 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         borderBottom: '0.5px solid rgba(255,255,255,0.08)'
       }}>
         {CATEGORIAS.map(cat => (
-          <button key={cat} type="button"
-            onClick={() => setCategoriaFiltro(cat)}
-            style={{
-              background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-              color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)',
-              border: 'none', borderRadius: '20px',
-              padding: '6px 14px', fontSize: '12px',
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              fontFamily: 'sans-serif'
-            }}
-          >
+          <button key={cat} type="button" onClick={() => setCategoriaFiltro(cat)} style={{
+            background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+            color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)',
+            border: 'none', borderRadius: '20px', padding: '6px 14px', fontSize: '12px',
+            cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'sans-serif'
+          }}>
             {cat}
           </button>
         ))}
@@ -131,10 +114,7 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
       {/* Mapa */}
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {trabajadoresFiltrados.map(t => (
             <Marker key={t.id} position={[t.lat, t.lng]}>
               <Popup>
@@ -142,11 +122,7 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
                   <strong style={{ fontSize: '14px' }}>{t.nombre}</strong><br />
                   <span style={{ color: '#555', fontSize: '13px' }}>{t.oficio}</span><br />
                   <span style={{ color: '#BA7517' }}>★ {t.rating}</span><br />
-                  <button style={{
-                    marginTop: '8px', width: '100%', padding: '7px',
-                    background: '#1D9E75', color: 'white', border: 'none',
-                    borderRadius: '6px', cursor: 'pointer', fontSize: '13px'
-                  }}>
+                  <button style={{ marginTop: '8px', width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
                     Contactar
                   </button>
                 </div>
@@ -155,12 +131,7 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
           ))}
         </MapContainer>
 
-        <div style={{
-          position: 'absolute', top: '10px', right: '10px',
-          background: 'rgba(0,0,0,0.7)', color: 'white',
-          padding: '6px 12px', borderRadius: '20px',
-          fontSize: '12px', zIndex: 1000
-        }}>
+        <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', zIndex: 1000 }}>
           {trabajadoresFiltrados.length} trabajadores cerca
         </div>
       </div>
@@ -171,12 +142,19 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
         padding: '12px 0', background: '#0D0D0D',
         borderTop: '0.5px solid rgba(255,255,255,0.1)'
       }}>
-        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
+        {[
+          ['🗺️', 'Mapa'],
+          ['➕', 'Publicar'],
+          ['📋', 'Mis trabajos'],
+          ['🔧', 'Trabajador'],
+          ['👤', 'Perfil'],
+        ].map(([icon, label]) => (
           <button key={label} type="button"
             onClick={() => {
               if (label === 'Mapa') setPantalla('mapa')
               if (label === 'Publicar') setPantalla('publicar')
               if (label === 'Mis trabajos') setPantalla('publicaciones')
+              if (label === 'Trabajador') onCambiarModo()
               if (label === 'Perfil') setPantalla('perfil')
             }}
             style={{
@@ -184,15 +162,14 @@ export default function MapaChamba({ onLogout, userEmail, userId }) {
               color: (pantalla === 'mapa' && label === 'Mapa') ||
                      (pantalla === 'publicar' && label === 'Publicar') ||
                      (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
-                     (pantalla === 'perfil' && label === 'Perfil') ? '#1D9E75' : 'rgba(255,255,255,0.5)',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: '4px',
-              cursor: 'pointer', fontSize: '20px',
-              fontFamily: 'sans-serif'
+                     (pantalla === 'perfil' && label === 'Perfil')
+                ? '#1D9E75' : 'rgba(255,255,255,0.5)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+              cursor: 'pointer', fontSize: '18px', fontFamily: 'sans-serif', padding: '0 4px'
             }}
           >
             {icon}
-            <span style={{ fontSize: '11px' }}>{label}</span>
+            <span style={{ fontSize: '10px' }}>{label}</span>
           </button>
         ))}
       </div>

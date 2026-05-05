@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AgendarCita from './AgendarCita'
 import Calificacion from './Calificacion'
+import ChatTrabajo from './ChatTrabajo'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -41,6 +42,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [agendando, setAgendando] = useState(null)
   const [citaConfirmada, setCitaConfirmada] = useState(null)
   const [calificando, setCalificando] = useState(null)
+  const [chatAbierto, setChatAbierto] = useState(null)
   const [pestana, setPestana] = useState('activos')
 
   useEffect(() => { cargarMisTrabajos() }, [])
@@ -143,12 +145,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const trabajosActivos = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
   const trabajosHistorial = trabajos.filter(t => ['completado', 'cancelado'].includes(t.status))
 
+  if (chatAbierto) {
+    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
+  }
+
   if (calificando) {
     return (
       <Calificacion
-        trabajo={calificando}
-        userId={userId}
-        rolCalificador="cliente"
+        trabajo={calificando} userId={userId} rolCalificador="cliente"
         onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
       />
     )
@@ -157,8 +161,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   if (agendando) {
     return (
       <AgendarCita
-        trabajo={agendando}
-        onVolver={() => setAgendando(null)}
+        trabajo={agendando} onVolver={() => setAgendando(null)}
         onConfirmado={(cita) => { setCitaConfirmada(cita); setAgendando(null); cargarMisTrabajos() }}
       />
     )
@@ -173,7 +176,18 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAccion('') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Mi publicación</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi publicación</h2>
+          {/* Botón chat en el header si está aceptado */}
+          {['aceptado', 'en_revision'].includes(trabajoSeleccionado.status) && (
+            <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
+              background: 'rgba(29,158,117,0.15)', color: '#1D9E75',
+              border: '1px solid rgba(29,158,117,0.3)', borderRadius: '10px',
+              padding: '6px 12px', fontSize: '13px', fontWeight: '600',
+              cursor: 'pointer', fontFamily: 'sans-serif'
+            }}>
+              💬 Chat
+            </button>
+          )}
         </div>
 
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -260,9 +274,18 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
-          {/* Trabajo aceptado — en progreso */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+              {/* Chat */}
+              <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
+                width: '100%', padding: '13px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
+                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '12px',
+                fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+              }}>
+                💬 Chat con el trabajador
+              </button>
+
               {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
                 <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75', borderRadius: '14px', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -325,43 +348,34 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
-          {/* Trabajo en revisión — trabajador terminó, cliente debe confirmar */}
           {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{
-                background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)',
-                borderRadius: '14px', padding: '20px', textAlign: 'center'
+              <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
+                width: '100%', padding: '13px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
+                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '12px',
+                fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
               }}>
+                💬 Chat con el trabajador
+              </button>
+              <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
-                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>
-                  ¡El trabajador terminó!
-                </p>
+                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador terminó!</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
-                  ¿Quedó bien el trabajo? Confirma para liberar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong> al trabajador.
+                  ¿Quedó bien? Confirma para liberar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong> al trabajador.
                 </p>
-                <button type="button"
-                  onClick={() => confirmarCompletado(trabajoSeleccionado)}
-                  disabled={loadingAccion}
-                  style={{
-                    width: '100%', padding: '14px',
-                    background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                    color: 'white', border: 'none', borderRadius: '12px',
-                    fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-                  }}
-                >
+                <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)} disabled={loadingAccion} style={{
+                  width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
+                  color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600',
+                  cursor: 'pointer', fontFamily: 'sans-serif'
+                }}>
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Historial — completado o cancelado */}
           {['completado', 'cancelado'].includes(trabajoSeleccionado.status) && (
-            <div style={{
-              background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
-              borderRadius: '12px', padding: '14px', textAlign: 'center',
-              fontSize: '13px', color: 'rgba(255,255,255,0.4)'
-            }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
               {trabajoSeleccionado.status === 'completado'
                 ? `🏁 Trabajo completado · $${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN`
                 : '❌ Trabajo cancelado'}
@@ -379,7 +393,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
-  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -388,7 +401,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Mis publicaciones</h2>
       </div>
 
-      {/* Pestañas activos / historial */}
       <div style={{ display: 'flex', gap: '4px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {[['activos', '📋 Activos', trabajosActivos.length], ['historial', '🏁 Historial', trabajosHistorial.length]].map(([key, label, count]) => (
           <button key={key} type="button" onClick={() => setPestana(key)} style={{
@@ -425,14 +437,10 @@ export default function MisPublicaciones({ onVolver, userId }) {
           const badge = statusBadge(trabajo)
           return (
             <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
-              background: trabajo.status === 'en_revision'
-                ? 'rgba(55,138,221,0.08)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado'
-                  ? 'rgba(186,117,23,0.08)' : 'rgba(255,255,255,0.04)',
-              border: trabajo.status === 'en_revision'
-                ? '1px solid rgba(55,138,221,0.4)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado'
-                  ? '1px solid rgba(186,117,23,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
+              background: trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)' : 'rgba(255,255,255,0.04)',
+              border: trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
               borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
