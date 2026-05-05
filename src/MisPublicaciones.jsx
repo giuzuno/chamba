@@ -41,6 +41,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [agendando, setAgendando] = useState(null)
   const [citaConfirmada, setCitaConfirmada] = useState(null)
   const [calificando, setCalificando] = useState(null)
+  const [pestana, setPestana] = useState('activos')
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -108,7 +109,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
   async function confirmarCompletado(trabajo) {
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
-    setExitoAccion(`✅ Pago de $${trabajo.precio_acordado || trabajo.presupuesto} MXN liberado al trabajador. ¡Gracias por usar Chamba!`)
     await cargarMisTrabajos()
     setLoadingAccion(false)
     setCalificando(trabajo)
@@ -131,6 +131,8 @@ export default function MisPublicaciones({ onVolver, userId }) {
       return { texto: '⏳ Esperando trabajadores', bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
     if (s === 'aceptado')
       return { texto: '✅ Trabajo aceptado', bg: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: 'rgba(29,158,117,0.3)' }
+    if (s === 'en_revision')
+      return { texto: '🔧 Trabajador terminó — confirma tú', bg: 'rgba(55,138,221,0.15)', color: '#378ADD', border: 'rgba(55,138,221,0.4)' }
     if (s === 'completado')
       return { texto: '🏁 Completado', bg: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: 'rgba(29,158,117,0.4)' }
     if (s === 'cancelado')
@@ -138,7 +140,9 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
   }
 
-  // ── Calificación — va primero ──
+  const trabajosActivos = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
+  const trabajosHistorial = trabajos.filter(t => ['completado', 'cancelado'].includes(t.status))
+
   if (calificando) {
     return (
       <Calificacion
@@ -256,16 +260,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* Trabajo aceptado — en progreso */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
               {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
                 <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75', borderRadius: '14px', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1D9E75' }} />
-                    <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '600' }}>
-                      🚗 El trabajador está en camino — ubicación en tiempo real
-                    </p>
+                    <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '600' }}>🚗 El trabajador está en camino — ubicación en tiempo real</p>
                   </div>
                   {trabajoSeleccionado.trabajador_lat && trabajoSeleccionado.trabajador_lng && (
                     <div style={{ height: '220px' }}>
@@ -323,6 +325,49 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* Trabajo en revisión — trabajador terminó, cliente debe confirmar */}
+          {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{
+                background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)',
+                borderRadius: '14px', padding: '20px', textAlign: 'center'
+              }}>
+                <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
+                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>
+                  ¡El trabajador terminó!
+                </p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
+                  ¿Quedó bien el trabajo? Confirma para liberar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong> al trabajador.
+                </p>
+                <button type="button"
+                  onClick={() => confirmarCompletado(trabajoSeleccionado)}
+                  disabled={loadingAccion}
+                  style={{
+                    width: '100%', padding: '14px',
+                    background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
+                    color: 'white', border: 'none', borderRadius: '12px',
+                    fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                  }}
+                >
+                  {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Historial — completado o cancelado */}
+          {['completado', 'cancelado'].includes(trabajoSeleccionado.status) && (
+            <div style={{
+              background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px', padding: '14px', textAlign: 'center',
+              fontSize: '13px', color: 'rgba(255,255,255,0.4)'
+            }}>
+              {trabajoSeleccionado.status === 'completado'
+                ? `🏁 Trabajo completado · $${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN`
+                : '❌ Trabajo cancelado'}
+            </div>
+          )}
+
           {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
             <button type="button" onClick={() => cancelarTrabajo(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               ❌ Cancelar publicación
@@ -334,6 +379,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
+  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -342,23 +388,51 @@ export default function MisPublicaciones({ onVolver, userId }) {
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Mis publicaciones</h2>
       </div>
 
+      {/* Pestañas activos / historial */}
+      <div style={{ display: 'flex', gap: '4px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+        {[['activos', '📋 Activos', trabajosActivos.length], ['historial', '🏁 Historial', trabajosHistorial.length]].map(([key, label, count]) => (
+          <button key={key} type="button" onClick={() => setPestana(key)} style={{
+            flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
+            background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+            color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
+            fontSize: '13px', fontWeight: pestana === key ? '600' : '400',
+            cursor: 'pointer', fontFamily: 'sans-serif'
+          }}>
+            {label} {count > 0 && `(${count})`}
+          </button>
+        ))}
+      </div>
+
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Cargando tus publicaciones...</div>}
 
-        {!cargando && trabajos.length === 0 && (
+        {!cargando && pestana === 'activos' && trabajosActivos.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
-            <p>No has publicado trabajos todavía.</p>
+            <p>No tienes publicaciones activas.</p>
           </div>
         )}
 
-        {trabajos.map(trabajo => {
+        {!cargando && pestana === 'historial' && trabajosHistorial.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏁</div>
+            <p>Aún no tienes trabajos completados.</p>
+          </div>
+        )}
+
+        {(pestana === 'activos' ? trabajosActivos : trabajosHistorial).map(trabajo => {
           const badge = statusBadge(trabajo)
           return (
             <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
-              background: trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)' : 'rgba(255,255,255,0.04)',
-              border: trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
+              background: trabajo.status === 'en_revision'
+                ? 'rgba(55,138,221,0.08)'
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado'
+                  ? 'rgba(186,117,23,0.08)' : 'rgba(255,255,255,0.04)',
+              border: trabajo.status === 'en_revision'
+                ? '1px solid rgba(55,138,221,0.4)'
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado'
+                  ? '1px solid rgba(186,117,23,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
               borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -376,7 +450,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
                       🚗 Trabajador en camino
                     </span>
                   )}
-                  {trabajo.trabajador_llego && (
+                  {trabajo.trabajador_llego && trabajo.status === 'aceptado' && (
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>
                       🏠 Trabajador llegó
                     </span>

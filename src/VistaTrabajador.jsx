@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import NegociacionTrabajo from './NegociacionTrabajo'
 import TrackingTrabajador from './TrackingTrabajador'
 import Calificacion from './Calificacion'
+import PerfilPublico from './PerfilPublico'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -20,6 +21,7 @@ const CATEGORIAS_ICONS = {
 export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
+  const [historial, setHistorial] = useState([])
   const [cargando, setCargando] = useState(true)
   const [trabajoSeleccionado, setTrabajoSeleccionado] = useState(null)
   const [exitoAceptar, setExitoAceptar] = useState(false)
@@ -28,18 +30,18 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
   const [loadingCompletar, setLoadingCompletar] = useState(null)
   const [tracking, setTracking] = useState(null)
   const [calificando, setCalificando] = useState(null)
+  const [verPerfilCliente, setVerPerfilCliente] = useState(null)
 
   useEffect(() => {
     cargarTrabajos()
     cargarMisTrabajos()
+    cargarHistorial()
   }, [])
 
   async function cargarTrabajos() {
     setCargando(true)
     const { data } = await supabase
-      .from('trabajos')
-      .select('*')
-      .eq('status', 'publicado')
+      .from('trabajos').select('*').eq('status', 'publicado')
       .order('creado_en', { ascending: false })
     if (data) setTrabajos(data)
     setCargando(false)
@@ -47,17 +49,25 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
 
   async function cargarMisTrabajos() {
     const { data } = await supabase
-      .from('trabajos')
-      .select('*')
+      .from('trabajos').select('*')
       .in('status', ['aceptado', 'en_revision'])
       .order('creado_en', { ascending: false })
     if (data) setMisTrabajos(data)
+  }
+
+  async function cargarHistorial() {
+    const { data } = await supabase
+      .from('trabajos').select('*')
+      .in('status', ['completado', 'cancelado'])
+      .order('creado_en', { ascending: false })
+    if (data) setHistorial(data)
   }
 
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
     await supabase.from('trabajos').update({ status: 'en_revision' }).eq('id', trabajo.id)
     await cargarMisTrabajos()
+    await cargarHistorial()
     setLoadingCompletar(null)
     setCalificando(trabajo)
   }
@@ -71,14 +81,25 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     return `hace ${Math.floor(hrs / 24)} días`
   }
 
-  // ── Calificación — va primero ──
+  // ── Perfil público del cliente ──
+  if (verPerfilCliente) {
+    return (
+      <PerfilPublico
+        usuarioId={verPerfilCliente}
+        rolVisto="cliente"
+        onVolver={() => setVerPerfilCliente(null)}
+      />
+    )
+  }
+
+  // ── Calificación ──
   if (calificando) {
     return (
       <Calificacion
         trabajo={calificando}
         userId={userId}
         rolCalificador="trabajador"
-        onCompletado={() => { setCalificando(null); cargarMisTrabajos() }}
+        onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }}
       />
     )
   }
@@ -111,7 +132,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
     )
   }
 
-  // ── Detalle del trabajo ──
+  // ── Detalle del trabajo disponible ──
   if (trabajoSeleccionado) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -167,8 +188,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                 </div>
               </div>
 
+              {/* Ver perfil del cliente */}
+              {trabajoSeleccionado.cliente_id && (
+                <button type="button"
+                  onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)}
+                  style={{
+                    width: '100%', padding: '13px',
+                    background: 'rgba(55,138,221,0.1)', color: '#378ADD',
+                    border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px',
+                    fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                  }}
+                >
+                  👤 Ver perfil del cliente
+                </button>
+              )}
+
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                🔒 Al aceptar, el pago queda protegido en escrow. Lo recibes cuando el cliente confirme que el trabajo quedó bien.
+                🔒 Al aceptar, el pago queda protegido en escrow. Lo recibes cuando el cliente confirme.
               </div>
 
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{
@@ -203,7 +239,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-            {pestana === 'disponibles' ? 'Trabajos disponibles cerca' : 'Mis trabajos aceptados'}
+            {pestana === 'disponibles' ? 'Trabajos disponibles' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
           </p>
         </div>
         <button type="button" onClick={onLogout} style={{
@@ -215,32 +251,32 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
         </button>
       </div>
 
+      {/* Pestañas — 3 ahora */}
       <div style={{
-        display: 'flex', gap: '8px', padding: '10px 16px',
+        display: 'flex', gap: '6px', padding: '10px 16px',
         borderBottom: '0.5px solid rgba(255,255,255,0.08)', background: '#0D0D0D'
       }}>
-        <button type="button" onClick={() => setPestana('disponibles')} style={{
-          flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
-          background: pestana === 'disponibles' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-          color: pestana === 'disponibles' ? 'white' : 'rgba(255,255,255,0.5)',
-          fontSize: '13px', fontWeight: pestana === 'disponibles' ? '600' : '400',
-          cursor: 'pointer', fontFamily: 'sans-serif'
-        }}>
-          🔍 Disponibles {trabajos.length > 0 && `(${trabajos.length})`}
-        </button>
-        <button type="button" onClick={() => setPestana('mis')} style={{
-          flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
-          background: pestana === 'mis' ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-          color: pestana === 'mis' ? 'white' : 'rgba(255,255,255,0.5)',
-          fontSize: '13px', fontWeight: pestana === 'mis' ? '600' : '400',
-          cursor: 'pointer', fontFamily: 'sans-serif'
-        }}>
-          ✅ Mis trabajos {misTrabajos.length > 0 && `(${misTrabajos.length})`}
-        </button>
+        {[
+          ['disponibles', '🔍', trabajos.length],
+          ['mis', '✅', misTrabajos.length],
+          ['historial', '🏁', historial.length],
+        ].map(([key, icon, count]) => (
+          <button key={key} type="button" onClick={() => setPestana(key)} style={{
+            flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px',
+            background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+            color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
+            fontSize: '12px', fontWeight: pestana === key ? '600' : '400',
+            cursor: 'pointer', fontFamily: 'sans-serif'
+          }}>
+            {icon} {key === 'disponibles' ? 'Disponibles' : key === 'mis' ? 'Activos' : 'Historial'}
+            {count > 0 && ` (${count})`}
+          </button>
+        ))}
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
+        {/* ── Disponibles ── */}
         {pestana === 'disponibles' && (
           <>
             {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
@@ -276,12 +312,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
           </>
         )}
 
+        {/* ── Mis trabajos activos ── */}
         {pestana === 'mis' && (
           <>
             {misTrabajos.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔧</div>
-                <p>No has aceptado trabajos todavía.</p>
+                <p>No tienes trabajos activos.</p>
               </div>
             )}
             {misTrabajos.map(trabajo => (
@@ -309,11 +346,25 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                       {trabajo.status === 'en_revision' ? (
                         <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow al confirmar</span>
+                        <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {trabajo.cliente_id && (
+                  <button type="button"
+                    onClick={() => setVerPerfilCliente(trabajo.cliente_id)}
+                    style={{
+                      width: '100%', padding: '8px', marginBottom: '8px',
+                      background: 'rgba(55,138,221,0.08)', color: '#378ADD',
+                      border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px',
+                      fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
+                    }}
+                  >
+                    👤 Ver perfil del cliente
+                  </button>
+                )}
 
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   <button type="button" onClick={() => setTracking(trabajo)} style={{
@@ -355,6 +406,52 @@ export default function VistaTrabajador({ onLogout, userEmail, userId }) {
                     ⏳ Esperando que el cliente agende la cita
                   </div>
                 )}
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Historial ── */}
+        {pestana === 'historial' && (
+          <>
+            {historial.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏁</div>
+                <p>Aún no tienes trabajos completados.</p>
+              </div>
+            )}
+            {historial.map(trabajo => (
+              <div key={trabajo.id} style={{
+                background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.06)' : 'rgba(240,149,149,0.05)',
+                border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.2)'}`,
+                borderRadius: '16px', padding: '16px 18px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
+                      <span style={{ fontSize: '15px', fontWeight: '700', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595' }}>
+                        ${trabajo.precio_acordado || trabajo.presupuesto}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
+                      {trabajo.descripcion}
+                    </p>
+                    <span style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block',
+                      background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)',
+                      color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595',
+                      border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.4)' : 'rgba(240,149,149,0.3)'}`,
+                      fontWeight: '500'
+                    }}>
+                      {trabajo.status === 'completado' ? '🏁 Completado' : '❌ Cancelado'}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>
+                      {tiempoTranscurrido(trabajo.creado_en)}
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </>
