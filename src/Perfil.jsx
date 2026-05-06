@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import VerificacionChofer from './VerificacionChofer'
 
 const CATEGORIAS_DISPONIBLES = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -35,8 +36,12 @@ const CATEGORIAS_DISPONIBLES = [
   { icon: '📐', nombre: 'Topógrafo' },
   { icon: '🧱', nombre: 'Albañil' },
   { icon: '🚕', nombre: 'Taxi / Chofer' },
+  { icon: '🏍️', nombre: 'Moto taxi' },
+  { icon: '🛵', nombre: 'Repartidor moto' },
   { icon: '🛍️', nombre: 'Mandados' },
 ]
+
+const CATEGORIAS_CHOFER = ['Taxi / Chofer', 'Moto taxi', 'Repartidor moto', 'Repartidor', 'Fletes', 'Mandados']
 
 const RADIOS = [
   { valor: 1000, label: '1 km', desc: 'Solo mi colonia' },
@@ -69,10 +74,13 @@ export default function Perfil({ userId, userEmail, onVolver }) {
   const [errores, setErrores] = useState({})
   const [pestana, setPestana] = useState('info')
   const [editando, setEditando] = useState(false)
+  const [verificandoChofer, setVerificandoChofer] = useState(false)
+  const [verificacion, setVerificacion] = useState(null)
 
   useEffect(() => {
     cargarPerfil()
     obtenerUbicacion()
+    cargarVerificacion()
   }, [])
 
   function obtenerUbicacion() {
@@ -94,10 +102,15 @@ export default function Perfil({ userId, userEmail, onVolver }) {
       setFotoUrl(data.foto_url || null)
       if (data.lat && data.lng) setUbicacion([data.lat, data.lng])
     } else {
-      // Si no existe perfil aún, entrar directo en modo edición
       setEditando(true)
     }
     setLoading(false)
+  }
+
+  async function cargarVerificacion() {
+    const { data } = await supabase
+      .from('verificaciones').select('*').eq('usuario_id', userId).maybeSingle()
+    if (data) setVerificacion(data)
   }
 
   async function subirFoto(e) {
@@ -159,6 +172,17 @@ export default function Perfil({ userId, userEmail, onVolver }) {
     cargarPerfil()
   }
 
+  const necesitaVerificacion = esTrabajador &&
+    categoriasServicio.some(c => CATEGORIAS_CHOFER.includes(c))
+
+  const statusVerificacion = () => {
+    if (!verificacion) return null
+    if (verificacion.status === 'aprobado') return { icon: '✅', texto: 'Chofer verificado', color: '#1D9E75', bg: 'rgba(29,158,117,0.1)', border: 'rgba(29,158,117,0.3)' }
+    if (verificacion.status === 'pendiente') return { icon: '⏳', texto: 'Verificación en revisión', color: '#E8A030', bg: 'rgba(186,117,23,0.1)', border: 'rgba(186,117,23,0.3)' }
+    if (verificacion.status === 'rechazado') return { icon: '❌', texto: 'Verificación rechazada', color: '#F09595', bg: 'rgba(240,149,149,0.1)', border: 'rgba(240,149,149,0.3)' }
+    return null
+  }
+
   const iniciales = nombre
     ? nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : userEmail?.[0]?.toUpperCase() || '?'
@@ -174,18 +198,26 @@ export default function Perfil({ userId, userEmail, onVolver }) {
     cursor: editando ? 'text' : 'default',
   })
 
+  // ── Verificación chofer ──
+  if (verificandoChofer) {
+    return (
+      <VerificacionChofer
+        userId={userId}
+        onVolver={() => setVerificandoChofer(false)}
+        onCompletado={() => {
+          setVerificandoChofer(false)
+          cargarVerificacion()
+        }}
+      />
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
       {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-      }}>
-        <button type="button" onClick={onVolver} style={{
-          background: 'transparent', color: 'rgba(255,255,255,0.6)',
-          border: 'none', fontSize: '20px', cursor: 'pointer'
-        }}>←</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi perfil</h2>
         {!editando && !loading && (
           <button type="button" onClick={() => setEditando(true)} style={{
@@ -198,48 +230,26 @@ export default function Perfil({ userId, userEmail, onVolver }) {
           </button>
         )}
         {editando && (
-          <span style={{ fontSize: '12px', color: '#E8A030', fontWeight: '500' }}>
-            Modo edición
-          </span>
+          <span style={{ fontSize: '12px', color: '#E8A030', fontWeight: '500' }}>Modo edición</span>
         )}
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.3)' }}>
-          Cargando perfil...
-        </div>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.3)' }}>Cargando perfil...</div>
       ) : (
         <>
           {/* Avatar */}
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: '12px', padding: '24px 20px 0'
-          }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '24px 20px 0' }}>
             <div style={{ position: 'relative' }}>
               {fotoUrl ? (
-                <img src={fotoUrl} alt="avatar" style={{
-                  width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover',
-                  border: `3px solid ${errores.foto ? '#F09595' : 'rgba(29,158,117,0.4)'}`
-                }} />
+                <img src={fotoUrl} alt="avatar" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${errores.foto ? '#F09595' : 'rgba(29,158,117,0.4)'}` }} />
               ) : (
-                <div style={{
-                  width: '80px', height: '80px', borderRadius: '50%',
-                  background: errores.foto ? 'linear-gradient(135deg, #F09595, #c06060)' : 'linear-gradient(135deg, #1D9E75, #0d6b50)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '28px', fontWeight: '700', color: 'white',
-                  border: `3px solid ${errores.foto ? '#F09595' : 'rgba(29,158,117,0.4)'}`
-                }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: errores.foto ? 'linear-gradient(135deg, #F09595, #c06060)' : 'linear-gradient(135deg, #1D9E75, #0d6b50)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: 'white', border: `3px solid ${errores.foto ? '#F09595' : 'rgba(29,158,117,0.4)'}` }}>
                   {iniciales}
                 </div>
               )}
               {editando && (
-                <label style={{
-                  position: 'absolute', bottom: 0, right: 0,
-                  background: errores.foto ? '#F09595' : '#1D9E75',
-                  borderRadius: '50%', width: '26px', height: '26px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', fontSize: '14px', border: '2px solid #0D0D0D'
-                }}>
+                <label style={{ position: 'absolute', bottom: 0, right: 0, background: errores.foto ? '#F09595' : '#1D9E75', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', border: '2px solid #0D0D0D' }}>
                   {subiendoFoto ? '⏳' : '📷'}
                   <input type="file" accept="image/*" onChange={subirFoto} style={{ display: 'none' }} />
                 </label>
@@ -250,7 +260,7 @@ export default function Perfil({ userId, userEmail, onVolver }) {
 
             {editando && esTrabajador && !fotoUrl && !errores.foto && (
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: '280px' }}>
-                📷 Los clientes necesitan ver tu foto. Toca el ícono de cámara para agregar tu selfie.
+                📷 Los clientes necesitan ver tu foto. Toca el ícono de cámara.
               </div>
             )}
 
@@ -259,28 +269,19 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{userEmail}</p>
             </div>
 
-            {/* Toggle cliente/trabajador — solo en modo edición */}
-            <div style={{
-              display: 'flex', gap: '4px',
-              background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '4px',
-              opacity: editando ? 1 : 0.6
-            }}>
-              <button type="button" onClick={() => editando && setEsTrabajador(false)} style={{
-                padding: '8px 16px', borderRadius: '10px', border: 'none',
-                background: !esTrabajador ? '#1D9E75' : 'transparent',
-                color: !esTrabajador ? 'white' : 'rgba(255,255,255,0.5)',
-                fontSize: '13px', fontWeight: '500',
-                cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif'
-              }}>
+            {/* Badge verificación chofer */}
+            {statusVerificacion() && (
+              <div style={{ background: statusVerificacion().bg, border: `0.5px solid ${statusVerificacion().border}`, borderRadius: '100px', padding: '5px 14px', fontSize: '12px', color: statusVerificacion().color, fontWeight: '600' }}>
+                {statusVerificacion().icon} {statusVerificacion().texto}
+              </div>
+            )}
+
+            {/* Toggle cliente/trabajador */}
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '4px', opacity: editando ? 1 : 0.6 }}>
+              <button type="button" onClick={() => editando && setEsTrabajador(false)} style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !esTrabajador ? '#1D9E75' : 'transparent', color: !esTrabajador ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif' }}>
                 🛍️ Cliente
               </button>
-              <button type="button" onClick={() => editando && setEsTrabajador(true)} style={{
-                padding: '8px 16px', borderRadius: '10px', border: 'none',
-                background: esTrabajador ? '#1D9E75' : 'transparent',
-                color: esTrabajador ? 'white' : 'rgba(255,255,255,0.5)',
-                fontSize: '13px', fontWeight: '500',
-                cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif'
-              }}>
+              <button type="button" onClick={() => editando && setEsTrabajador(true)} style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: esTrabajador ? '#1D9E75' : 'transparent', color: esTrabajador ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif' }}>
                 🔧 Trabajador
               </button>
             </div>
@@ -289,13 +290,7 @@ export default function Perfil({ userId, userEmail, onVolver }) {
           {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
             {[['info', 'Información'], ['servicios', 'Mis servicios']].map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setPestana(key)} style={{
-                flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
-                background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-                color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
-                fontSize: '13px', fontWeight: pestana === key ? '600' : '400',
-                cursor: 'pointer', fontFamily: 'sans-serif'
-              }}>
+              <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 {label}
               </button>
             ))}
@@ -316,10 +311,9 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Nombre completo {editando && '*'}
                   </p>
-                  <input type="text" placeholder="Tu nombre completo"
-                    value={nombre} onChange={e => { setNombre(e.target.value); setErrores(p => ({ ...p, nombre: null })) }}
-                    disabled={!editando}
-                    style={inputStyle(errores.nombre)}
+                  <input type="text" placeholder="Tu nombre completo" value={nombre}
+                    onChange={e => { setNombre(e.target.value); setErrores(p => ({ ...p, nombre: null })) }}
+                    disabled={!editando} style={inputStyle(errores.nombre)}
                   />
                   {errores.nombre && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '4px' }}>{errores.nombre}</p>}
                 </div>
@@ -330,8 +324,7 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   </p>
                   <textarea placeholder="Cuéntanos sobre ti o tu servicio..."
                     value={bio} onChange={e => { setBio(e.target.value); setErrores(p => ({ ...p, bio: null })) }}
-                    rows={3} disabled={!editando}
-                    style={{ ...inputStyle(errores.bio), resize: 'none' }}
+                    rows={3} disabled={!editando} style={{ ...inputStyle(errores.bio), resize: 'none' }}
                   />
                   {errores.bio && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '4px' }}>{errores.bio}</p>}
                 </div>
@@ -375,17 +368,14 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                       {errores.categorias && <p style={{ color: '#F09595', fontSize: '12px', marginBottom: '8px' }}>{errores.categorias}</p>}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                         {CATEGORIAS_DISPONIBLES.map(cat => (
-                          <button key={cat.nombre} type="button"
-                            onClick={() => toggleCategoria(cat.nombre)}
-                            style={{
-                              background: categoriasServicio.includes(cat.nombre) ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.05)',
-                              border: categoriasServicio.includes(cat.nombre) ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.1)',
-                              borderRadius: '12px', padding: '10px 6px',
-                              cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                              opacity: editando ? 1 : 0.7
-                            }}
-                          >
+                          <button key={cat.nombre} type="button" onClick={() => toggleCategoria(cat.nombre)} style={{
+                            background: categoriasServicio.includes(cat.nombre) ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.05)',
+                            border: categoriasServicio.includes(cat.nombre) ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.1)',
+                            borderRadius: '12px', padding: '10px 6px',
+                            cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                            opacity: editando ? 1 : 0.7
+                          }}>
                             <span style={{ fontSize: '20px' }}>{cat.icon}</span>
                             <span style={{ fontSize: '9px', color: categoriasServicio.includes(cat.nombre) ? '#1D9E75' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: '1.2' }}>
                               {cat.nombre}
@@ -395,23 +385,55 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                       </div>
                     </div>
 
+                    {/* Botón verificación chofer */}
+                    {necesitaVerificacion && (
+                      <div>
+                        {!verificacion ? (
+                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{
+                            width: '100%', padding: '14px',
+                            background: 'rgba(55,138,221,0.1)', color: '#378ADD',
+                            border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px',
+                            fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                          }}>
+                            🚗 Verificarme como chofer — requerido
+                          </button>
+                        ) : verificacion.status === 'rechazado' ? (
+                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{
+                            width: '100%', padding: '14px',
+                            background: 'rgba(240,149,149,0.1)', color: '#F09595',
+                            border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px',
+                            fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+                          }}>
+                            ❌ Verificación rechazada — volver a enviar
+                          </button>
+                        ) : (
+                          <div style={{
+                            padding: '12px 16px', borderRadius: '12px', textAlign: 'center',
+                            background: verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.1)' : 'rgba(186,117,23,0.1)',
+                            border: `0.5px solid ${verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.3)' : 'rgba(186,117,23,0.3)'}`,
+                            fontSize: '13px', color: verificacion.status === 'aprobado' ? '#1D9E75' : '#E8A030', fontWeight: '500'
+                          }}>
+                            {verificacion.status === 'aprobado' ? '✅ Chofer verificado' : '⏳ Documentos en revisión — hasta 24 hrs'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Radio de alertas */}
                     <div>
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Radio de alertas — {radioActual?.label} · {radioActual?.desc}
                       </p>
                       <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
                         {RADIOS.map(r => (
-                          <button key={r.valor} type="button"
-                            onClick={() => editando && setRadioAlertas(r.valor)}
-                            style={{
-                              padding: '8px 14px', borderRadius: '20px', border: 'none',
-                              background: radioAlertas === r.valor ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-                              color: radioAlertas === r.valor ? 'white' : 'rgba(255,255,255,0.5)',
-                              fontSize: '12px', fontWeight: radioAlertas === r.valor ? '600' : '400',
-                              cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif',
-                              opacity: editando ? 1 : 0.7
-                            }}
-                          >
+                          <button key={r.valor} type="button" onClick={() => editando && setRadioAlertas(r.valor)} style={{
+                            padding: '8px 14px', borderRadius: '20px', border: 'none',
+                            background: radioAlertas === r.valor ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+                            color: radioAlertas === r.valor ? 'white' : 'rgba(255,255,255,0.5)',
+                            fontSize: '12px', fontWeight: radioAlertas === r.valor ? '600' : '400',
+                            cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif', opacity: editando ? 1 : 0.7
+                          }}>
                             {r.label}
                           </button>
                         ))}
@@ -419,18 +441,11 @@ export default function Perfil({ userId, userEmail, onVolver }) {
 
                       {ubicacion && (
                         <div style={{ height: '220px', borderRadius: '14px', overflow: 'hidden', border: '0.5px solid rgba(29,158,117,0.3)' }}>
-                          <MapContainer
-                            center={ubicacion}
-                            zoom={radioAlertas >= 10000 ? 12 : radioAlertas >= 5000 ? 13 : radioAlertas >= 3000 ? 14 : 15}
-                            style={{ height: '100%', width: '100%' }}
-                            zoomControl={false}
-                          >
+                          <MapContainer center={ubicacion} zoom={radioAlertas >= 10000 ? 12 : radioAlertas >= 5000 ? 13 : radioAlertas >= 3000 ? 14 : 15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
                             <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                             <CentrarMapa center={ubicacion} />
                             {radioAlertas < 999000 && (
-                              <Circle center={ubicacion} radius={radioAlertas}
-                                pathOptions={{ color: '#1D9E75', fillColor: '#1D9E75', fillOpacity: 0.15, weight: 2, dashArray: '6 4' }}
-                              />
+                              <Circle center={ubicacion} radius={radioAlertas} pathOptions={{ color: '#1D9E75', fillColor: '#1D9E75', fillOpacity: 0.15, weight: 2, dashArray: '6 4' }} />
                             )}
                           </MapContainer>
                         </div>
@@ -456,22 +471,12 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               ∴ 👁 ∴
             </div>
 
-            {/* Botones solo en modo edición */}
             {editando && (
               <>
-                <button type="button" onClick={guardarPerfil} disabled={guardando} style={{
-                  width: '100%', padding: '16px',
-                  background: guardando ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                  color: 'white', border: 'none', borderRadius: '14px',
-                  fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-                }}>
+                <button type="button" onClick={guardarPerfil} disabled={guardando} style={{ width: '100%', padding: '16px', background: guardando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   {guardando ? 'Guardando...' : '💾 Guardar cambios'}
                 </button>
-                <button type="button" onClick={cancelarEdicion} style={{
-                  width: '100%', padding: '14px', background: 'transparent',
-                  color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
-                  borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
-                }}>
+                <button type="button" onClick={cancelarEdicion} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   Cancelar
                 </button>
               </>

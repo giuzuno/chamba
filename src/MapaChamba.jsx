@@ -6,6 +6,7 @@ import L from 'leaflet'
 import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
 import Perfil from './Perfil'
+import PublicarViaje from './PublicarViaje'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -23,6 +24,101 @@ const TRABAJADORES_PRUEBA = [
   { id: 4, nombre: 'Rosa Vega', oficio: 'Limpieza', rating: 5.0, lat: 16.1860, lng: -95.2040 },
   { id: 5, nombre: 'Luis Torres', oficio: 'Pintor', rating: 4.6, lat: 16.1810, lng: -95.1990 },
 ]
+
+// ── Pantalla de selección: Servicio o Viaje ──
+function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>¿Qué necesitas?</h2>
+      </div>
+
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '8px' }}>
+          Selecciona el tipo de servicio que quieres publicar
+        </p>
+
+        {/* Opción Servicio */}
+        <button type="button" onClick={onServicio} style={{
+          background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
+          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
+        }}>
+          <div style={{
+            width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0,
+            background: 'rgba(29,158,117,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px'
+          }}>
+            🔧
+          </div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>
+              Contratar un servicio
+            </p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+              Electricista, Plomero, Pintor, Limpieza y más de 30 oficios disponibles
+            </p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {['⚡', '🔧', '🍳', '🧹', '🖌️', '🔑'].map(e => (
+                <span key={e} style={{ fontSize: '18px' }}>{e}</span>
+              ))}
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>+26 más</span>
+            </div>
+          </div>
+        </button>
+
+        {/* Opción Viaje */}
+        <button type="button" onClick={onViaje} style={{
+          background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
+          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
+        }}>
+          <div style={{
+            width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0,
+            background: 'rgba(55,138,221,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px'
+          }}>
+            🚕
+          </div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>
+              Solicitar un viaje
+            </p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+              Taxi, repartidor o flete — elige origen y destino en el mapa
+            </p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              {[['🚕', 'Taxi'], ['🛵', 'Repartidor'], ['🚛', 'Flete']].map(([icon, label]) => (
+                <span key={label} style={{
+                  fontSize: '11px', padding: '3px 10px', borderRadius: '100px',
+                  background: 'rgba(55,138,221,0.15)', color: '#378ADD',
+                  border: '0.5px solid rgba(55,138,221,0.3)'
+                }}>
+                  {icon} {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </button>
+
+        {/* Separador masónico */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
+          <span style={{ color: 'rgba(255,255,255,0.06)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
+          Todo dentro de Chamba — seguro y con escrow
+        </p>
+
+      </div>
+    </div>
+  )
+}
 
 export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
   const [trabajadores, setTrabajadores] = useState(TRABAJADORES_PRUEBA)
@@ -61,8 +157,23 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
     ? trabajadores
     : trabajadores.filter(t => t.oficio === categoriaFiltro)
 
+  // ── Pantallas ──
+  if (pantalla === 'seleccionar') {
+    return (
+      <SeleccionarTipoPublicacion
+        onVolver={() => setPantalla('mapa')}
+        onServicio={() => setPantalla('publicar')}
+        onViaje={() => setPantalla('viaje')}
+      />
+    )
+  }
+
   if (pantalla === 'publicar') {
-    return <PublicarTrabajo onVolver={() => setPantalla('mapa')} userId={userId} />
+    return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  }
+
+  if (pantalla === 'viaje') {
+    return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   }
 
   if (pantalla === 'publicaciones') {
@@ -152,7 +263,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
           <button key={label} type="button"
             onClick={() => {
               if (label === 'Mapa') setPantalla('mapa')
-              if (label === 'Publicar') setPantalla('publicar')
+              if (label === 'Publicar') setPantalla('seleccionar')
               if (label === 'Mis trabajos') setPantalla('publicaciones')
               if (label === 'Trabajador') onCambiarModo()
               if (label === 'Perfil') setPantalla('perfil')
@@ -160,7 +271,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
             style={{
               background: 'transparent', border: 'none',
               color: (pantalla === 'mapa' && label === 'Mapa') ||
-                     (pantalla === 'publicar' && label === 'Publicar') ||
+                     (['seleccionar','publicar','viaje'].includes(pantalla) && label === 'Publicar') ||
                      (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
                      (pantalla === 'perfil' && label === 'Perfil')
                 ? '#1D9E75' : 'rgba(255,255,255,0.5)',
