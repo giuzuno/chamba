@@ -59,6 +59,22 @@ function CentrarMapa({ center }) {
   return null
 }
 
+function EstrellaRating({ rating }) {
+  if (!rating) return <span style={{ fontSize: '22px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>— </span>
+  const llenas = Math.floor(rating)
+  const media = rating % 1 >= 0.5
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'center' }}>
+      {[1,2,3,4,5].map(i => (
+        <span key={i} style={{ fontSize: '16px', color: i <= llenas ? '#F5A623' : (i === llenas + 1 && media) ? '#F5A623' : 'rgba(255,255,255,0.2)' }}>
+          {i <= llenas ? '★' : (i === llenas + 1 && media) ? '⭐' : '☆'}
+        </span>
+      ))}
+      <span style={{ fontSize: '14px', fontWeight: '700', color: '#F5A623', marginLeft: '4px' }}>{rating}</span>
+    </div>
+  )
+}
+
 export default function Perfil({ userId, userEmail, onVolver }) {
   const [nombre, setNombre] = useState('')
   const [bio, setBio] = useState('')
@@ -76,11 +92,15 @@ export default function Perfil({ userId, userEmail, onVolver }) {
   const [editando, setEditando] = useState(false)
   const [verificandoChofer, setVerificandoChofer] = useState(false)
   const [verificacion, setVerificacion] = useState(null)
+  const [ratingReal, setRatingReal] = useState(null)
+  const [totalTrabajos, setTotalTrabajos] = useState(0)
+  const [resenas, setResenas] = useState([])
 
   useEffect(() => {
     cargarPerfil()
     obtenerUbicacion()
     cargarVerificacion()
+    cargarStats()
   }, [])
 
   function obtenerUbicacion() {
@@ -105,6 +125,21 @@ export default function Perfil({ userId, userEmail, onVolver }) {
       setEditando(true)
     }
     setLoading(false)
+  }
+
+  async function cargarStats() {
+    const { data } = await supabase
+      .from('calificaciones')
+      .select('estrellas, comentario, creado_en, calificador_id')
+      .eq('calificado_id', userId)
+      .order('creado_en', { ascending: false })
+
+    if (data && data.length > 0) {
+      const promedio = data.reduce((acc, c) => acc + c.estrellas, 0) / data.length
+      setRatingReal(parseFloat(promedio.toFixed(1)))
+      setTotalTrabajos(data.length)
+      setResenas(data.filter(c => c.comentario))
+    }
   }
 
   async function cargarVerificacion() {
@@ -157,6 +192,8 @@ export default function Perfil({ userId, userEmail, onVolver }) {
       es_trabajador: esTrabajador,
       categorias_servicio: categoriasServicio,
       radio_alertas: radioAlertas,
+      rating_promedio: ratingReal,
+      total_trabajos: totalTrabajos,
     }
     if (ubicacion) { datos.lat = ubicacion[0]; datos.lng = ubicacion[1] }
     await supabase.from('usuarios').upsert(datos)
@@ -198,16 +235,12 @@ export default function Perfil({ userId, userEmail, onVolver }) {
     cursor: editando ? 'text' : 'default',
   })
 
-  // ── Verificación chofer ──
   if (verificandoChofer) {
     return (
       <VerificacionChofer
         userId={userId}
         onVolver={() => setVerificandoChofer(false)}
-        onCompletado={() => {
-          setVerificandoChofer(false)
-          cargarVerificacion()
-        }}
+        onCompletado={() => { setVerificandoChofer(false); cargarVerificacion() }}
       />
     )
   }
@@ -220,18 +253,11 @@ export default function Perfil({ userId, userEmail, onVolver }) {
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi perfil</h2>
         {!editando && !loading && (
-          <button type="button" onClick={() => setEditando(true)} style={{
-            background: 'rgba(29,158,117,0.15)', color: '#1D9E75',
-            border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px',
-            padding: '6px 14px', fontSize: '13px', fontWeight: '600',
-            cursor: 'pointer', fontFamily: 'sans-serif'
-          }}>
+          <button type="button" onClick={() => setEditando(true)} style={{ background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px', padding: '6px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             ✏️ Editar
           </button>
         )}
-        {editando && (
-          <span style={{ fontSize: '12px', color: '#E8A030', fontWeight: '500' }}>Modo edición</span>
-        )}
+        {editando && <span style={{ fontSize: '12px', color: '#E8A030', fontWeight: '500' }}>Modo edición</span>}
       </div>
 
       {loading ? (
@@ -257,7 +283,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             </div>
 
             {errores.foto && <p style={{ color: '#F09595', fontSize: '12px', textAlign: 'center', maxWidth: '240px' }}>📷 {errores.foto}</p>}
-
             {editando && esTrabajador && !fotoUrl && !errores.foto && (
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: '280px' }}>
                 📷 Los clientes necesitan ver tu foto. Toca el ícono de cámara.
@@ -269,14 +294,12 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{userEmail}</p>
             </div>
 
-            {/* Badge verificación chofer */}
             {statusVerificacion() && (
               <div style={{ background: statusVerificacion().bg, border: `0.5px solid ${statusVerificacion().border}`, borderRadius: '100px', padding: '5px 14px', fontSize: '12px', color: statusVerificacion().color, fontWeight: '600' }}>
                 {statusVerificacion().icon} {statusVerificacion().texto}
               </div>
             )}
 
-            {/* Toggle cliente/trabajador */}
             <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '4px', opacity: editando ? 1 : 0.6 }}>
               <button type="button" onClick={() => editando && setEsTrabajador(false)} style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !esTrabajador ? '#1D9E75' : 'transparent', color: !esTrabajador ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif' }}>
                 🛍️ Cliente
@@ -289,9 +312,9 @@ export default function Perfil({ userId, userEmail, onVolver }) {
 
           {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
-            {[['info', 'Información'], ['servicios', 'Mis servicios']].map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                {label}
+            {[['info', 'Información'], ['servicios', 'Mis servicios'], ['resenas', 'Reseñas']].map(([key, label]) => (
+              <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                {label} {key === 'resenas' && totalTrabajos > 0 && `(${totalTrabajos})`}
               </button>
             ))}
           </div>
@@ -329,15 +352,21 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   {errores.bio && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '4px' }}>{errores.bio}</p>}
                 </div>
 
-                {/* Stats */}
+                {/* Stats reales */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>⭐ 5.0</p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Calificación</p>
+                    {ratingReal ? (
+                      <EstrellaRating rating={ratingReal} />
+                    ) : (
+                      <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificar</p>
+                    )}
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '6px' }}>Calificación</p>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>0</p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Trabajos</p>
+                    <p style={{ fontSize: '28px', fontWeight: '700', color: '#1D9E75' }}>{totalTrabajos}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+                      {totalTrabajos === 1 ? 'Trabajo' : 'Trabajos'}
+                    </p>
                   </div>
                 </div>
 
@@ -346,6 +375,60 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   <span style={{ color: 'rgba(255,255,255,0.1)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
                   <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
                 </div>
+              </>
+            )}
+
+            {/* ── Reseñas ── */}
+            {pestana === 'resenas' && (
+              <>
+                {totalTrabajos === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>⭐</div>
+                    <p>Aún no tienes calificaciones.</p>
+                    <p style={{ fontSize: '12px', marginTop: '8px' }}>Completa trabajos para recibir reseñas.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Resumen */}
+                    <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '48px', fontWeight: '800', color: '#F5A623', marginBottom: '8px' }}>{ratingReal}</p>
+                      <EstrellaRating rating={ratingReal} />
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '8px' }}>
+                        Basado en {totalTrabajos} {totalTrabajos === 1 ? 'calificación' : 'calificaciones'}
+                      </p>
+                    </div>
+
+                    {/* Lista de reseñas con comentario */}
+                    {resenas.length > 0 ? (
+                      resenas.map((r, i) => (
+                        <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #378ADD, #1a5fa8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: 'white' }}>
+                              👤
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', gap: '2px' }}>
+                                {[1,2,3,4,5].map(s => (
+                                  <span key={s} style={{ fontSize: '12px', color: s <= r.estrellas ? '#F5A623' : 'rgba(255,255,255,0.2)' }}>★</span>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                                {new Date(r.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', fontStyle: 'italic' }}>
+                            "{r.comentario}"
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>
+                        Tienes {totalTrabajos} calificaciones pero sin comentarios escritos aún.
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
 
@@ -385,55 +468,31 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                       </div>
                     </div>
 
-                    {/* Botón verificación chofer */}
                     {necesitaVerificacion && (
                       <div>
                         {!verificacion ? (
-                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{
-                            width: '100%', padding: '14px',
-                            background: 'rgba(55,138,221,0.1)', color: '#378ADD',
-                            border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px',
-                            fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                          }}>
+                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{ width: '100%', padding: '14px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                             🚗 Verificarme como chofer — requerido
                           </button>
                         ) : verificacion.status === 'rechazado' ? (
-                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{
-                            width: '100%', padding: '14px',
-                            background: 'rgba(240,149,149,0.1)', color: '#F09595',
-                            border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px',
-                            fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-                          }}>
+                          <button type="button" onClick={() => setVerificandoChofer(true)} style={{ width: '100%', padding: '14px', background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                             ❌ Verificación rechazada — volver a enviar
                           </button>
                         ) : (
-                          <div style={{
-                            padding: '12px 16px', borderRadius: '12px', textAlign: 'center',
-                            background: verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.1)' : 'rgba(186,117,23,0.1)',
-                            border: `0.5px solid ${verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.3)' : 'rgba(186,117,23,0.3)'}`,
-                            fontSize: '13px', color: verificacion.status === 'aprobado' ? '#1D9E75' : '#E8A030', fontWeight: '500'
-                          }}>
+                          <div style={{ padding: '12px 16px', borderRadius: '12px', textAlign: 'center', background: verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.1)' : 'rgba(186,117,23,0.1)', border: `0.5px solid ${verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.3)' : 'rgba(186,117,23,0.3)'}`, fontSize: '13px', color: verificacion.status === 'aprobado' ? '#1D9E75' : '#E8A030', fontWeight: '500' }}>
                             {verificacion.status === 'aprobado' ? '✅ Chofer verificado' : '⏳ Documentos en revisión — hasta 24 hrs'}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Radio de alertas */}
                     <div>
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Radio de alertas — {radioActual?.label} · {radioActual?.desc}
                       </p>
                       <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
                         {RADIOS.map(r => (
-                          <button key={r.valor} type="button" onClick={() => editando && setRadioAlertas(r.valor)} style={{
-                            padding: '8px 14px', borderRadius: '20px', border: 'none',
-                            background: radioAlertas === r.valor ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-                            color: radioAlertas === r.valor ? 'white' : 'rgba(255,255,255,0.5)',
-                            fontSize: '12px', fontWeight: radioAlertas === r.valor ? '600' : '400',
-                            cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif', opacity: editando ? 1 : 0.7
-                          }}>
+                          <button key={r.valor} type="button" onClick={() => editando && setRadioAlertas(r.valor)} style={{ padding: '8px 14px', borderRadius: '20px', border: 'none', background: radioAlertas === r.valor ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: radioAlertas === r.valor ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: radioAlertas === r.valor ? '600' : '400', cursor: editando ? 'pointer' : 'default', fontFamily: 'sans-serif', opacity: editando ? 1 : 0.7 }}>
                             {r.label}
                           </button>
                         ))}
@@ -467,9 +526,7 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               </>
             )}
 
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.06)', fontSize: '16px', letterSpacing: '8px' }}>
-              ∴ 👁 ∴
-            </div>
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.06)', fontSize: '16px', letterSpacing: '8px' }}>∴ 👁 ∴</div>
 
             {editando && (
               <>
