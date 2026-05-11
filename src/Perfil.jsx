@@ -24,14 +24,14 @@ const CATEGORIAS_DISPONIBLES = [
   { icon: '⚓', nombre: 'Soldador' },
   { icon: '🎨', nombre: 'Diseñador gráfico' },
   { icon: '📸', nombre: 'Fotógrafo' },
-  { icon: '💆', nombre: 'Masajista' },
+  
   { icon: '🐕', nombre: 'Veterinario' },
   { icon: '🖥️', nombre: 'Téc. computadoras' },
   { icon: '🏊', nombre: 'Limpieza albercas' },
-  { icon: '👶', nombre: 'Niñera' },
+
   { icon: '🎵', nombre: 'Músico' },
   { icon: '❄️', nombre: 'Téc. refrigeración' },
-  { icon: '💉', nombre: 'Enfermera' },
+
   { icon: '🎪', nombre: 'Barra de eventos' },
   { icon: '📐', nombre: 'Topógrafo' },
   { icon: '🧱', nombre: 'Albañil' },
