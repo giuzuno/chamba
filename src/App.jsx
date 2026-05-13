@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
-import MisPublicaciones from './MisPublicaciones'
-import Perfil from './Perfil'
 
 export default function App() {
   const [email, setEmail] = useState('')
@@ -11,7 +9,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
-  const [pantalla, setPantalla] = useState('mapa')
+  const [modoTrabajador, setModoTrabajador] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -42,85 +40,31 @@ export default function App() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setPantalla('mapa')
+    setModoTrabajador(false)
   }
 
   if (session) {
-    const userId = session.user.id
-    const userEmail = session.user.email
-
-    if (pantalla === 'trabajador') {
+    if (modoTrabajador) {
       return (
         <VistaTrabajador
           onLogout={handleLogout}
-          userId={userId}
-          userEmail={userEmail}
-          onCambiarModo={() => setPantalla('mapa')}
-        />
-      )
-    }
-
-    if (pantalla === 'publicaciones') {
-      return (
-        <MisPublicaciones
-          userId={userId}
-          userEmail={userEmail}
-          onVolver={() => setPantalla('mapa')}
-        />
-      )
-    }
-
-    if (pantalla === 'perfil') {
-      return (
-        <Perfil
-          userId={userId}
-          userEmail={userEmail}
-          onVolver={() => setPantalla('mapa')}
+          userId={session.user.id}
+          userEmail={session.user.email}
+          onCambiarModo={() => setModoTrabajador(false)}
         />
       )
     }
 
     return (
-      <div style={{ position: 'relative', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <MapaChamba
-            onLogout={handleLogout}
-            userId={userId}
-            userEmail={userEmail}
-            onCambiarModo={() => setPantalla('trabajador')}
-          />
-        </div>
-
-        {/* Bottom Bar */}
-        <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#111', borderTop: '0.5px solid rgba(255,255,255,0.1)',
-          display: 'flex', zIndex: 1000, paddingBottom: 'env(safe-area-inset-bottom)'
-        }}>
-          {[
-            { key: 'mapa', icon: '🗺️', label: 'Mapa' },
-            { key: 'publicaciones', icon: '📋', label: 'Mis trabajos' },
-            { key: 'trabajador', icon: '🔧', label: 'Trabajador' },
-            { key: 'perfil', icon: '👤', label: 'Perfil' },
-          ].map(tab => (
-            <button key={tab.key} type="button" onClick={() => setPantalla(tab.key)} style={{
-              flex: 1, padding: '10px 0', background: 'transparent', border: 'none',
-              color: pantalla === tab.key ? '#1D9E75' : 'rgba(255,255,255,0.4)',
-              fontSize: '20px', cursor: 'pointer', fontFamily: 'sans-serif',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
-            }}>
-              <span>{tab.icon}</span>
-              <span style={{ fontSize: '10px', fontWeight: pantalla === tab.key ? '600' : '400' }}>
-                {tab.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <MapaChamba
+        onLogout={handleLogout}
+        userId={session.user.id}
+        userEmail={session.user.email}
+        onCambiarModo={() => setModoTrabajador(true)}
+      />
     )
   }
 
-  // ── Login ──
   return (
     <div style={{
       minHeight: '100vh', background: '#0D0D0D',
@@ -139,13 +83,11 @@ export default function App() {
         </p>
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <input
-            id="email" name="email" type="email" placeholder="Tu correo"
+          <input id="email" name="email" type="email" placeholder="Tu correo"
             value={email} onChange={e => setEmail(e.target.value)} required
             style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
           />
-          <input
-            id="password" name="password" type="password" placeholder="Contraseña"
+          <input id="password" name="password" type="password" placeholder="Contraseña"
             value={password} onChange={e => setPassword(e.target.value)} required
             style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
           />
