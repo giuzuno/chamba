@@ -290,9 +290,11 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             )}
 
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{userEmail}</p>
-            </div>
+  <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
+  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+    {userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}
+  </p>
+</div>
 
             {statusVerificacion() && (
               <div style={{ background: statusVerificacion().bg, border: `0.5px solid ${statusVerificacion().border}`, borderRadius: '100px', padding: '5px 14px', fontSize: '12px', color: statusVerificacion().color, fontWeight: '600' }}>
