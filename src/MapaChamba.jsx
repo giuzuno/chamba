@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 })
 
 const SALINA_CRUZ = [16.1833, -95.2000]
-
+  
 const TRABAJADORES_PRUEBA = [
   { id: 1, nombre: 'Carlos Mendoza', oficio: 'Electricista', rating: 4.9, lat: 16.1850, lng: -95.1980 },
   { id: 2, nombre: 'Ana García', oficio: 'Cocinera', rating: 4.8, lat: 16.1820, lng: -95.2020 },
@@ -24,6 +24,7 @@ const TRABAJADORES_PRUEBA = [
   { id: 4, nombre: 'Rosa Vega', oficio: 'Limpieza', rating: 5.0, lat: 16.1860, lng: -95.2040 },
   { id: 5, nombre: 'Luis Torres', oficio: 'Pintor', rating: 4.6, lat: 16.1810, lng: -95.1990 },
 ]
+   
 
 // ── Pantalla de selección: Servicio o Viaje ──
 function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
