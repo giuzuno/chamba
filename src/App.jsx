@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
+import MisPublicaciones from './MisPublicaciones'
+import Perfil from './Perfil'
 
 export default function App() {
   const [email, setEmail] = useState('')
@@ -9,7 +11,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
-  const [modoTrabajador, setModoTrabajador] = useState(false)
+  const [pantalla, setPantalla] = useState('mapa')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,28 +42,81 @@ export default function App() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setModoTrabajador(false)
+    setPantalla('mapa')
   }
 
   if (session) {
-    if (modoTrabajador) {
+    const userId = session.user.id
+    const userEmail = session.user.email
+
+    if (pantalla === 'trabajador') {
       return (
         <VistaTrabajador
           onLogout={handleLogout}
-          userId={session.user.id}
-          userEmail={session.user.email}
-          onCambiarModo={() => setModoTrabajador(false)}
+          userId={userId}
+          userEmail={userEmail}
+          onCambiarModo={() => setPantalla('mapa')}
+        />
+      )
+    }
+
+    if (pantalla === 'publicaciones') {
+      return (
+        <MisPublicaciones
+          userId={userId}
+          userEmail={userEmail}
+          onVolver={() => setPantalla('mapa')}
+        />
+      )
+    }
+
+    if (pantalla === 'perfil') {
+      return (
+        <Perfil
+          userId={userId}
+          userEmail={userEmail}
+          onVolver={() => setPantalla('mapa')}
         />
       )
     }
 
     return (
-      <MapaChamba
-        onLogout={handleLogout}
-        userId={session.user.id}
-        userEmail={session.user.email}
-        onCambiarModo={() => setModoTrabajador(true)}
-      />
+      <div style={{ position: 'relative', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <MapaChamba
+            onLogout={handleLogout}
+            userId={userId}
+            userEmail={userEmail}
+            onCambiarModo={() => setPantalla('trabajador')}
+          />
+        </div>
+
+        {/* Bottom Bar */}
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: '#111', borderTop: '0.5px solid rgba(255,255,255,0.1)',
+          display: 'flex', zIndex: 1000, paddingBottom: 'env(safe-area-inset-bottom)'
+        }}>
+          {[
+            { key: 'mapa', icon: '🗺️', label: 'Mapa' },
+            { key: 'publicaciones', icon: '📋', label: 'Mis trabajos' },
+            { key: 'trabajador', icon: '🔧', label: 'Trabajador' },
+            { key: 'perfil', icon: '👤', label: 'Perfil' },
+          ].map(tab => (
+            <button key={tab.key} type="button" onClick={() => setPantalla(tab.key)} style={{
+              flex: 1, padding: '10px 0', background: 'transparent', border: 'none',
+              color: pantalla === tab.key ? '#1D9E75' : 'rgba(255,255,255,0.4)',
+              fontSize: '20px', cursor: 'pointer', fontFamily: 'sans-serif',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
+            }}>
+              <span>{tab.icon}</span>
+              <span style={{ fontSize: '10px', fontWeight: pantalla === tab.key ? '600' : '400' }}>
+                {tab.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     )
   }
 
