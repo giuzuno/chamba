@@ -30,6 +30,7 @@ const CATEGORIAS_ICONS = {
   'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
+  'Taxi': '🚕', 'Moto taxi': '🏍️', 'Flete': '🚛',
 }
 
 export default function MisPublicaciones({ onVolver, userId }) {
@@ -44,6 +45,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [calificando, setCalificando] = useState(null)
   const [chatAbierto, setChatAbierto] = useState(null)
   const [pestana, setPestana] = useState('activos')
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState({})
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -60,11 +62,59 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return () => supabase.removeChannel(channel)
   }, [trabajoSeleccionado])
 
+  // Realtime para mensajes nuevos
+  useEffect(() => {
+    const channel = supabase
+      .channel('mensajes-cliente')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
+        // Si el mensaje no es mío, es no leído
+        if (payload.new.emisor_id !== userId) {
+          setMensajesNoLeidos(prev => ({
+            ...prev,
+            [payload.new.trabajo_id]: (prev[payload.new.trabajo_id] || 0) + 1
+          }))
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [userId])
+
   async function cargarMisTrabajos() {
     setCargando(true)
     const { data } = await supabase.from('trabajos').select('*').order('creado_en', { ascending: false })
-    if (data) setTrabajos(data)
+    if (data) {
+      setTrabajos(data)
+      cargarMensajesNoLeidos(data)
+    }
     setCargando(false)
+  }
+
+  async function cargarMensajesNoLeidos(listaTrabajos) {
+    if (!listaTrabajos || listaTrabajos.length === 0) return
+    const ids = listaTrabajos.map(t => t.id)
+    const { data } = await supabase
+      .from('mensajes')
+      .select('trabajo_id, emisor_id')
+      .in('trabajo_id', ids)
+      .neq('emisor_id', userId)
+      .eq('leido', false)
+
+    if (data) {
+      const conteo = {}
+      data.forEach(m => {
+        conteo[m.trabajo_id] = (conteo[m.trabajo_id] || 0) + 1
+      })
+      setMensajesNoLeidos(conteo)
+    }
+  }
+
+  async function marcarMensajesLeidos(trabajoId) {
+    await supabase
+      .from('mensajes')
+      .update({ leido: true })
+      .eq('trabajo_id', trabajoId)
+      .neq('emisor_id', userId)
+    setMensajesNoLeidos(prev => ({ ...prev, [trabajoId]: 0 }))
   }
 
   async function cargarNegociaciones(trabajoId) {
@@ -146,7 +196,10 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const trabajosHistorial = trabajos.filter(t => ['completado', 'cancelado'].includes(t.status))
 
   if (chatAbierto) {
-    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
+    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
+      setChatAbierto(null)
+      marcarMensajesLeidos(chatAbierto.id)
+    }} />
   }
 
   if (calificando) {
@@ -170,6 +223,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   if (trabajoSeleccionado) {
     const badge = statusBadge(trabajoSeleccionado)
     const tieneContraoferta = trabajoSeleccionado.quien_oferto === 'trabajador' && trabajoSeleccionado.ultima_oferta
+    const noLeidos = mensajesNoLeidos[trabajoSeleccionado.id] || 0
 
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -177,17 +231,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAccion('') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi publicación</h2>
-          {/* Botón chat en el header si está aceptado */}
-          {['aceptado', 'en_revision'].includes(trabajoSeleccionado.status) && (
-            <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
-              background: 'rgba(29,158,117,0.15)', color: '#1D9E75',
-              border: '1px solid rgba(29,158,117,0.3)', borderRadius: '10px',
-              padding: '6px 12px', fontSize: '13px', fontWeight: '600',
-              cursor: 'pointer', fontFamily: 'sans-serif'
-            }}>
-              💬 Chat
-            </button>
-          )}
+          {/* Botón chat en header con badge */}
+          <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+            background: noLeidos > 0 ? 'rgba(240,149,149,0.15)' : 'rgba(29,158,117,0.15)',
+            color: noLeidos > 0 ? '#F09595' : '#1D9E75',
+            border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.4)' : 'rgba(29,158,117,0.3)'}`,
+            borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600',
+            cursor: 'pointer', fontFamily: 'sans-serif', position: 'relative', display: 'flex', alignItems: 'center', gap: '6px'
+          }}>
+            💬 Chat
+            {noLeidos > 0 && (
+              <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>
+                {noLeidos}
+              </span>
+            )}
+          </button>
         </div>
 
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -208,6 +266,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
               </span>
             </div>
           </div>
+
+          {/* Chat desde publicado — cuando trabajador manda consulta previa */}
+          {trabajoSeleccionado.status === 'publicado' && (
+            <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+              width: '100%', padding: '13px',
+              background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(55,138,221,0.08)',
+              color: noLeidos > 0 ? '#F09595' : '#378ADD',
+              border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(55,138,221,0.3)'}`,
+              borderRadius: '12px', fontSize: '14px', fontWeight: '600',
+              cursor: 'pointer', fontFamily: 'sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+            }}>
+              💬 {noLeidos > 0 ? `Ver mensajes del trabajador (${noLeidos} nuevo${noLeidos > 1 ? 's' : ''})` : 'Ver mensajes del trabajador'}
+            </button>
+          )}
 
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
@@ -276,14 +349,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-              {/* Chat */}
-              <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
-                width: '100%', padding: '13px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
-                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '12px',
-                fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+                width: '100%', padding: '13px',
+                background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
+                color: noLeidos > 0 ? '#F09595' : '#1D9E75',
+                border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
+                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
+                cursor: 'pointer', fontFamily: 'sans-serif',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}>
                 💬 Chat con el trabajador
+                {noLeidos > 0 && (
+                  <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px' }}>
+                    {noLeidos}
+                  </span>
+                )}
               </button>
 
               {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
@@ -350,12 +430,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
           {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{
-                width: '100%', padding: '13px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
-                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '12px',
-                fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
+              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+                width: '100%', padding: '13px',
+                background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
+                color: noLeidos > 0 ? '#F09595' : '#1D9E75',
+                border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
+                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
+                cursor: 'pointer', fontFamily: 'sans-serif',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}>
                 💬 Chat con el trabajador
+                {noLeidos > 0 && (
+                  <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px' }}>
+                    {noLeidos}
+                  </span>
+                )}
               </button>
               <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
@@ -435,12 +524,15 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
         {(pestana === 'activos' ? trabajosActivos : trabajosHistorial).map(trabajo => {
           const badge = statusBadge(trabajo)
+          const noLeidos = mensajesNoLeidos[trabajo.id] || 0
           return (
             <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
               background: trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)' : 'rgba(255,255,255,0.04)',
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)'
+                : noLeidos > 0 ? 'rgba(240,149,149,0.05)' : 'rgba(255,255,255,0.04)',
               border: trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
+                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)'
+                : noLeidos > 0 ? '1px solid rgba(240,149,149,0.3)' : '0.5px solid rgba(255,255,255,0.08)',
               borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -448,7 +540,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
-                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {noLeidos > 0 && (
+                        <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 7px' }}>
+                          {noLeidos}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}</span>
+                    </div>
                   </div>
                   <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>
                     {trabajo.descripcion}
