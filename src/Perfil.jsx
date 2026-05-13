@@ -292,8 +292,8 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             <div style={{ textAlign: 'center' }}>
   <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-    {userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}
-  </p>
+  {userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}
+</p>
 </div>
 
             {statusVerificacion() && (
