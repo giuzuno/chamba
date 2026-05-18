@@ -177,6 +177,8 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
     return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   }
 
+  
+
   if (pantalla === 'publicaciones') {
     return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
   }
