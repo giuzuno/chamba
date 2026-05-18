@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
+import SplashScreen from './SplashScreen'
 
 export default function App() {
   const [email, setEmail] = useState('')
@@ -10,6 +11,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
   const [modoTrabajador, setModoTrabajador] = useState(false)
+  const [mostrarSplash, setMostrarSplash] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -41,6 +43,10 @@ export default function App() {
   async function handleLogout() {
     await supabase.auth.signOut()
     setModoTrabajador(false)
+  }
+
+  if (mostrarSplash) {
+    return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
   }
 
   if (session) {
