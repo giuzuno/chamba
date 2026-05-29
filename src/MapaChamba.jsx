@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import 'leaflet/dist/leaflet.css'
@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 })
 
 const SALINA_CRUZ = [16.1833, -95.2000]
-  
+
 const TRABAJADORES_PRUEBA = [
   { id: 1, nombre: 'Carlos Mendoza', oficio: 'Electricista', rating: 4.9, lat: 16.1850, lng: -95.1980 },
   { id: 2, nombre: 'Ana García', oficio: 'Cocinera', rating: 4.8, lat: 16.1820, lng: -95.2020 },
@@ -24,101 +24,71 @@ const TRABAJADORES_PRUEBA = [
   { id: 4, nombre: 'Rosa Vega', oficio: 'Limpieza', rating: 5.0, lat: 16.1860, lng: -95.2040 },
   { id: 5, nombre: 'Luis Torres', oficio: 'Pintor', rating: 4.6, lat: 16.1810, lng: -95.1990 },
 ]
-   
 
-// ── Pantalla de selección: Servicio o Viaje ──
 function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>¿Qué necesitas?</h2>
       </div>
-
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
         <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '8px' }}>
           Selecciona el tipo de servicio que quieres publicar
         </p>
-
-        {/* Opción Servicio */}
         <button type="button" onClick={onServicio} style={{
           background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
           borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
           textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
         }}>
-          <div style={{
-            width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0,
-            background: 'rgba(29,158,117,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px'
-          }}>
-            🔧
-          </div>
+          <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🔧</div>
           <div>
-            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>
-              Contratar un servicio
-            </p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-              Electricista, Plomero, Pintor, Limpieza y más de 30 oficios disponibles
-            </p>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Contratar un servicio</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>Electricista, Plomero, Pintor, Limpieza y más de 30 oficios disponibles</p>
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-              {['⚡', '🔧', '🍳', '🧹', '🖌️', '🔑'].map(e => (
-                <span key={e} style={{ fontSize: '18px' }}>{e}</span>
-              ))}
+              {['⚡', '🔧', '🍳', '🧹', '🖌️', '🔑'].map(e => <span key={e} style={{ fontSize: '18px' }}>{e}</span>)}
               <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>+26 más</span>
             </div>
           </div>
         </button>
-
-        {/* Opción Viaje */}
         <button type="button" onClick={onViaje} style={{
           background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
           borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
           textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
         }}>
-          <div style={{
-            width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0,
-            background: 'rgba(55,138,221,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px'
-          }}>
-            🚕
-          </div>
+          <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🚕</div>
           <div>
-            <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>
-              Solicitar un viaje
-            </p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-              Taxi, repartidor o flete — elige origen y destino en el mapa
-            </p>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>Solicitar un viaje</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>Taxi, repartidor o flete — elige origen y destino en el mapa</p>
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
               {[['🚕', 'Taxi'], ['🛵', 'Repartidor'], ['🚛', 'Flete']].map(([icon, label]) => (
-                <span key={label} style={{
-                  fontSize: '11px', padding: '3px 10px', borderRadius: '100px',
-                  background: 'rgba(55,138,221,0.15)', color: '#378ADD',
-                  border: '0.5px solid rgba(55,138,221,0.3)'
-                }}>
+                <span key={label} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)' }}>
                   {icon} {label}
                 </span>
               ))}
             </div>
           </div>
         </button>
-
-        {/* Separador masónico */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
           <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
           <span style={{ color: 'rgba(255,255,255,0.06)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
           <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
         </div>
-
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
-          Todo dentro de Chamba — seguro y con escrow
-        </p>
-
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>Todo dentro de Chamba — seguro y con escrow</p>
       </div>
     </div>
   )
+}
+
+// Componente que detecta drag del mapa
+function MapaDragListener({ onDragStart, onDragEnd }) {
+  useMapEvents({
+    dragstart: () => onDragStart(),
+    dragend: () => onDragEnd(),
+    movestart: () => onDragStart(),
+    moveend: () => onDragEnd(),
+  })
+  return null
 }
 
 export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
@@ -126,6 +96,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
   const [pantalla, setPantalla] = useState('mapa')
+  const [barVisible, setBarVisible] = useState(true)
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
@@ -137,7 +108,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
       .from('trabajadores')
       .select(`id, categorias, rating_promedio, disponible, usuarios(nombre, lat, lng)`)
       .eq('disponible', true)
-
     if (data && data.length > 0) {
       const formateados = data
         .filter(t => t.usuarios?.lat && t.usuarios?.lng)
@@ -158,31 +128,18 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
     ? trabajadores
     : trabajadores.filter(t => t.oficio === categoriaFiltro)
 
-  // ── Pantallas ──
   if (pantalla === 'seleccionar') {
-    return (
-      <SeleccionarTipoPublicacion
-        onVolver={() => setPantalla('mapa')}
-        onServicio={() => setPantalla('publicar')}
-        onViaje={() => setPantalla('viaje')}
-      />
-    )
+    return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   }
-
   if (pantalla === 'publicar') {
     return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
   }
-
   if (pantalla === 'viaje') {
     return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   }
-
-  
-
   if (pantalla === 'publicaciones') {
     return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
   }
-
   if (pantalla === 'perfil') {
     return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
   }
@@ -229,6 +186,10 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
           <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapaDragListener
+            onDragStart={() => setBarVisible(false)}
+            onDragEnd={() => setBarVisible(true)}
+          />
           {trabajadoresFiltrados.map(t => (
             <Marker key={t.id} position={[t.lat, t.lng]}>
               <Popup>
@@ -250,11 +211,14 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* Bottom bar con animación */}
       <div style={{
         display: 'flex', justifyContent: 'space-around',
         padding: '12px 0', background: '#0D0D0D',
-        borderTop: '0.5px solid rgba(255,255,255,0.1)'
+        borderTop: '0.5px solid rgba(255,255,255,0.1)',
+        transform: barVisible ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.3s ease',
+        position: 'relative', zIndex: 1000
       }}>
         {[
           ['🗺️', 'Mapa'],
