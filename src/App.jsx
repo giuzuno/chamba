@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
 import SplashScreen from './SplashScreen'
+import Privacidad from './Privacidad'
 
-export default function App() {
+function AppContenido() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -60,7 +62,6 @@ export default function App() {
         />
       )
     }
-
     return (
       <MapaChamba
         onLogout={handleLogout}
@@ -113,8 +114,29 @@ export default function App() {
           }}>
             Crear cuenta
           </button>
+
+          <div style={{ textAlign: 'center', marginTop: '4px' }}>
+            <a href="/privacidad" style={{
+              color: 'rgba(255,255,255,0.3)', fontSize: '12px',
+              textDecoration: 'none'
+            }}>
+              Política de privacidad
+            </a>
+          </div>
+
         </form>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/privacidad" element={<Privacidad />} />
+        <Route path="/*" element={<AppContenido />} />
+      </Routes>
+    </BrowserRouter>
   )
 }

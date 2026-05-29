@@ -24,14 +24,11 @@ const CATEGORIAS_DISPONIBLES = [
   { icon: '⚓', nombre: 'Soldador' },
   { icon: '🎨', nombre: 'Diseñador gráfico' },
   { icon: '📸', nombre: 'Fotógrafo' },
-  
   { icon: '🐕', nombre: 'Veterinario' },
   { icon: '🖥️', nombre: 'Téc. computadoras' },
   { icon: '🏊', nombre: 'Limpieza albercas' },
-
   { icon: '🎵', nombre: 'Músico' },
   { icon: '❄️', nombre: 'Téc. refrigeración' },
-
   { icon: '🎪', nombre: 'Barra de eventos' },
   { icon: '📐', nombre: 'Topógrafo' },
   { icon: '🧱', nombre: 'Albañil' },
@@ -60,7 +57,7 @@ function CentrarMapa({ center }) {
 }
 
 function EstrellaRating({ rating }) {
-  if (!rating) return <span style={{ fontSize: '22px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>— </span>
+  if (!rating) return <span style={{ fontSize: '22px', fontWeight: '700', color: 'rgba(255,255,255,0.3)' }}>—</span>
   const llenas = Math.floor(rating)
   const media = rating % 1 >= 0.5
   return (
@@ -133,7 +130,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
       .select('estrellas, comentario, creado_en, calificador_id')
       .eq('calificado_id', userId)
       .order('creado_en', { ascending: false })
-
     if (data && data.length > 0) {
       const promedio = data.reduce((acc, c) => acc + c.estrellas, 0) / data.length
       setRatingReal(parseFloat(promedio.toFixed(1)))
@@ -248,7 +244,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi perfil</h2>
@@ -264,7 +259,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
         <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.3)' }}>Cargando perfil...</div>
       ) : (
         <>
-          {/* Avatar */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '24px 20px 0' }}>
             <div style={{ position: 'relative' }}>
               {fotoUrl ? (
@@ -290,11 +284,11 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             )}
 
             <div style={{ textAlign: 'center' }}>
-  <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
-  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-  {userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}
-</p>
-</div>
+              <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                {userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}
+              </p>
+            </div>
 
             {statusVerificacion() && (
               <div style={{ background: statusVerificacion().bg, border: `0.5px solid ${statusVerificacion().border}`, borderRadius: '100px', padding: '5px 14px', fontSize: '12px', color: statusVerificacion().color, fontWeight: '600' }}>
@@ -312,7 +306,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             </div>
           </div>
 
-          {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
             {[['info', 'Información'], ['servicios', 'Mis servicios'], ['resenas', 'Reseñas']].map(([key, label]) => (
               <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -329,7 +322,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               </div>
             )}
 
-            {/* ── Info ── */}
             {pestana === 'info' && (
               <>
                 <div>
@@ -354,21 +346,14 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   {errores.bio && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '4px' }}>{errores.bio}</p>}
                 </div>
 
-                {/* Stats reales */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                    {ratingReal ? (
-                      <EstrellaRating rating={ratingReal} />
-                    ) : (
-                      <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificar</p>
-                    )}
+                    {ratingReal ? <EstrellaRating rating={ratingReal} /> : <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificar</p>}
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '6px' }}>Calificación</p>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                     <p style={{ fontSize: '28px', fontWeight: '700', color: '#1D9E75' }}>{totalTrabajos}</p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
-                      {totalTrabajos === 1 ? 'Trabajo' : 'Trabajos'}
-                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>{totalTrabajos === 1 ? 'Trabajo' : 'Trabajos'}</p>
                   </div>
                 </div>
 
@@ -380,7 +365,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               </>
             )}
 
-            {/* ── Reseñas ── */}
             {pestana === 'resenas' && (
               <>
                 {totalTrabajos === 0 ? (
@@ -391,7 +375,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                   </div>
                 ) : (
                   <>
-                    {/* Resumen */}
                     <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
                       <p style={{ fontSize: '48px', fontWeight: '800', color: '#F5A623', marginBottom: '8px' }}>{ratingReal}</p>
                       <EstrellaRating rating={ratingReal} />
@@ -399,32 +382,24 @@ export default function Perfil({ userId, userEmail, onVolver }) {
                         Basado en {totalTrabajos} {totalTrabajos === 1 ? 'calificación' : 'calificaciones'}
                       </p>
                     </div>
-
-                    {/* Lista de reseñas con comentario */}
-                    {resenas.length > 0 ? (
-                      resenas.map((r, i) => (
-                        <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #378ADD, #1a5fa8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: 'white' }}>
-                              👤
+                    {resenas.length > 0 ? resenas.map((r, i) => (
+                      <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #378ADD, #1a5fa8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: 'white' }}>👤</div>
+                          <div>
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                              {[1,2,3,4,5].map(s => (
+                                <span key={s} style={{ fontSize: '12px', color: s <= r.estrellas ? '#F5A623' : 'rgba(255,255,255,0.2)' }}>★</span>
+                              ))}
                             </div>
-                            <div>
-                              <div style={{ display: 'flex', gap: '2px' }}>
-                                {[1,2,3,4,5].map(s => (
-                                  <span key={s} style={{ fontSize: '12px', color: s <= r.estrellas ? '#F5A623' : 'rgba(255,255,255,0.2)' }}>★</span>
-                                ))}
-                              </div>
-                              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                                {new Date(r.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </p>
-                            </div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                              {new Date(r.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
                           </div>
-                          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', fontStyle: 'italic' }}>
-                            "{r.comentario}"
-                          </p>
                         </div>
-                      ))
-                    ) : (
+                        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', fontStyle: 'italic' }}>"{r.comentario}"</p>
+                      </div>
+                    )) : (
                       <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>
                         Tienes {totalTrabajos} calificaciones pero sin comentarios escritos aún.
                       </div>
@@ -434,7 +409,6 @@ export default function Perfil({ userId, userEmail, onVolver }) {
               </>
             )}
 
-            {/* ── Servicios ── */}
             {pestana === 'servicios' && (
               <>
                 {!esTrabajador ? (
@@ -529,6 +503,12 @@ export default function Perfil({ userId, userEmail, onVolver }) {
             )}
 
             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.06)', fontSize: '16px', letterSpacing: '8px' }}>∴ 👁 ∴</div>
+
+            <div style={{ textAlign: 'center' }}>
+              <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>
+                Política de privacidad
+              </a>
+            </div>
 
             {editando && (
               <>
