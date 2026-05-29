@@ -5,6 +5,7 @@ import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
 import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
+import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 
 function AppContenido() {
   const [email, setEmail] = useState('')
@@ -15,14 +16,26 @@ function AppContenido() {
   const [modoTrabajador, setModoTrabajador] = useState(false)
   const [mostrarSplash, setMostrarSplash] = useState(true)
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
+useEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session)
+  })
+  supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session)
+  })
+}, [])
+
+useEffect(() => {
+  if (session) {
+    solicitarPermiso().then(token => {
+      if (token) console.log('Notificaciones activadas')
     })
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+    const unsubscribe = escucharNotificaciones((payload) => {
+      alert(`📬 ${payload.notification?.title}: ${payload.notification?.body}`)
     })
-  }, [])
+    return () => unsubscribe()
+  }
+}, [session])
 
   async function handleLogin(e) {
     e.preventDefault()
