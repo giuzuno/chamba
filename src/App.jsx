@@ -27,8 +27,14 @@ useEffect(() => {
 
 useEffect(() => {
   if (session) {
-    solicitarPermiso().then(token => {
-      if (token) console.log('Notificaciones activadas')
+    solicitarPermiso().then(async token => {
+      if (token) {
+        console.log('Notificaciones activadas')
+        await supabase
+          .from('usuarios')
+          .update({ fcm_token: token })
+          .eq('id', session.user.id)
+      }
     })
     const unsubscribe = escucharNotificaciones((payload) => {
       alert(`📬 ${payload.notification?.title}: ${payload.notification?.body}`)
