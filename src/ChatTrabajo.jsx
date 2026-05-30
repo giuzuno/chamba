@@ -99,6 +99,31 @@ export default function ChatTrabajo({ trabajo, userId, onVolver }) {
       contenido,
     })
 
+    if (!error) {
+      // Mandar notificación al destinatario
+      const destinatarioId = userId === trabajo.cliente_id
+        ? trabajo.trabajador_id
+        : trabajo.cliente_id
+
+      if (destinatarioId) {
+        const { data: destinatario } = await supabase
+          .from('usuarios')
+          .select('fcm_token')
+          .eq('id', destinatarioId)
+          .maybeSingle()
+
+        if (destinatario?.fcm_token) {
+          await supabase.functions.invoke('enviar-notificacion', {
+            body: {
+              token: destinatario.fcm_token,
+              titulo: '💬 Nuevo mensaje en Chamba',
+              cuerpo: contenido.substring(0, 60)
+            }
+          })
+        }
+      }
+    }
+
     if (error) console.log('Error enviando mensaje:', error)
     setTexto('')
     setEnviando(false)
