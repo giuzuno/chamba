@@ -7,41 +7,187 @@ import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 
+// ── Pantalla de selección de modo ──
+function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre }) {
+  return (
+    <div style={{
+      minHeight: '100vh', background: '#0D0D0D',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'sans-serif', padding: '24px'
+    }}>
+      {/* Logo */}
+      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>
+          chamba
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
+          Salina Cruz, Oaxaca
+        </p>
+        {nombre && (
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>
+            Hola, {nombre.split(' ')[0]} 👋
+          </p>
+        )}
+      </div>
+
+      {/* Pregunta */}
+      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '24px', textAlign: 'center' }}>
+        ¿Qué deseas hacer hoy?
+      </p>
+
+      {/* Opciones */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '360px' }}>
+
+        <button type="button" onClick={onCliente} style={{
+          background: 'rgba(29,158,117,0.08)',
+          border: '1px solid rgba(29,158,117,0.3)',
+          borderRadius: '20px', padding: '28px 24px',
+          cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
+          transition: 'all 0.2s'
+        }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0,
+            background: 'rgba(29,158,117,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'
+          }}>🛍️</div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>
+              Solicitar un servicio
+            </p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+              Busca y contrata trabajadores cerca de ti
+            </p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {['⚡', '🔧', '🍳', '🧹', '🚕', '🛵'].map(e => (
+                <span key={e} style={{ fontSize: '16px' }}>{e}</span>
+              ))}
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>+26 más</span>
+            </div>
+          </div>
+        </button>
+
+        <button type="button" onClick={onTrabajador} style={{
+          background: 'rgba(55,138,221,0.08)',
+          border: '1px solid rgba(55,138,221,0.3)',
+          borderRadius: '20px', padding: '28px 24px',
+          cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
+          transition: 'all 0.2s'
+        }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0,
+            background: 'rgba(55,138,221,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'
+          }}>🔧</div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>
+              Quiero trabajar
+            </p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+              Ve los trabajos disponibles y acepta los que te convengan
+            </p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              {['💰', '📍', '⭐'].map(e => (
+                <span key={e} style={{ fontSize: '16px' }}>{e}</span>
+              ))}
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>
+                Pago seguro con escrow
+              </span>
+            </div>
+          </div>
+        </button>
+
+      </div>
+
+      {/* Separador */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', maxWidth: '360px', margin: '24px 0 16px' }}>
+        <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
+        <span style={{ color: 'rgba(255,255,255,0.08)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
+        <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
+      </div>
+
+      <button type="button" onClick={onLogout} style={{
+        background: 'transparent', color: 'rgba(255,255,255,0.25)',
+        border: 'none', fontSize: '13px', cursor: 'pointer',
+        fontFamily: 'sans-serif'
+      }}>
+        Cerrar sesión
+      </button>
+    </div>
+  )
+}
+
 function AppContenido() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
-  const [modoTrabajador, setModoTrabajador] = useState(false)
+  const [modo, setModo] = useState(null) // null = selección, 'cliente', 'trabajador'
   const [mostrarSplash, setMostrarSplash] = useState(true)
+  const [nombreUsuario, setNombreUsuario] = useState('')
 
-useEffect(() => {
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setSession(session)
-  })
-  supabase.auth.onAuthStateChange((_event, session) => {
-    setSession(session)
-  })
-}, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (!session) setModo(null)
+    })
+  }, [])
 
-useEffect(() => {
-  if (session) {
-    solicitarPermiso().then(async token => {
-      if (token) {
-        console.log('Notificaciones activadas')
-        await supabase
-          .from('usuarios')
-          .update({ fcm_token: token })
-          .eq('id', session.user.id)
-      }
-    })
-    const unsubscribe = escucharNotificaciones((payload) => {
-      alert(`📬 ${payload.notification?.title}: ${payload.notification?.body}`)
-    })
-    return () => unsubscribe()
+  // Cargar nombre del usuario
+  useEffect(() => {
+    if (session) {
+      supabase.from('usuarios').select('nombre')
+        .eq('id', session.user.id).maybeSingle()
+        .then(({ data }) => {
+          if (data?.nombre) setNombreUsuario(data.nombre)
+        })
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (session) {
+      solicitarPermiso().then(async token => {
+        if (token) {
+          await supabase
+            .from('usuarios')
+            .update({ fcm_token: token })
+            .eq('id', session.user.id)
+        }
+      })
+      const unsubscribe = escucharNotificaciones((payload) => {
+        // Notificación en foreground — mostrar toast en lugar de alert
+        const titulo = payload.notification?.title || ''
+        const cuerpo = payload.notification?.body || ''
+        mostrarToast(`${titulo}: ${cuerpo}`)
+      })
+      return () => unsubscribe()
+    }
+  }, [session])
+
+  function mostrarToast(mensaje) {
+    const toast = document.createElement('div')
+    toast.innerText = mensaje
+    toast.style.cssText = `
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background: #1D9E75; color: white; padding: 12px 20px;
+      border-radius: 12px; font-size: 14px; font-family: sans-serif;
+      z-index: 99999; max-width: 320px; text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      animation: fadeIn 0.3s ease;
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      toast.style.opacity = '0'
+      toast.style.transition = 'opacity 0.5s'
+      setTimeout(() => document.body.removeChild(toast), 500)
+    }, 4000)
   }
-}, [session])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -63,7 +209,8 @@ useEffect(() => {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setModoTrabajador(false)
+    setModo(null)
+    setNombreUsuario('')
   }
 
   if (mostrarSplash) {
@@ -71,22 +218,35 @@ useEffect(() => {
   }
 
   if (session) {
-    if (modoTrabajador) {
+    // Pantalla de selección de modo
+    if (!modo) {
+      return (
+        <SeleccionModo
+          nombre={nombreUsuario}
+          onCliente={() => setModo('cliente')}
+          onTrabajador={() => setModo('trabajador')}
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (modo === 'trabajador') {
       return (
         <VistaTrabajador
           onLogout={handleLogout}
           userId={session.user.id}
           userEmail={session.user.email}
-          onCambiarModo={() => setModoTrabajador(false)}
+          onCambiarModo={() => setModo(null)}
         />
       )
     }
+
     return (
       <MapaChamba
         onLogout={handleLogout}
         userId={session.user.id}
         userEmail={session.user.email}
-        onCambiarModo={() => setModoTrabajador(true)}
+        onCambiarModo={() => setModo(null)}
       />
     )
   }
@@ -136,13 +296,11 @@ useEffect(() => {
 
           <div style={{ textAlign: 'center', marginTop: '4px' }}>
             <a href="/privacidad" style={{
-              color: 'rgba(255,255,255,0.3)', fontSize: '12px',
-              textDecoration: 'none'
+              color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none'
             }}>
               Política de privacidad
             </a>
           </div>
-
         </form>
       </div>
     </div>
