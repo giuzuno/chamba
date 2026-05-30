@@ -5,17 +5,42 @@ import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
 import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
+import Notificaciones from './Notificaciones'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 
 // ── Pantalla de selección de modo ──
-function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre }) {
+function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, onNotificaciones }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#0D0D0D',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'sans-serif', padding: '24px'
+      fontFamily: 'sans-serif', padding: '24px',
+      position: 'relative'
     }}>
+
+      {/* Campanita */}
+      <div style={{ position: 'absolute', top: '16px', right: '20px' }}>
+        <button type="button" onClick={onNotificaciones} style={{
+          background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+          borderRadius: '50%', width: '42px', height: '42px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', position: 'relative', fontSize: '18px'
+        }}>
+          🔔
+          {noLeidas > 0 && (
+            <span style={{
+              position: 'absolute', top: '-4px', right: '-4px',
+              background: '#F09595', color: 'white',
+              borderRadius: '100px', fontSize: '10px', fontWeight: '700',
+              padding: '1px 6px', minWidth: '18px', textAlign: 'center'
+            }}>
+              {noLeidas > 99 ? '99+' : noLeidas}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Logo */}
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>
@@ -45,7 +70,6 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre }) {
           borderRadius: '20px', padding: '28px 24px',
           cursor: 'pointer', fontFamily: 'sans-serif',
           textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
-          transition: 'all 0.2s'
         }}>
           <div style={{
             width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0,
@@ -74,7 +98,6 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre }) {
           borderRadius: '20px', padding: '28px 24px',
           cursor: 'pointer', fontFamily: 'sans-serif',
           textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
-          transition: 'all 0.2s'
         }}>
           <div style={{
             width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0,
@@ -125,9 +148,11 @@ function AppContenido() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [session, setSession] = useState(null)
-  const [modo, setModo] = useState(null) // null = selección, 'cliente', 'trabajador'
+  const [modo, setModo] = useState(null)
   const [mostrarSplash, setMostrarSplash] = useState(true)
   const [nombreUsuario, setNombreUsuario] = useState('')
+  const [noLeidas, setNoLeidas] = useState(0)
+  const [verNotificaciones, setVerNotificaciones] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -139,7 +164,7 @@ function AppContenido() {
     })
   }, [])
 
-  // Cargar nombre del usuario
+  // Cargar nombre
   useEffect(() => {
     if (session) {
       supabase.from('usuarios').select('nombre')
@@ -150,6 +175,31 @@ function AppContenido() {
     }
   }, [session])
 
+  // Badge notificaciones no leídas + realtime
+  useEffect(() => {
+    if (!session) return
+    cargarNoLeidas()
+    const channel = supabase
+      .channel('notificaciones-badge')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notificaciones',
+        filter: `usuario_id=eq.${session.user.id}`
+      }, () => { cargarNoLeidas() })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [session])
+
+  async function cargarNoLeidas() {
+    if (!session) return
+    const { count } = await supabase
+      .from('notificaciones')
+      .select('*', { count: 'exact', head: true })
+      .eq('usuario_id', session.user.id)
+      .eq('leida', false)
+    setNoLeidas(count || 0)
+  }
+
+  // FCM + toast
   useEffect(() => {
     if (session) {
       solicitarPermiso().then(async token => {
@@ -161,10 +211,10 @@ function AppContenido() {
         }
       })
       const unsubscribe = escucharNotificaciones((payload) => {
-        // Notificación en foreground — mostrar toast en lugar de alert
         const titulo = payload.notification?.title || ''
         const cuerpo = payload.notification?.body || ''
         mostrarToast(`${titulo}: ${cuerpo}`)
+        cargarNoLeidas()
       })
       return () => unsubscribe()
     }
@@ -179,13 +229,14 @@ function AppContenido() {
       border-radius: 12px; font-size: 14px; font-family: sans-serif;
       z-index: 99999; max-width: 320px; text-align: center;
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      animation: fadeIn 0.3s ease;
     `
     document.body.appendChild(toast)
     setTimeout(() => {
       toast.style.opacity = '0'
       toast.style.transition = 'opacity 0.5s'
-      setTimeout(() => document.body.removeChild(toast), 500)
+      setTimeout(() => {
+        if (document.body.contains(toast)) document.body.removeChild(toast)
+      }, 500)
     }, 4000)
   }
 
@@ -211,6 +262,7 @@ function AppContenido() {
     await supabase.auth.signOut()
     setModo(null)
     setNombreUsuario('')
+    setNoLeidas(0)
   }
 
   if (mostrarSplash) {
@@ -218,14 +270,25 @@ function AppContenido() {
   }
 
   if (session) {
-    // Pantalla de selección de modo
+
+    if (verNotificaciones) {
+      return (
+        <Notificaciones
+          userId={session.user.id}
+          onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }}
+        />
+      )
+    }
+
     if (!modo) {
       return (
         <SeleccionModo
           nombre={nombreUsuario}
+          noLeidas={noLeidas}
           onCliente={() => setModo('cliente')}
           onTrabajador={() => setModo('trabajador')}
           onLogout={handleLogout}
+          onNotificaciones={() => setVerNotificaciones(true)}
         />
       )
     }

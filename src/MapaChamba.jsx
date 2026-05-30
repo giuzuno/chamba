@@ -7,6 +7,7 @@ import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
 import Perfil from './Perfil'
 import PublicarViaje from './PublicarViaje'
+import Notificaciones from './Notificaciones'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -17,13 +18,20 @@ L.Icon.Default.mergeOptions({
 
 const SALINA_CRUZ = [16.1833, -95.2000]
 
-const TRABAJADORES_PRUEBA = [
-  { id: 1, nombre: 'Carlos Mendoza', oficio: 'Electricista', rating: 4.9, lat: 16.1850, lng: -95.1980 },
-  { id: 2, nombre: 'Ana García', oficio: 'Cocinera', rating: 4.8, lat: 16.1820, lng: -95.2020 },
-  { id: 3, nombre: 'Pedro Ruiz', oficio: 'Plomero', rating: 4.7, lat: 16.1800, lng: -95.1960 },
-  { id: 4, nombre: 'Rosa Vega', oficio: 'Limpieza', rating: 5.0, lat: 16.1860, lng: -95.2040 },
-  { id: 5, nombre: 'Luis Torres', oficio: 'Pintor', rating: 4.6, lat: 16.1810, lng: -95.1990 },
-]
+const CATEGORIAS_ICONS_MAPA = {
+  'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
+  'Limpieza': '🧹', 'Planchado': '👔', 'Pintor': '🖌️',
+  'Cerrajero': '🔑', 'Mecánico': '🔩', 'Téc. celulares': '📱',
+  'Fletes': '🚛', 'Costurera': '✂️', 'Clases': '📚',
+  'Jardinero': '🌿', 'Lavado autos': '🚗', 'Carpintero': '🪵',
+  'Repartidor': '🛵', 'Soldador': '⚓', 'Diseñador gráfico': '🎨',
+  'Fotógrafo': '📸', 'Masajista': '💆', 'Veterinario': '🐕',
+  'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
+  'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
+  'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
+  'Taxi / Chofer': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵',
+  'Mandados': '🛍️', 'Taxi': '🚕', 'Flete': '🚛',
+}
 
 function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
   return (
@@ -80,7 +88,6 @@ function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
   )
 }
 
-// Componente que detecta drag del mapa
 function MapaDragListener({ onDragStart, onDragEnd }) {
   useMapEvents({
     dragstart: () => onDragStart(),
@@ -92,42 +99,59 @@ function MapaDragListener({ onDragStart, onDragEnd }) {
 }
 
 export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
-  const [trabajadores, setTrabajadores] = useState(TRABAJADORES_PRUEBA)
+  const [trabajosPublicados, setTrabajosPublicados] = useState([])
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
   const [pantalla, setPantalla] = useState('mapa')
   const [barVisible, setBarVisible] = useState(true)
+  const [noLeidas, setNoLeidas] = useState(0)
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
-  useEffect(() => { cargarTrabajadores() }, [])
+  useEffect(() => {
+    cargarTrabajosPublicados()
+    cargarNoLeidas()
 
-  async function cargarTrabajadores() {
+    const channel = supabase
+      .channel('notif-badge-mapa')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notificaciones',
+        filter: `usuario_id=eq.${userId}`
+      }, () => cargarNoLeidas())
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [])
+
+  async function cargarTrabajosPublicados() {
     setCargando(true)
     const { data } = await supabase
-      .from('trabajadores')
-      .select(`id, categorias, rating_promedio, disponible, usuarios(nombre, lat, lng)`)
-      .eq('disponible', true)
-    if (data && data.length > 0) {
-      const formateados = data
-        .filter(t => t.usuarios?.lat && t.usuarios?.lng)
-        .map(t => ({
-          id: t.id,
-          nombre: t.usuarios.nombre,
-          oficio: t.categorias?.[0] || 'Servicio general',
-          rating: t.rating_promedio || 5.0,
-          lat: t.usuarios.lat,
-          lng: t.usuarios.lng,
-        }))
-      setTrabajadores(formateados)
-    }
+      .from('trabajos')
+      .select('id, categoria, descripcion, presupuesto, ultima_oferta, lat, lng, creado_en')
+      .eq('status', 'publicado')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .order('creado_en', { ascending: false })
+    if (data) setTrabajosPublicados(data)
     setCargando(false)
   }
 
-  const trabajadoresFiltrados = categoriaFiltro === 'Todos'
-    ? trabajadores
-    : trabajadores.filter(t => t.oficio === categoriaFiltro)
+  async function cargarNoLeidas() {
+    const { count } = await supabase
+      .from('notificaciones')
+      .select('*', { count: 'exact', head: true })
+      .eq('usuario_id', userId)
+      .eq('leida', false)
+    setNoLeidas(count || 0)
+  }
 
+  const trabajosFiltrados = categoriaFiltro === 'Todos'
+    ? trabajosPublicados
+    : trabajosPublicados.filter(t => t.categoria === categoriaFiltro)
+
+  if (pantalla === 'notificaciones') {
+    return <Notificaciones userId={userId} onVolver={() => { setPantalla('mapa'); cargarNoLeidas() }} />
+  }
   if (pantalla === 'seleccionar') {
     return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   }
@@ -155,13 +179,34 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
       }}>
         <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Salina Cruz, Oax.</span>
-        <button type="button" onClick={onLogout} style={{
-          background: 'transparent', color: 'rgba(255,255,255,0.4)',
-          border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
-          padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
-        }}>
-          Salir
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Campanita */}
+          <button type="button" onClick={() => setPantalla('notificaciones')} style={{
+            background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+            borderRadius: '50%', width: '36px', height: '36px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', position: 'relative', fontSize: '16px'
+          }}>
+            🔔
+            {noLeidas > 0 && (
+              <span style={{
+                position: 'absolute', top: '-4px', right: '-4px',
+                background: '#F09595', color: 'white',
+                borderRadius: '100px', fontSize: '9px', fontWeight: '700',
+                padding: '1px 5px', minWidth: '16px', textAlign: 'center'
+              }}>
+                {noLeidas > 99 ? '99+' : noLeidas}
+              </span>
+            )}
+          </button>
+          <button type="button" onClick={onLogout} style={{
+            background: 'transparent', color: 'rgba(255,255,255,0.4)',
+            border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
+            padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
+          }}>
+            Salir
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -190,28 +235,51 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
             onDragStart={() => setBarVisible(false)}
             onDragEnd={() => setBarVisible(true)}
           />
-          {trabajadoresFiltrados.map(t => (
-            <Marker key={t.id} position={[t.lat, t.lng]}>
-              <Popup>
-                <div style={{ minWidth: '160px' }}>
-                  <strong style={{ fontSize: '14px' }}>{t.nombre}</strong><br />
-                  <span style={{ color: '#555', fontSize: '13px' }}>{t.oficio}</span><br />
-                  <span style={{ color: '#BA7517' }}>★ {t.rating}</span><br />
-                  <button style={{ marginTop: '8px', width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                    Contactar
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {trabajosFiltrados.map(t => {
+            const icono = L.divIcon({
+              html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">${CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</div>`,
+              className: '', iconSize: [44,44], iconAnchor: [22,22], popupAnchor: [0,-26],
+            })
+            return (
+              <Marker key={t.id} position={[t.lat, t.lng]} icon={icono}>
+                <Popup>
+                  <div style={{ minWidth: '180px', fontFamily: 'sans-serif' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '20px' }}>{CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</span>
+                      <strong style={{ fontSize: '14px', color: '#111' }}>{t.categoria}</strong>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#555', marginBottom: '6px', lineHeight: '1.4' }}>
+                      {t.descripcion?.substring(0, 60)}{t.descripcion?.length > 60 ? '...' : ''}
+                    </p>
+                    <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '8px' }}>
+                      ${t.ultima_oferta || t.presupuesto} MXN
+                    </p>
+                    <button
+                      onClick={() => setPantalla('publicaciones')}
+                      style={{ width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                      Ver trabajo
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
         </MapContainer>
 
+        {/* Contador */}
         <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', zIndex: 1000 }}>
-          {trabajadoresFiltrados.length} trabajadores cerca
+          {cargando ? '⏳ Cargando...' : `${trabajosFiltrados.length} trabajo${trabajosFiltrados.length !== 1 ? 's' : ''} cerca`}
         </div>
+
+        {/* Aviso si no hay trabajos */}
+        {!cargando && trabajosFiltrados.length === 0 && (
+          <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.9)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', zIndex: 1000, whiteSpace: 'nowrap' }}>
+            📭 No hay trabajos publicados ahorita
+          </div>
+        )}
       </div>
 
-      {/* Bottom bar con animación */}
+      {/* Bottom bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-around',
         padding: '12px 0', background: '#0D0D0D',
