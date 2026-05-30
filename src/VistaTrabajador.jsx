@@ -17,15 +17,16 @@ const CATEGORIAS_ICONS = {
   'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
-  'Taxi': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Flete': '🚛',
+  'Taxi / Chofer': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Mandados': '🛍️',
 }
 
-const CATEGORIAS_VIAJE = ['Taxi', 'Moto taxi', 'Repartidor', 'Repartidor moto', 'Flete']
+const CATEGORIAS_VIAJE = ['Taxi', 'Moto taxi', 'Repartidor', 'Repartidor moto', 'Flete', 'Taxi / Chofer', 'Mandados']
 
 export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
+  const [perfilUsuario, setPerfilUsuario] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [trabajoSeleccionado, setTrabajoSeleccionado] = useState(null)
   const [exitoAceptar, setExitoAceptar] = useState(false)
@@ -39,28 +40,63 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [mensajeNoPuedoLlegar, setMensajeNoPuedoLlegar] = useState(null)
 
   useEffect(() => {
-    cargarTrabajos()
+    cargarPerfilUsuario()
     cargarMisTrabajos()
     cargarHistorial()
   }, [])
 
-  async function cargarTrabajos() {
+  // Cargar perfil para filtrar trabajos por categorías
+  async function cargarPerfilUsuario() {
+    const { data } = await supabase
+      .from('usuarios')
+      .select('categorias_servicio, radio_alertas, lat, lng')
+      .eq('id', userId)
+      .maybeSingle()
+    if (data) setPerfilUsuario(data)
+    // Cargar disponibles después de tener el perfil
+    cargarTrabajos(data)
+  }
+
+  // FIX 3: filtrar trabajos disponibles por categorías del trabajador
+  async function cargarTrabajos(perfil) {
     setCargando(true)
-    const { data } = await supabase.from('trabajos').select('*')
-      .eq('status', 'publicado').order('creado_en', { ascending: false })
+    const categorias = perfil?.categorias_servicio || []
+
+    let query = supabase
+      .from('trabajos')
+      .select('*')
+      .eq('status', 'publicado')
+      .order('creado_en', { ascending: false })
+
+    // Si el trabajador tiene categorías registradas, filtrar por ellas
+    if (categorias.length > 0) {
+      query = query.in('categoria', categorias)
+    }
+
+    const { data } = await query
     if (data) setTrabajos(data)
     setCargando(false)
   }
 
+  // FIX 2: filtrar mis trabajos activos solo los de este trabajador
   async function cargarMisTrabajos() {
-    const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision']).order('creado_en', { ascending: false })
+    const { data } = await supabase
+      .from('trabajos')
+      .select('*')
+      .in('status', ['aceptado', 'en_revision'])
+      .eq('trabajador_id', userId)
+      .order('creado_en', { ascending: false })
     if (data) setMisTrabajos(data)
   }
 
+  // FIX 2: filtrar historial solo los de este trabajador
   async function cargarHistorial() {
-    const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['completado', 'cancelado']).order('creado_en', { ascending: false })
+    const { data } = await supabase
+      .from('trabajos')
+      .select('*')
+      .in('status', ['completado', 'cancelado'])
+      .eq('trabajador_id', userId)
+      .order('creado_en', { ascending: false })
     if (data) setHistorial(data)
   }
 
@@ -74,7 +110,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   async function noPuedoLlegar(trabajo) {
-    // Insertar mensaje automático en el chat
     await supabase.from('mensajes').insert({
       trabajo_id: trabajo.id,
       emisor_id: userId,
@@ -120,14 +155,16 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     return (
       <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
         onAceptado={() => {
-          setNegociando(null); setTrabajoSeleccionado(null)
-          cargarTrabajos(); cargarMisTrabajos(); setPestana('mis')
+          setNegociando(null)
+          setTrabajoSeleccionado(null)
+          cargarTrabajos(perfilUsuario)
+          cargarMisTrabajos()
+          setPestana('mis')
         }}
       />
     )
   }
 
-  // ── Modal confirmación no puedo llegar ──
   if (mensajeNoPuedoLlegar) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -187,7 +224,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>{trabajoSeleccionado.descripcion}</p>
                 </div>
 
-                {/* Si es viaje — mostrar origen y destino */}
                 {esViaje(trabajoSeleccionado) && trabajoSeleccionado.origen_lat && (
                   <>
                     <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -204,11 +240,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                         <p style={{ fontSize: '13px', color: 'white' }}>{trabajoSeleccionado.destino_lat.toFixed(4)}, {trabajoSeleccionado.destino_lng.toFixed(4)}</p>
                       </div>
                     </div>
-                    <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
-                      <div>
-                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DISTANCIA</p>
-                        <p style={{ fontSize: '14px', color: 'white' }}>{trabajoSeleccionado.distancia_km?.toFixed(1)} km</p>
-                      </div>
+                    <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DISTANCIA</p>
+                      <p style={{ fontSize: '14px', color: 'white' }}>{trabajoSeleccionado.distancia_km?.toFixed(1)} km</p>
                     </div>
                   </>
                 )}
@@ -290,11 +324,19 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
         {/* ── Disponibles ── */}
         {pestana === 'disponibles' && (
           <>
-            {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
+            {/* Aviso si no tiene categorías configuradas */}
+            {perfilUsuario && (!perfilUsuario.categorias_servicio || perfilUsuario.categorias_servicio.length === 0) && (
+              <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#E8A030', textAlign: 'center' }}>
+                ⚠️ Configura tus servicios en tu perfil para ver solo los trabajos de tu especialidad.
+              </div>
+            )}
+            {cargando && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>
+            )}
             {!cargando && trabajos.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
-                <p>No hay trabajos publicados ahorita.</p>
+                <p>No hay trabajos disponibles para tus categorías ahorita.</p>
               </div>
             )}
             {trabajos.map(trabajo => (
@@ -342,17 +384,12 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
-
-                    {/* Info de viaje */}
                     {esViaje(trabajo) && trabajo.origen_lat && (
                       <div style={{ marginTop: '6px', display: 'flex', gap: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                        <span>📍 Origen marcado</span>
-                        <span>→</span>
-                        <span>🏁 Destino marcado</span>
+                        <span>📍 Origen</span><span>→</span><span>🏁 Destino</span>
                         <span>· {trabajo.distancia_km?.toFixed(1)} km</span>
                       </div>
                     )}
-
                     {trabajo.fecha_cita && (
                       <p style={{ fontSize: '11px', color: '#1D9E75', marginTop: '4px' }}>📅 {trabajo.fecha_cita} a las {trabajo.hora_cita?.slice(0, 5)} hrs</p>
                     )}
@@ -365,19 +402,16 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </div>
                 </div>
 
-                {/* Chat */}
                 <button type="button" onClick={() => setChatAbierto(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   💬 Chat con el cliente
                 </button>
 
-                {/* Botón no puedo llegar — solo para viajes */}
                 {esViaje(trabajo) && trabajo.status === 'aceptado' && (
                   <button type="button" onClick={() => setMensajeNoPuedoLlegar(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(232,160,48,0.08)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     ⚠️ No puedo llegar al punto — coordinar con cliente
                   </button>
                 )}
 
-                {/* Ver perfil del cliente */}
                 {trabajo.cliente_id && (
                   <button type="button" onClick={() => setVerPerfilCliente(trabajo.cliente_id)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(55,138,221,0.08)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     👤 Ver perfil del cliente

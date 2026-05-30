@@ -33,7 +33,9 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function cargarOfertas() {
     setCargando(true)
     const { data } = await supabase
-      .from('negociaciones').select('*').eq('trabajo_id', trabajo.id)
+      .from('negociaciones')
+      .select('*')
+      .eq('trabajo_id', trabajo.id)
       .order('creado_en', { ascending: true })
     if (data) setOfertas(data)
     setCargando(false)
@@ -42,22 +44,67 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function hacerContraoferta() {
     if (nuevaOferta === precioActual || rondasRestantes <= 0) return
     setLoading(true)
+
     await supabase.from('negociaciones').insert({
-      trabajo_id: trabajo.id, ofertado_por: 'trabajador', monto: nuevaOferta,
+      trabajo_id: trabajo.id,
+      ofertado_por: 'trabajador',
+      monto: nuevaOferta,
     })
+
     await supabase.from('trabajos').update({
-      ultima_oferta: nuevaOferta, quien_oferto: 'trabajador',
+      ultima_oferta: nuevaOferta,
+      quien_oferto: 'trabajador',
       rondas_negociacion: rondasUsadas + 1,
     }).eq('id', trabajo.id)
+
+    // Notificar al cliente
+    const { data: clienteData } = await supabase
+      .from('usuarios')
+      .select('fcm_token')
+      .eq('id', trabajo.cliente_id)
+      .maybeSingle()
+
+    if (clienteData?.fcm_token) {
+      await supabase.functions.invoke('enviar-notificacion', {
+        body: {
+          token: clienteData.fcm_token,
+          titulo: '💬 Nueva contraoferta en Chamba',
+          cuerpo: `Un trabajador ofrece $${nuevaOferta} MXN por tu ${trabajo.categoria}`,
+        }
+      })
+    }
+
     await cargarOfertas()
     setLoading(false)
   }
 
+  // FIX: guardar trabajador_id al aceptar
   async function aceptarPrecio() {
     setLoading(true)
+
     await supabase.from('trabajos').update({
-      status: 'aceptado', precio_acordado: precioActual,
+      status: 'aceptado',
+      precio_acordado: precioActual,
+      trabajador_id: userId,
     }).eq('id', trabajo.id)
+
+    // Notificar al cliente
+    const { data: clienteData } = await supabase
+      .from('usuarios')
+      .select('fcm_token')
+      .eq('id', trabajo.cliente_id)
+      .maybeSingle()
+
+    if (clienteData?.fcm_token) {
+      await supabase.functions.invoke('enviar-notificacion', {
+        body: {
+          token: clienteData.fcm_token,
+          titulo: '✅ ¡Trabajo aceptado!',
+          cuerpo: `Un trabajador aceptó tu ${trabajo.categoria} por $${precioActual} MXN`,
+        }
+      })
+    }
+
     setExito(true)
     setLoading(false)
   }
@@ -69,7 +116,6 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     return `hace ${Math.floor(min / 60)} hrs`
   }
 
-  // ── Perfil público del trabajador ──
   if (verPerfilTrabajador) {
     return (
       <PerfilPublico
@@ -122,7 +168,6 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-        {/* Info del trabajo */}
         <div style={{
           background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)',
           borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px'
@@ -137,20 +182,15 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
           </div>
         </div>
 
-        {/* Ver mi propio perfil público */}
-        <button type="button"
-          onClick={() => setVerPerfilTrabajador(true)}
-          style={{
-            width: '100%', padding: '11px',
-            background: 'rgba(29,158,117,0.08)', color: '#1D9E75',
-            border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '10px',
-            fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
-          }}
-        >
+        <button type="button" onClick={() => setVerPerfilTrabajador(true)} style={{
+          width: '100%', padding: '11px',
+          background: 'rgba(29,158,117,0.08)', color: '#1D9E75',
+          border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '10px',
+          fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif'
+        }}>
           ⭐ Ver cómo te ve el cliente — tu perfil público
         </button>
 
-        {/* Historial de ofertas */}
         {!cargando && ofertas.length > 0 && (
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -183,7 +223,6 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
           </div>
         )}
 
-        {/* Precio actual y rondas */}
         <div style={{
           background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
@@ -205,7 +244,6 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
           </div>
         </div>
 
-        {/* Contraoferta */}
         {rondasRestantes > 0 && (
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

@@ -30,7 +30,7 @@ const CATEGORIAS_ICONS = {
   'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
-  'Taxi': '🚕', 'Moto taxi': '🏍️', 'Flete': '🚛',
+  'Taxi': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Flete': '🚛',
 }
 
 export default function MisPublicaciones({ onVolver, userId }) {
@@ -53,6 +53,8 @@ export default function MisPublicaciones({ onVolver, userId }) {
     const channel = supabase
       .channel('tracking-cliente')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
+        // FIX 2: solo procesar trabajos de este cliente
+        if (payload.new.cliente_id !== userId) return
         setTrabajos(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t))
         if (trabajoSeleccionado?.id === payload.new.id) {
           setTrabajoSeleccionado(prev => ({ ...prev, ...payload.new }))
@@ -60,28 +62,35 @@ export default function MisPublicaciones({ onVolver, userId }) {
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [trabajoSeleccionado])
+  }, [trabajoSeleccionado, userId])
 
-  // Realtime para mensajes nuevos
+  // FIX 3: solo contar mensajes de trabajos de este cliente
   useEffect(() => {
     const channel = supabase
       .channel('mensajes-cliente')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
-        // Si el mensaje no es mío, es no leído
         if (payload.new.emisor_id !== userId) {
-          setMensajesNoLeidos(prev => ({
-            ...prev,
-            [payload.new.trabajo_id]: (prev[payload.new.trabajo_id] || 0) + 1
-          }))
+          const trabajoEsMio = trabajos.some(t => t.id === payload.new.trabajo_id)
+          if (trabajoEsMio) {
+            setMensajesNoLeidos(prev => ({
+              ...prev,
+              [payload.new.trabajo_id]: (prev[payload.new.trabajo_id] || 0) + 1
+            }))
+          }
         }
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [userId])
+  }, [userId, trabajos])
 
+  // FIX 1: filtrar por cliente_id
   async function cargarMisTrabajos() {
     setCargando(true)
-    const { data } = await supabase.from('trabajos').select('*').order('creado_en', { ascending: false })
+    const { data } = await supabase
+      .from('trabajos')
+      .select('*')
+      .eq('cliente_id', userId)
+      .order('creado_en', { ascending: false })
     if (data) {
       setTrabajos(data)
       cargarMensajesNoLeidos(data)
@@ -98,7 +107,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
       .in('trabajo_id', ids)
       .neq('emisor_id', userId)
       .eq('leido', false)
-
     if (data) {
       const conteo = {}
       data.forEach(m => {
@@ -118,7 +126,11 @@ export default function MisPublicaciones({ onVolver, userId }) {
   }
 
   async function cargarNegociaciones(trabajoId) {
-    const { data } = await supabase.from('negociaciones').select('*').eq('trabajo_id', trabajoId).order('creado_en', { ascending: true })
+    const { data } = await supabase
+      .from('negociaciones')
+      .select('*')
+      .eq('trabajo_id', trabajoId)
+      .order('creado_en', { ascending: true })
     if (data) setNegociaciones(data)
   }
 
@@ -192,8 +204,8 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
   }
 
-  const trabajosActivos = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
-  const trabajosHistorial = trabajos.filter(t => ['completado', 'cancelado'].includes(t.status))
+  const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
+  const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
 
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
@@ -231,13 +243,12 @@ export default function MisPublicaciones({ onVolver, userId }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAccion('') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi publicación</h2>
-          {/* Botón chat en header con badge */}
           <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
             background: noLeidos > 0 ? 'rgba(240,149,149,0.15)' : 'rgba(29,158,117,0.15)',
             color: noLeidos > 0 ? '#F09595' : '#1D9E75',
             border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.4)' : 'rgba(29,158,117,0.3)'}`,
             borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600',
-            cursor: 'pointer', fontFamily: 'sans-serif', position: 'relative', display: 'flex', alignItems: 'center', gap: '6px'
+            cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: '6px'
           }}>
             💬 Chat
             {noLeidos > 0 && (
@@ -267,7 +278,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           </div>
 
-          {/* Chat desde publicado — cuando trabajador manda consulta previa */}
           {trabajoSeleccionado.status === 'publicado' && (
             <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
               width: '100%', padding: '13px',
@@ -482,6 +492,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
+  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -506,7 +517,11 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Cargando tus publicaciones...</div>}
+        {cargando && (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
+            Cargando tus publicaciones...
+          </div>
+        )}
 
         {!cargando && pestana === 'activos' && trabajosActivos.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
