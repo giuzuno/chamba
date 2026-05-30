@@ -1,26 +1,23 @@
-import { useState, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import AgendarCita from './AgendarCita'
-import Calificacion from './Calificacion'
-import ChatTrabajo from './ChatTrabajo'
-import Disputa from './Disputa'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import PublicarTrabajo from './PublicarTrabajo'
+import MisPublicaciones from './MisPublicaciones'
+import Perfil from './Perfil'
+import PublicarViaje from './PublicarViaje'
 
 delete L.Icon.Default.prototype._getIconUrl
-
-const iconoTrabajador = L.divIcon({
-  html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
-  className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const iconoCliente = L.divIcon({
-  html: `<div style="background:#378ADD;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
-  className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
-})
+const SALINA_CRUZ = [16.1833, -95.2000]
 
-const CATEGORIAS_ICONS = {
+const CATEGORIAS_ICONS_MAPA = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
   'Limpieza': '🧹', 'Planchado': '👔', 'Pintor': '🖌️',
   'Cerrajero': '🔑', 'Mecánico': '🔩', 'Téc. celulares': '📱',
@@ -31,619 +28,250 @@ const CATEGORIAS_ICONS = {
   'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
-  'Taxi': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Flete': '🚛',
+  'Taxi / Chofer': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Mandados': '🛍️',
+  'Taxi': '🚕', 'Flete': '🚛',
 }
 
-export default function MisPublicaciones({ onVolver, userId }) {
-  const [trabajos, setTrabajos] = useState([])
-  const [cargando, setCargando] = useState(true)
-  const [trabajoSeleccionado, setTrabajoSeleccionado] = useState(null)
-  const [negociaciones, setNegociaciones] = useState([])
-  const [loadingAccion, setLoadingAccion] = useState(false)
-  const [exitoAccion, setExitoAccion] = useState('')
-  const [agendando, setAgendando] = useState(null)
-  const [citaConfirmada, setCitaConfirmada] = useState(null)
-  const [calificando, setCalificando] = useState(null)
-  const [chatAbierto, setChatAbierto] = useState(null)
-  const [pestana, setPestana] = useState('activos')
-  const [mensajesNoLeidos, setMensajesNoLeidos] = useState({})
-  const [abrirDisputa, setAbrirDisputa] = useState(null)
+function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>¿Qué necesitas?</h2>
+      </div>
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '8px' }}>
+          Selecciona el tipo de servicio que quieres publicar
+        </p>
+        <button type="button" onClick={onServicio} style={{
+          background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
+          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
+        }}>
+          <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🔧</div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Contratar un servicio</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>Electricista, Plomero, Pintor, Limpieza y más de 30 oficios disponibles</p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {['⚡', '🔧', '🍳', '🧹', '🖌️', '🔑'].map(e => <span key={e} style={{ fontSize: '18px' }}>{e}</span>)}
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>+26 más</span>
+            </div>
+          </div>
+        </button>
+        <button type="button" onClick={onViaje} style={{
+          background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
+          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
+          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
+        }}>
+          <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🚕</div>
+          <div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>Solicitar un viaje</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>Taxi, repartidor o flete — elige origen y destino en el mapa</p>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              {[['🚕', 'Taxi'], ['🛵', 'Repartidor'], ['🚛', 'Flete']].map(([icon, label]) => (
+                <span key={label} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)' }}>
+                  {icon} {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
+          <span style={{ color: 'rgba(255,255,255,0.06)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>Todo dentro de Chamba — seguro y con escrow</p>
+      </div>
+    </div>
+  )
+}
 
-  useEffect(() => { cargarMisTrabajos() }, [])
+function MapaDragListener({ onDragStart, onDragEnd }) {
+  useMapEvents({
+    dragstart: () => onDragStart(),
+    dragend: () => onDragEnd(),
+    movestart: () => onDragStart(),
+    moveend: () => onDragEnd(),
+  })
+  return null
+}
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('tracking-cliente')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
-        if (payload.new.cliente_id !== userId) return
-        setTrabajos(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t))
-        if (trabajoSeleccionado?.id === payload.new.id) {
-          setTrabajoSeleccionado(prev => ({ ...prev, ...payload.new }))
-        }
-      })
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [trabajoSeleccionado, userId])
+export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
+  const [trabajosPublicados, setTrabajosPublicados] = useState([])
+  const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
+  const [cargando, setCargando] = useState(false)
+  const [pantalla, setPantalla] = useState('mapa')
+  const [barVisible, setBarVisible] = useState(true)
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('mensajes-cliente')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
-        if (payload.new.emisor_id !== userId) {
-          const trabajoEsMio = trabajos.some(t => t.id === payload.new.trabajo_id)
-          if (trabajoEsMio) {
-            setMensajesNoLeidos(prev => ({
-              ...prev,
-              [payload.new.trabajo_id]: (prev[payload.new.trabajo_id] || 0) + 1
-            }))
-          }
-        }
-      })
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [userId, trabajos])
+  const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
-  async function cargarMisTrabajos() {
+  useEffect(() => { cargarTrabajosPublicados() }, [])
+
+  async function cargarTrabajosPublicados() {
     setCargando(true)
     const { data } = await supabase
       .from('trabajos')
-      .select('*')
-      .eq('cliente_id', userId)
+      .select('id, categoria, descripcion, presupuesto, ultima_oferta, lat, lng, creado_en')
+      .eq('status', 'publicado')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
       .order('creado_en', { ascending: false })
-    if (data) {
-      setTrabajos(data)
-      cargarMensajesNoLeidos(data)
-    }
+    if (data) setTrabajosPublicados(data)
     setCargando(false)
   }
 
-  async function cargarMensajesNoLeidos(listaTrabajos) {
-    if (!listaTrabajos || listaTrabajos.length === 0) return
-    const ids = listaTrabajos.map(t => t.id)
-    const { data } = await supabase
-      .from('mensajes')
-      .select('trabajo_id, emisor_id')
-      .in('trabajo_id', ids)
-      .neq('emisor_id', userId)
-      .eq('leido', false)
-    if (data) {
-      const conteo = {}
-      data.forEach(m => { conteo[m.trabajo_id] = (conteo[m.trabajo_id] || 0) + 1 })
-      setMensajesNoLeidos(conteo)
-    }
+  const trabajosFiltrados = categoriaFiltro === 'Todos'
+    ? trabajosPublicados
+    : trabajosPublicados.filter(t => t.categoria === categoriaFiltro)
+
+  if (pantalla === 'seleccionar') {
+    return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
+  }
+  if (pantalla === 'publicar') {
+    return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  }
+  if (pantalla === 'viaje') {
+    return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  }
+  if (pantalla === 'publicaciones') {
+    return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
+  }
+  if (pantalla === 'perfil') {
+    return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
   }
 
-  async function marcarMensajesLeidos(trabajoId) {
-    await supabase.from('mensajes').update({ leido: true })
-      .eq('trabajo_id', trabajoId).neq('emisor_id', userId)
-    setMensajesNoLeidos(prev => ({ ...prev, [trabajoId]: 0 }))
-  }
-
-  async function cargarNegociaciones(trabajoId) {
-    const { data } = await supabase.from('negociaciones').select('*')
-      .eq('trabajo_id', trabajoId).order('creado_en', { ascending: true })
-    if (data) setNegociaciones(data)
-  }
-
-  async function seleccionarTrabajo(trabajo) {
-    setExitoAccion('')
-    setTrabajoSeleccionado(trabajo)
-    await cargarNegociaciones(trabajo.id)
-  }
-
-  async function aceptarContraoferta(trabajo) {
-    setLoadingAccion(true)
-    const precioFinal = trabajo.ultima_oferta || trabajo.presupuesto
-    await supabase.from('trabajos').update({ status: 'aceptado', precio_acordado: precioFinal }).eq('id', trabajo.id)
-    setExitoAccion(`¡Aceptaste la contraoferta de $${precioFinal} MXN!`)
-    await cargarMisTrabajos()
-    setLoadingAccion(false)
-  }
-
-  async function rechazarContraoferta(trabajo) {
-    setLoadingAccion(true)
-    await supabase.from('trabajos').update({
-      ultima_oferta: null, quien_oferto: null,
-      rondas_negociacion: (trabajo.rondas_negociacion || 0) + 1,
-    }).eq('id', trabajo.id)
-    setExitoAccion('Contraoferta rechazada. El trabajador puede intentar de nuevo.')
-    await cargarMisTrabajos()
-    await cargarNegociaciones(trabajo.id)
-    setTrabajoSeleccionado(prev => ({ ...prev, ultima_oferta: null, quien_oferto: null }))
-    setLoadingAccion(false)
-  }
-
-  async function cancelarTrabajo(trabajo) {
-    setLoadingAccion(true)
-    await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
-    setTrabajoSeleccionado(null)
-    await cargarMisTrabajos()
-    setLoadingAccion(false)
-  }
-
-  async function confirmarCompletado(trabajo) {
-    setLoadingAccion(true)
-    await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
-
-    if (trabajo.trabajador_id) {
-      const { data: trabajadorData } = await supabase
-        .from('usuarios').select('fcm_token')
-        .eq('id', trabajo.trabajador_id).maybeSingle()
-
-      if (trabajadorData?.fcm_token) {
-        await supabase.functions.invoke('enviar-notificacion', {
-          body: {
-            token: trabajadorData.fcm_token,
-            titulo: '✅ ¡Pago liberado!',
-            cuerpo: `El cliente confirmó tu ${trabajo.categoria}. El pago de $${trabajo.precio_acordado || trabajo.presupuesto} MXN fue liberado.`,
-          }
-        })
-      }
-    }
-
-    await cargarMisTrabajos()
-    setLoadingAccion(false)
-    setCalificando(trabajo)
-  }
-
-  function tiempoTranscurrido(fecha) {
-    const diff = Date.now() - new Date(fecha).getTime()
-    const min = Math.floor(diff / 60000)
-    if (min < 60) return `hace ${min} min`
-    const hrs = Math.floor(min / 60)
-    if (hrs < 24) return `hace ${hrs} hrs`
-    return `hace ${Math.floor(hrs / 24)} días`
-  }
-
-  function statusBadge(trabajo) {
-    const s = trabajo.status
-    if (s === 'en_disputa')
-      return { texto: '⚠️ En disputa', bg: 'rgba(240,149,149,0.1)', color: '#F09595', border: 'rgba(240,149,149,0.3)' }
-    if (s === 'publicado' && trabajo.quien_oferto === 'trabajador')
-      return { texto: '💬 Contraoferta recibida', bg: 'rgba(186,117,23,0.15)', color: '#E8A030', border: 'rgba(186,117,23,0.4)' }
-    if (s === 'publicado')
-      return { texto: '⏳ Esperando trabajadores', bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
-    if (s === 'aceptado')
-      return { texto: '✅ Trabajo aceptado', bg: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: 'rgba(29,158,117,0.3)' }
-    if (s === 'en_revision')
-      return { texto: '🔧 Trabajador terminó — confirma tú', bg: 'rgba(55,138,221,0.15)', color: '#378ADD', border: 'rgba(55,138,221,0.4)' }
-    if (s === 'completado')
-      return { texto: '🏁 Completado', bg: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: 'rgba(29,158,117,0.4)' }
-    if (s === 'cancelado')
-      return { texto: '❌ Cancelado', bg: 'rgba(240,149,149,0.1)', color: '#F09595', border: 'rgba(240,149,149,0.3)' }
-    return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
-  }
-
-  const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
-  const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
-
-  // ── Pantallas secundarias ──
-  if (chatAbierto) {
-    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
-      setChatAbierto(null)
-      marcarMensajesLeidos(chatAbierto.id)
-    }} />
-  }
-
-  if (abrirDisputa) {
-    return (
-      <Disputa
-        trabajo={abrirDisputa}
-        userId={userId}
-        onVolver={() => setAbrirDisputa(null)}
-        onDisputaAbierta={() => {
-          setAbrirDisputa(null)
-          setTrabajoSeleccionado(null)
-          cargarMisTrabajos()
-        }}
-      />
-    )
-  }
-
-  if (calificando) {
-    return (
-      <Calificacion trabajo={calificando} userId={userId} rolCalificador="cliente"
-        onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
-      />
-    )
-  }
-
-  if (agendando) {
-    return (
-      <AgendarCita trabajo={agendando} onVolver={() => setAgendando(null)}
-        onConfirmado={(cita) => { setCitaConfirmada(cita); setAgendando(null); cargarMisTrabajos() }}
-      />
-    )
-  }
-
-  // ── Detalle del trabajo ──
-  if (trabajoSeleccionado) {
-    const badge = statusBadge(trabajoSeleccionado)
-    const tieneContraoferta = trabajoSeleccionado.quien_oferto === 'trabajador' && trabajoSeleccionado.ultima_oferta
-    const noLeidos = mensajesNoLeidos[trabajoSeleccionado.id] || 0
-
-    return (
-      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAccion('') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi publicación</h2>
-          <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-            background: noLeidos > 0 ? 'rgba(240,149,149,0.15)' : 'rgba(29,158,117,0.15)',
-            color: noLeidos > 0 ? '#F09595' : '#1D9E75',
-            border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.4)' : 'rgba(29,158,117,0.3)'}`,
-            borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600',
-            cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: '6px'
-          }}>
-            💬 Chat
-            {noLeidos > 0 && (
-              <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>
-                {noLeidos}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-          {exitoAccion && (
-            <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#5DCAA5', textAlign: 'center' }}>
-              {exitoAccion}
-            </div>
-          )}
-
-          {/* Info del trabajo */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '44px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '19px', fontWeight: '700', marginBottom: '4px' }}>{trabajoSeleccionado.categoria}</h3>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>{trabajoSeleccionado.descripcion}</p>
-              <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: badge.bg, color: badge.color, border: `0.5px solid ${badge.border}`, fontWeight: '500' }}>
-                {badge.texto}
-              </span>
-            </div>
-          </div>
-
-          {/* En disputa */}
-          {trabajoSeleccionado.status === 'en_disputa' && (
-            <div style={{ background: 'rgba(240,149,149,0.08)', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
-              <p style={{ fontSize: '32px', marginBottom: '10px' }}>⚠️</p>
-              <p style={{ fontSize: '15px', color: '#F09595', fontWeight: '700', marginBottom: '6px' }}>Disputa en proceso</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>
-                El equipo de Chamba está revisando tu caso. Te notificaremos cuando haya una resolución. Esto puede tomar hasta 48 horas.
-              </p>
-              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-                marginTop: '14px', width: '100%', padding: '12px',
-                background: 'rgba(240,149,149,0.1)', color: '#F09595',
-                border: '0.5px solid rgba(240,149,149,0.3)',
-                borderRadius: '10px', fontSize: '13px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif'
-              }}>
-                💬 Chat con el trabajador
-              </button>
-            </div>
-          )}
-
-          {/* Mensaje al trabajador en publicado */}
-          {trabajoSeleccionado.status === 'publicado' && (
-            <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-              width: '100%', padding: '13px',
-              background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(55,138,221,0.08)',
-              color: noLeidos > 0 ? '#F09595' : '#378ADD',
-              border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(55,138,221,0.3)'}`,
-              borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-              cursor: 'pointer', fontFamily: 'sans-serif',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-            }}>
-              💬 {noLeidos > 0 ? `Ver mensajes del trabajador (${noLeidos} nuevo${noLeidos > 1 ? 's' : ''})` : 'Ver mensajes del trabajador'}
-            </button>
-          )}
-
-          {/* Precios */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>Tu presupuesto inicial</span>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>${trabajoSeleccionado.presupuesto} MXN</span>
-            </div>
-            {trabajoSeleccionado.ultima_oferta && (
-              <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: '#E8A030' }}>Contraoferta del trabajador</span>
-                <span style={{ fontSize: '16px', fontWeight: '700', color: '#E8A030' }}>${trabajoSeleccionado.ultima_oferta} MXN</span>
-              </div>
-            )}
-            {trabajoSeleccionado.precio_acordado && (
-              <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: '#1D9E75' }}>Precio acordado final</span>
-                <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
-              </div>
-            )}
-          </div>
-
-          {/* Historial negociación */}
-          {negociaciones.length > 0 && (
-            <div>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Historial de negociación
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <div style={{ background: 'rgba(55,138,221,0.15)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '12px', padding: '10px 14px', maxWidth: '70%' }}>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>Tú (oferta inicial)</p>
-                    <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD' }}>${trabajoSeleccionado.presupuesto} MXN</p>
-                  </div>
-                </div>
-                {negociaciones.map(n => (
-                  <div key={n.id} style={{ display: 'flex', justifyContent: n.ofertado_por === 'trabajador' ? 'flex-start' : 'flex-end' }}>
-                    <div style={{
-                      background: n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.15)' : 'rgba(55,138,221,0.15)',
-                      border: `0.5px solid ${n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.3)' : 'rgba(55,138,221,0.3)'}`,
-                      borderRadius: '12px', padding: '10px 14px', maxWidth: '70%'
-                    }}>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>
-                        {n.ofertado_por === 'trabajador' ? 'Trabajador' : 'Tú'} · {tiempoTranscurrido(n.creado_en)}
-                      </p>
-                      <p style={{ fontSize: '18px', fontWeight: '700', color: n.ofertado_por === 'trabajador' ? '#E8A030' : '#378ADD' }}>
-                        ${n.monto} MXN
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Contraoferta */}
-          {tieneContraoferta && trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
-                El trabajador pide <strong style={{ color: '#E8A030' }}>${trabajoSeleccionado.ultima_oferta} MXN</strong> — ¿qué decides?
-              </p>
-              <button type="button" onClick={() => aceptarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '15px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ✅ Aceptar ${trabajoSeleccionado.ultima_oferta} MXN
-              </button>
-              <button type="button" onClick={() => rechazarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#E8A030', border: '1px solid rgba(186,117,23,0.4)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ↩ Rechazar y pedir otro precio
-              </button>
-            </div>
-          )}
-
-          {/* Aceptado — cliente agenda y espera */}
-          {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-                width: '100%', padding: '13px',
-                background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
-                color: noLeidos > 0 ? '#F09595' : '#1D9E75',
-                border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
-                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-              }}>
-                💬 Chat con el trabajador
-                {noLeidos > 0 && (
-                  <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px' }}>
-                    {noLeidos}
-                  </span>
-                )}
-              </button>
-
-              {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
-                <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75', borderRadius: '14px', overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1D9E75' }} />
-                    <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '600' }}>🚗 El trabajador está en camino — ubicación en tiempo real</p>
-                  </div>
-                  {trabajoSeleccionado.trabajador_lat && trabajoSeleccionado.trabajador_lng && (
-                    <div style={{ height: '220px' }}>
-                      <MapContainer center={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
-                        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <Marker position={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]} icon={iconoTrabajador}>
-                          <Popup>👷 Trabajador en camino</Popup>
-                        </Marker>
-                        {trabajoSeleccionado.lat && trabajoSeleccionado.lng && (
-                          <Marker position={[trabajoSeleccionado.lat, trabajoSeleccionado.lng]} icon={iconoCliente}>
-                            <Popup>🏠 Tu domicilio</Popup>
-                          </Marker>
-                        )}
-                      </MapContainer>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {trabajoSeleccionado.trabajador_llego && (
-                <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '14px', color: '#1D9E75', fontWeight: '600' }}>
-                  🏠 ¡El trabajador llegó a tu domicilio!
-                </div>
-              )}
-
-              {!trabajoSeleccionado.fecha_cita ? (
-                <button type="button" onClick={() => setAgendando(trabajoSeleccionado)} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#1D9E75', border: '1.5px solid #1D9E75', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                  📅 Agendar fecha y hora
-                </button>
-              ) : (
-                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#1D9E75', textAlign: 'center' }}>
-                  📅 Cita: {trabajoSeleccionado.fecha_cita} a las {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs
-                </div>
-              )}
-
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
-                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo en progreso</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)' }}>
-                  Cuando el trabajador termine, te avisará y podrás confirmar el pago de{' '}
-                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* En revisión — cliente confirma o abre disputa */}
-          {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-                width: '100%', padding: '13px',
-                background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
-                color: noLeidos > 0 ? '#F09595' : '#1D9E75',
-                border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
-                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-              }}>
-                💬 Chat con el trabajador
-                {noLeidos > 0 && (
-                  <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px' }}>
-                    {noLeidos}
-                  </span>
-                )}
-              </button>
-
-              <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
-                <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
-                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador terminó!</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
-                  ¿Quedó bien? Confirma para liberar el pago de{' '}
-                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>{' '}
-                  al trabajador.
-                </p>
-                <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)}
-                  disabled={loadingAccion}
-                  style={{
-                    width: '100%', padding: '14px',
-                    background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                    color: 'white', border: 'none', borderRadius: '12px',
-                    fontSize: '15px', fontWeight: '600',
-                    cursor: loadingAccion ? 'not-allowed' : 'pointer',
-                    fontFamily: 'sans-serif'
-                  }}
-                >
-                  {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
-                </button>
-              </div>
-
-              {/* Botón de disputa — si algo salió mal */}
-              <button type="button" onClick={() => setAbrirDisputa(trabajoSeleccionado)} style={{
-                width: '100%', padding: '13px', background: 'transparent',
-                color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)',
-                borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif'
-              }}>
-                ⚠️ Hay un problema — abrir disputa
-              </button>
-            </div>
-          )}
-
-          {/* Completado / Cancelado */}
-          {['completado', 'cancelado'].includes(trabajoSeleccionado.status) && (
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              {trabajoSeleccionado.status === 'completado'
-                ? `🏁 Trabajo completado · $${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN`
-                : '❌ Trabajo cancelado'}
-            </div>
-          )}
-
-          {/* Cancelar publicación */}
-          {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
-            <button type="button" onClick={() => cancelarTrabajo(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-              ❌ Cancelar publicación
-            </button>
-          )}
-
-        </div>
-      </div>
-    )
-  }
-
-  // ── Lista principal ──
   return (
-    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+    <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Mis publicaciones</h2>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 20px', background: '#0D0D0D',
+        borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000
+      }}>
+        <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Salina Cruz, Oax.</span>
+        <button type="button" onClick={onLogout} style={{
+          background: 'transparent', color: 'rgba(255,255,255,0.4)',
+          border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
+          padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
+        }}>
+          Salir
+        </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-        {[['activos', '📋 Activos', trabajosActivos.length], ['historial', '🏁 Historial', trabajosHistorial.length]].map(([key, label, count]) => (
-          <button key={key} type="button" onClick={() => setPestana(key)} style={{
-            flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
-            background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-            color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
-            fontSize: '13px', fontWeight: pestana === key ? '600' : '400',
-            cursor: 'pointer', fontFamily: 'sans-serif'
+      {/* Filtros */}
+      <div style={{
+        display: 'flex', gap: '8px', padding: '10px 16px',
+        overflowX: 'auto', background: '#0D0D0D',
+        borderBottom: '0.5px solid rgba(255,255,255,0.08)'
+      }}>
+        {CATEGORIAS.map(cat => (
+          <button key={cat} type="button" onClick={() => setCategoriaFiltro(cat)} style={{
+            background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+            color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)',
+            border: 'none', borderRadius: '20px', padding: '6px 14px', fontSize: '12px',
+            cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'sans-serif'
           }}>
-            {label} {count > 0 && `(${count})`}
+            {cat}
           </button>
         ))}
       </div>
 
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-        {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Cargando tus publicaciones...</div>}
-
-        {!cargando && pestana === 'activos' && trabajosActivos.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
-            <p>No tienes publicaciones activas.</p>
-          </div>
-        )}
-
-        {!cargando && pestana === 'historial' && trabajosHistorial.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏁</div>
-            <p>Aún no tienes trabajos completados.</p>
-          </div>
-        )}
-
-        {(pestana === 'activos' ? trabajosActivos : trabajosHistorial).map(trabajo => {
-          const badge = statusBadge(trabajo)
-          const noLeidos = mensajesNoLeidos[trabajo.id] || 0
-          return (
-            <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
-              background: trabajo.status === 'en_disputa' ? 'rgba(240,149,149,0.08)'
-                : trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)'
-                : noLeidos > 0 ? 'rgba(240,149,149,0.05)' : 'rgba(255,255,255,0.04)',
-              border: trabajo.status === 'en_disputa' ? '1px solid rgba(240,149,149,0.4)'
-                : trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
-                : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)'
-                : noLeidos > 0 ? '1px solid rgba(240,149,149,0.3)' : '0.5px solid rgba(255,255,255,0.08)',
-              borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {noLeidos > 0 && (
-                        <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 7px' }}>
-                          {noLeidos}
-                        </span>
-                      )}
-                      <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}</span>
+      {/* Mapa */}
+      <div style={{ flex: 1, position: 'relative' }}>
+        <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
+          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapaDragListener
+            onDragStart={() => setBarVisible(false)}
+            onDragEnd={() => setBarVisible(true)}
+          />
+          {trabajosFiltrados.map(t => {
+            const icono = L.divIcon({
+              html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">${CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</div>`,
+              className: '', iconSize: [44,44], iconAnchor: [22,22], popupAnchor: [0,-26],
+            })
+            return (
+              <Marker key={t.id} position={[t.lat, t.lng]} icon={icono}>
+                <Popup>
+                  <div style={{ minWidth: '180px', fontFamily: 'sans-serif' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '20px' }}>{CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</span>
+                      <strong style={{ fontSize: '14px', color: '#111' }}>{t.categoria}</strong>
                     </div>
+                    <p style={{ fontSize: '12px', color: '#555', marginBottom: '6px', lineHeight: '1.4' }}>
+                      {t.descripcion?.substring(0, 60)}{t.descripcion?.length > 60 ? '...' : ''}
+                    </p>
+                    <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '8px' }}>
+                      ${t.ultima_oferta || t.presupuesto} MXN
+                    </p>
+                    <button
+                      onClick={() => setPantalla('publicaciones')}
+                      style={{ width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                      Ver trabajo
+                    </button>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>
-                    {trabajo.descripcion}
-                  </p>
-                  {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>
-                      🚗 Trabajador en camino
-                    </span>
-                  )}
-                  {trabajo.trabajador_llego && trabajo.status === 'aceptado' && (
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>
-                      🏠 Trabajador llegó
-                    </span>
-                  )}
-                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: badge.bg, color: badge.color, border: `0.5px solid ${badge.border}`, fontWeight: '500', display: 'inline-block' }}>
-                    {badge.texto}
-                  </span>
-                </div>
-              </div>
-            </button>
-          )
-        })}
+                </Popup>
+              </Marker>
+            )
+          })}
+        </MapContainer>
+
+        {/* Contador */}
+        <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', zIndex: 1000 }}>
+          {cargando ? '⏳ Cargando...' : `${trabajosFiltrados.length} trabajo${trabajosFiltrados.length !== 1 ? 's' : ''} cerca`}
+        </div>
+
+        {/* Aviso si no hay trabajos */}
+        {!cargando && trabajosFiltrados.length === 0 && (
+          <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.9)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', zIndex: 1000, whiteSpace: 'nowrap' }}>
+            📭 No hay trabajos publicados ahorita
+          </div>
+        )}
       </div>
+
+      {/* Bottom bar */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-around',
+        padding: '12px 0', background: '#0D0D0D',
+        borderTop: '0.5px solid rgba(255,255,255,0.1)',
+        transform: barVisible ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.3s ease',
+        position: 'relative', zIndex: 1000
+      }}>
+        {[
+          ['🗺️', 'Mapa'],
+          ['➕', 'Publicar'],
+          ['📋', 'Mis trabajos'],
+          ['🔧', 'Trabajador'],
+          ['👤', 'Perfil'],
+        ].map(([icon, label]) => (
+          <button key={label} type="button"
+            onClick={() => {
+              if (label === 'Mapa') setPantalla('mapa')
+              if (label === 'Publicar') setPantalla('seleccionar')
+              if (label === 'Mis trabajos') setPantalla('publicaciones')
+              if (label === 'Trabajador') onCambiarModo()
+              if (label === 'Perfil') setPantalla('perfil')
+            }}
+            style={{
+              background: 'transparent', border: 'none',
+              color: (pantalla === 'mapa' && label === 'Mapa') ||
+                     (['seleccionar','publicar','viaje'].includes(pantalla) && label === 'Publicar') ||
+                     (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
+                     (pantalla === 'perfil' && label === 'Perfil')
+                ? '#1D9E75' : 'rgba(255,255,255,0.5)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+              cursor: 'pointer', fontSize: '18px', fontFamily: 'sans-serif', padding: '0 4px'
+            }}
+          >
+            {icon}
+            <span style={{ fontSize: '10px' }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
     </div>
   )
 }
