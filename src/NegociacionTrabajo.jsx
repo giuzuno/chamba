@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import PerfilPublico from './PerfilPublico'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -57,28 +58,19 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       rondas_negociacion: rondasUsadas + 1,
     }).eq('id', trabajo.id)
 
-    // Notificar al cliente
-    const { data: clienteData } = await supabase
-      .from('usuarios')
-      .select('fcm_token')
-      .eq('id', trabajo.cliente_id)
-      .maybeSingle()
-
-    if (clienteData?.fcm_token) {
-      await supabase.functions.invoke('enviar-notificacion', {
-        body: {
-          token: clienteData.fcm_token,
-          titulo: '💬 Nueva contraoferta en Chamba',
-          cuerpo: `Un trabajador ofrece $${nuevaOferta} MXN por tu ${trabajo.categoria}`,
-        }
-      })
-    }
+    // Notificar al cliente — guardado en BD + push
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '💬 Nueva contraoferta en Chamba',
+      cuerpo: `Un trabajador ofrece $${nuevaOferta} MXN por tu ${trabajo.categoria}`,
+      tipo: 'contraoferta',
+      trabajoId: trabajo.id,
+    })
 
     await cargarOfertas()
     setLoading(false)
   }
 
-  // FIX: guardar trabajador_id al aceptar
   async function aceptarPrecio() {
     setLoading(true)
 
@@ -88,22 +80,14 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       trabajador_id: userId,
     }).eq('id', trabajo.id)
 
-    // Notificar al cliente
-    const { data: clienteData } = await supabase
-      .from('usuarios')
-      .select('fcm_token')
-      .eq('id', trabajo.cliente_id)
-      .maybeSingle()
-
-    if (clienteData?.fcm_token) {
-      await supabase.functions.invoke('enviar-notificacion', {
-        body: {
-          token: clienteData.fcm_token,
-          titulo: '✅ ¡Trabajo aceptado!',
-          cuerpo: `Un trabajador aceptó tu ${trabajo.categoria} por $${precioActual} MXN`,
-        }
-      })
-    }
+    // Notificar al cliente — guardado en BD + push
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '✅ ¡Trabajo aceptado!',
+      cuerpo: `Un trabajador aceptó tu ${trabajo.categoria} por $${precioActual} MXN`,
+      tipo: 'trabajo_aceptado',
+      trabajoId: trabajo.id,
+    })
 
     setExito(true)
     setLoading(false)
