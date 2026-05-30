@@ -424,8 +424,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 )}
 
                 {/* CANDADO: solo aparece si status es aceptado, tiene cita, y no está en_revision */}
-                {trabajo.status === 'aceptado' && trabajo.fecha_cita && (
-                  <button type="button" onClick={() => marcarCompletado(trabajo)}
+                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
+                   <button type="button" onClick={() => marcarCompletado(trabajo)}
                     disabled={loadingCompletar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
@@ -439,9 +439,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </div>
                 )}
 
-                {trabajo.status === 'aceptado' && !trabajo.fecha_cita && (
+                {trabajo.status === 'aceptado' && !trabajo.trabajador_llego && (
                   <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                    ⏳ Esperando que el cliente agende la cita
+                   ⏳ Confirma tu llegada antes de marcar como terminado
                   </div>
                 )}
               </div>
