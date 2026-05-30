@@ -21,14 +21,11 @@ const CATEGORIAS = [
   { icon: '⚓', nombre: 'Soldador' },
   { icon: '🎨', nombre: 'Diseñador gráfico' },
   { icon: '📸', nombre: 'Fotógrafo' },
-
   { icon: '🐕', nombre: 'Veterinario' },
   { icon: '🖥️', nombre: 'Téc. computadoras' },
   { icon: '🏊', nombre: 'Limpieza albercas' },
-
   { icon: '🎵', nombre: 'Músico' },
   { icon: '❄️', nombre: 'Téc. refrigeración' },
-,
   { icon: '🎪', nombre: 'Barra de eventos' },
   { icon: '📐', nombre: 'Topógrafo' },
   { icon: '🧱', nombre: 'Albañil' },
