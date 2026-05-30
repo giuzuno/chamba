@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import AgendarCita from './AgendarCita'
 import Calificacion from './Calificacion'
 import ChatTrabajo from './ChatTrabajo'
+import Disputa from './Disputa'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -46,6 +47,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [chatAbierto, setChatAbierto] = useState(null)
   const [pestana, setPestana] = useState('activos')
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState({})
+  const [abrirDisputa, setAbrirDisputa] = useState(null)
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -159,7 +161,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     setLoadingAccion(false)
   }
 
-  // CANDADO: solo el cliente confirma completado → notifica al trabajador
   async function confirmarCompletado(trabajo) {
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
@@ -196,6 +197,8 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
   function statusBadge(trabajo) {
     const s = trabajo.status
+    if (s === 'en_disputa')
+      return { texto: '⚠️ En disputa', bg: 'rgba(240,149,149,0.1)', color: '#F09595', border: 'rgba(240,149,149,0.3)' }
     if (s === 'publicado' && trabajo.quien_oferto === 'trabajador')
       return { texto: '💬 Contraoferta recibida', bg: 'rgba(186,117,23,0.15)', color: '#E8A030', border: 'rgba(186,117,23,0.4)' }
     if (s === 'publicado')
@@ -214,11 +217,27 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
   const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
 
+  // ── Pantallas secundarias ──
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
       setChatAbierto(null)
       marcarMensajesLeidos(chatAbierto.id)
     }} />
+  }
+
+  if (abrirDisputa) {
+    return (
+      <Disputa
+        trabajo={abrirDisputa}
+        userId={userId}
+        onVolver={() => setAbrirDisputa(null)}
+        onDisputaAbierta={() => {
+          setAbrirDisputa(null)
+          setTrabajoSeleccionado(null)
+          cargarMisTrabajos()
+        }}
+      />
+    )
   }
 
   if (calificando) {
@@ -237,6 +256,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
+  // ── Detalle del trabajo ──
   if (trabajoSeleccionado) {
     const badge = statusBadge(trabajoSeleccionado)
     const tieneContraoferta = trabajoSeleccionado.quien_oferto === 'trabajador' && trabajoSeleccionado.ultima_oferta
@@ -272,6 +292,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* Info del trabajo */}
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
             <span style={{ fontSize: '44px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
             <div style={{ flex: 1 }}>
@@ -283,6 +304,27 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           </div>
 
+          {/* En disputa */}
+          {trabajoSeleccionado.status === 'en_disputa' && (
+            <div style={{ background: 'rgba(240,149,149,0.08)', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
+              <p style={{ fontSize: '32px', marginBottom: '10px' }}>⚠️</p>
+              <p style={{ fontSize: '15px', color: '#F09595', fontWeight: '700', marginBottom: '6px' }}>Disputa en proceso</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>
+                El equipo de Chamba está revisando tu caso. Te notificaremos cuando haya una resolución. Esto puede tomar hasta 48 horas.
+              </p>
+              <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+                marginTop: '14px', width: '100%', padding: '12px',
+                background: 'rgba(240,149,149,0.1)', color: '#F09595',
+                border: '0.5px solid rgba(240,149,149,0.3)',
+                borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                cursor: 'pointer', fontFamily: 'sans-serif'
+              }}>
+                💬 Chat con el trabajador
+              </button>
+            </div>
+          )}
+
+          {/* Mensaje al trabajador en publicado */}
           {trabajoSeleccionado.status === 'publicado' && (
             <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
               width: '100%', padding: '13px',
@@ -297,6 +339,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </button>
           )}
 
+          {/* Precios */}
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>Tu presupuesto inicial</span>
@@ -316,6 +359,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             )}
           </div>
 
+          {/* Historial negociación */}
           {negociaciones.length > 0 && (
             <div>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -348,6 +392,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* Contraoferta */}
           {tieneContraoferta && trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
@@ -362,7 +407,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
-          {/* CANDADO: cuando está aceptado, el cliente solo agenda y espera */}
+          {/* Aceptado — cliente agenda y espera */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -422,17 +467,17 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 </div>
               )}
 
-              {/* CANDADO: el cliente NO puede marcar completado mientras está aceptado, solo espera al trabajador */}
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
                 <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo en progreso</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)' }}>
-                  Cuando el trabajador termine, te avisará y podrás confirmar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
+                  Cuando el trabajador termine, te avisará y podrás confirmar el pago de{' '}
+                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
                 </p>
               </div>
             </div>
           )}
 
-          {/* CANDADO: solo cuando el trabajador marcó "Terminé" aparece el botón de confirmar */}
+          {/* En revisión — cliente confirma o abre disputa */}
           {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -474,9 +519,19 @@ export default function MisPublicaciones({ onVolver, userId }) {
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
                 </button>
               </div>
+
+              {/* Botón de disputa — si algo salió mal */}
+              <button type="button" onClick={() => setAbrirDisputa(trabajoSeleccionado)} style={{
+                width: '100%', padding: '13px', background: 'transparent',
+                color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)',
+                borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif'
+              }}>
+                ⚠️ Hay un problema — abrir disputa
+              </button>
             </div>
           )}
 
+          {/* Completado / Cancelado */}
           {['completado', 'cancelado'].includes(trabajoSeleccionado.status) && (
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
               {trabajoSeleccionado.status === 'completado'
@@ -485,6 +540,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* Cancelar publicación */}
           {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
             <button type="button" onClick={() => cancelarTrabajo(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               ❌ Cancelar publicación
@@ -496,6 +552,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
+  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -541,10 +598,12 @@ export default function MisPublicaciones({ onVolver, userId }) {
           const noLeidos = mensajesNoLeidos[trabajo.id] || 0
           return (
             <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
-              background: trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
+              background: trabajo.status === 'en_disputa' ? 'rgba(240,149,149,0.08)'
+                : trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
                 : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? 'rgba(186,117,23,0.08)'
                 : noLeidos > 0 ? 'rgba(240,149,149,0.05)' : 'rgba(255,255,255,0.04)',
-              border: trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
+              border: trabajo.status === 'en_disputa' ? '1px solid rgba(240,149,149,0.4)'
+                : trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
                 : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)'
                 : noLeidos > 0 ? '1px solid rgba(240,149,149,0.3)' : '0.5px solid rgba(255,255,255,0.08)',
               borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
