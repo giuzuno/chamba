@@ -45,7 +45,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     cargarHistorial()
   }, [])
 
-  // Cargar perfil para filtrar trabajos por categorías
   async function cargarPerfilUsuario() {
     const { data } = await supabase
       .from('usuarios')
@@ -53,32 +52,25 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       .eq('id', userId)
       .maybeSingle()
     if (data) setPerfilUsuario(data)
-    // Cargar disponibles después de tener el perfil
     cargarTrabajos(data)
   }
 
-  // FIX 3: filtrar trabajos disponibles por categorías del trabajador
   async function cargarTrabajos(perfil) {
     setCargando(true)
     const categorias = perfil?.categorias_servicio || []
-
     let query = supabase
       .from('trabajos')
       .select('*')
       .eq('status', 'publicado')
       .order('creado_en', { ascending: false })
-
-    // Si el trabajador tiene categorías registradas, filtrar por ellas
     if (categorias.length > 0) {
       query = query.in('categoria', categorias)
     }
-
     const { data } = await query
     if (data) setTrabajos(data)
     setCargando(false)
   }
 
-  // FIX 2: filtrar mis trabajos activos solo los de este trabajador
   async function cargarMisTrabajos() {
     const { data } = await supabase
       .from('trabajos')
@@ -89,7 +81,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (data) setMisTrabajos(data)
   }
 
-  // FIX 2: filtrar historial solo los de este trabajador
   async function cargarHistorial() {
     const { data } = await supabase
       .from('trabajos')
@@ -100,9 +91,30 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (data) setHistorial(data)
   }
 
+  // CANDADO: solo el trabajador marca "Terminé" → en_revision
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
-    await supabase.from('trabajos').update({ status: 'en_revision' }).eq('id', trabajo.id)
+    await supabase.from('trabajos')
+      .update({ status: 'en_revision' })
+      .eq('id', trabajo.id)
+
+    // Notificar al cliente
+    const { data: clienteData } = await supabase
+      .from('usuarios')
+      .select('fcm_token')
+      .eq('id', trabajo.cliente_id)
+      .maybeSingle()
+
+    if (clienteData?.fcm_token) {
+      await supabase.functions.invoke('enviar-notificacion', {
+        body: {
+          token: clienteData.fcm_token,
+          titulo: '🔧 El trabajador terminó',
+          cuerpo: `Tu ${trabajo.categoria} está listo. ¡Confírmalo para liberar el pago!`,
+        }
+      })
+    }
+
     await cargarMisTrabajos()
     await cargarHistorial()
     setLoadingCompletar(null)
@@ -130,7 +142,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   const esViaje = (trabajo) => trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
 
-  // ── Pantallas ──
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   }
@@ -172,10 +183,10 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>⚠️</div>
           <h3 style={{ fontSize: '18px', fontWeight: '700', textAlign: 'center', marginBottom: '12px' }}>¿No puedes llegar al punto?</h3>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: '1.6', marginBottom: '20px' }}>
-            Se enviará este mensaje al cliente automáticamente y se abrirá el chat para coordinar un punto de encuentro:
+            Se enviará este mensaje al cliente automáticamente y se abrirá el chat para coordinar:
           </p>
           <div style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 14px', fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '20px', fontStyle: 'italic' }}>
-            "⚠️ Hola, no puedo llegar exactamente al punto marcado en el mapa. ¿Podemos acordar un punto de encuentro cercano?"
+            "⚠️ Hola, no puedo llegar exactamente al punto marcado. ¿Podemos acordar un punto de encuentro cercano?"
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button type="button" onClick={() => noPuedoLlegar(mensajeNoPuedoLlegar)} style={{ width: '100%', padding: '14px', background: '#E8A030', color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -190,7 +201,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     )
   }
 
-  // ── Detalle del trabajo disponible ──
   if (trabajoSeleccionado) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -198,7 +208,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Detalle del trabajo</h2>
         </div>
-
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {exitoAceptar ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
@@ -217,13 +226,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </span>
                 </div>
               </div>
-
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>DESCRIPCIÓN</p>
                   <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>{trabajoSeleccionado.descripcion}</p>
                 </div>
-
                 {esViaje(trabajoSeleccionado) && trabajoSeleccionado.origen_lat && (
                   <>
                     <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -246,7 +253,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     </div>
                   </>
                 )}
-
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>UBICACIÓN</p>
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>📍 {trabajoSeleccionado.lat?.toFixed(4)}, {trabajoSeleccionado.lng?.toFixed(4)}</p>
@@ -256,25 +262,20 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {tiempoTranscurrido(trabajoSeleccionado.creado_en)}</p>
                 </div>
               </div>
-
               {trabajoSeleccionado.cliente_id && (
                 <button type="button" onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)} style={{ width: '100%', padding: '13px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   👤 Ver perfil del cliente
                 </button>
               )}
-
               <button type="button" onClick={() => setChatAbierto(trabajoSeleccionado)} style={{ width: '100%', padding: '13px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 ❓ Pedir más detalles al cliente
               </button>
-
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
                 🔒 Al aceptar, el pago queda protegido en escrow.
               </div>
-
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{ width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 💰 Ver y negociar precio
               </button>
-
               <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 Ver otros trabajos
               </button>
@@ -285,7 +286,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     )
   }
 
-  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -306,7 +306,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
         </div>
       </div>
 
-      {/* Pestañas */}
       <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {[
           ['disponibles', '🔍', 'Disponibles', trabajos.length],
@@ -321,18 +320,14 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* ── Disponibles ── */}
         {pestana === 'disponibles' && (
           <>
-            {/* Aviso si no tiene categorías configuradas */}
             {perfilUsuario && (!perfilUsuario.categorias_servicio || perfilUsuario.categorias_servicio.length === 0) && (
               <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#E8A030', textAlign: 'center' }}>
                 ⚠️ Configura tus servicios en tu perfil para ver solo los trabajos de tu especialidad.
               </div>
             )}
-            {cargando && (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>
-            )}
+            {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
             {!cargando && trabajos.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
@@ -364,7 +359,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           </>
         )}
 
-        {/* ── Mis trabajos activos ── */}
         {pestana === 'mis' && (
           <>
             {misTrabajos.length === 0 && (
@@ -374,8 +368,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               </div>
             )}
             {misTrabajos.map(trabajo => (
-              <div key={trabajo.id} style={{ background: trabajo.status === 'en_revision' ? 'rgba(186,117,23,0.08)' : 'rgba(29,158,117,0.06)', border: `0.5px solid ${trabajo.status === 'en_revision' ? 'rgba(186,117,23,0.3)' : 'rgba(29,158,117,0.2)'}`, borderRadius: '16px', padding: '16px 18px' }}>
-
+              <div key={trabajo.id} style={{ background: trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.08)' : 'rgba(29,158,117,0.06)', border: `0.5px solid ${trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.3)' : 'rgba(29,158,117,0.2)'}`, borderRadius: '16px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
                   <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -430,10 +423,20 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
+                {/* CANDADO: solo aparece si status es aceptado, tiene cita, y no está en_revision */}
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && (
-                  <button type="button" onClick={() => marcarCompletado(trabajo)} disabled={loadingCompletar === trabajo.id} style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                    {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Marcar trabajo como completado'}
+                  <button type="button" onClick={() => marcarCompletado(trabajo)}
+                    disabled={loadingCompletar === trabajo.id}
+                    style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
                   </button>
+                )}
+
+                {/* CANDADO: cuando ya está en revisión, el trabajador solo espera */}
+                {trabajo.status === 'en_revision' && (
+                  <div style={{ padding: '10px 14px', background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '12px', color: '#E8A030', textAlign: 'center' }}>
+                    ⏳ Avisaste que terminaste — esperando que el cliente confirme
+                  </div>
                 )}
 
                 {trabajo.status === 'aceptado' && !trabajo.fecha_cita && (
@@ -446,7 +449,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           </>
         )}
 
-        {/* ── Historial ── */}
         {pestana === 'historial' && (
           <>
             {historial.length === 0 && (
@@ -479,7 +481,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
             ))}
           </>
         )}
-
       </div>
     </div>
   )

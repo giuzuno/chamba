@@ -53,7 +53,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     const channel = supabase
       .channel('tracking-cliente')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
-        // FIX 2: solo procesar trabajos de este cliente
         if (payload.new.cliente_id !== userId) return
         setTrabajos(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t))
         if (trabajoSeleccionado?.id === payload.new.id) {
@@ -64,7 +63,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return () => supabase.removeChannel(channel)
   }, [trabajoSeleccionado, userId])
 
-  // FIX 3: solo contar mensajes de trabajos de este cliente
   useEffect(() => {
     const channel = supabase
       .channel('mensajes-cliente')
@@ -83,7 +81,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     return () => supabase.removeChannel(channel)
   }, [userId, trabajos])
 
-  // FIX 1: filtrar por cliente_id
   async function cargarMisTrabajos() {
     setCargando(true)
     const { data } = await supabase
@@ -109,28 +106,20 @@ export default function MisPublicaciones({ onVolver, userId }) {
       .eq('leido', false)
     if (data) {
       const conteo = {}
-      data.forEach(m => {
-        conteo[m.trabajo_id] = (conteo[m.trabajo_id] || 0) + 1
-      })
+      data.forEach(m => { conteo[m.trabajo_id] = (conteo[m.trabajo_id] || 0) + 1 })
       setMensajesNoLeidos(conteo)
     }
   }
 
   async function marcarMensajesLeidos(trabajoId) {
-    await supabase
-      .from('mensajes')
-      .update({ leido: true })
-      .eq('trabajo_id', trabajoId)
-      .neq('emisor_id', userId)
+    await supabase.from('mensajes').update({ leido: true })
+      .eq('trabajo_id', trabajoId).neq('emisor_id', userId)
     setMensajesNoLeidos(prev => ({ ...prev, [trabajoId]: 0 }))
   }
 
   async function cargarNegociaciones(trabajoId) {
-    const { data } = await supabase
-      .from('negociaciones')
-      .select('*')
-      .eq('trabajo_id', trabajoId)
-      .order('creado_en', { ascending: true })
+    const { data } = await supabase.from('negociaciones').select('*')
+      .eq('trabajo_id', trabajoId).order('creado_en', { ascending: true })
     if (data) setNegociaciones(data)
   }
 
@@ -170,9 +159,27 @@ export default function MisPublicaciones({ onVolver, userId }) {
     setLoadingAccion(false)
   }
 
+  // CANDADO: solo el cliente confirma completado → notifica al trabajador
   async function confirmarCompletado(trabajo) {
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
+
+    if (trabajo.trabajador_id) {
+      const { data: trabajadorData } = await supabase
+        .from('usuarios').select('fcm_token')
+        .eq('id', trabajo.trabajador_id).maybeSingle()
+
+      if (trabajadorData?.fcm_token) {
+        await supabase.functions.invoke('enviar-notificacion', {
+          body: {
+            token: trabajadorData.fcm_token,
+            titulo: '✅ ¡Pago liberado!',
+            cuerpo: `El cliente confirmó tu ${trabajo.categoria}. El pago de $${trabajo.precio_acordado || trabajo.presupuesto} MXN fue liberado.`,
+          }
+        })
+      }
+    }
+
     await cargarMisTrabajos()
     setLoadingAccion(false)
     setCalificando(trabajo)
@@ -216,8 +223,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
   if (calificando) {
     return (
-      <Calificacion
-        trabajo={calificando} userId={userId} rolCalificador="cliente"
+      <Calificacion trabajo={calificando} userId={userId} rolCalificador="cliente"
         onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
       />
     )
@@ -225,8 +231,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
   if (agendando) {
     return (
-      <AgendarCita
-        trabajo={agendando} onVolver={() => setAgendando(null)}
+      <AgendarCita trabajo={agendando} onVolver={() => setAgendando(null)}
         onConfirmado={(cita) => { setCitaConfirmada(cita); setAgendando(null); cargarMisTrabajos() }}
       />
     )
@@ -357,6 +362,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
+          {/* CANDADO: cuando está aceptado, el cliente solo agenda y espera */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -416,28 +422,17 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 </div>
               )}
 
-              <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
-                <p style={{ fontSize: '14px', color: '#1D9E75', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo en progreso</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '14px' }}>
-                  Cuando el trabajador termine, confirma aquí para liberar el pago de ${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN.
+              {/* CANDADO: el cliente NO puede marcar completado mientras está aceptado, solo espera al trabajador */}
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo en progreso</p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)' }}>
+                  Cuando el trabajador termine, te avisará y podrás confirmar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
                 </p>
-                <button type="button"
-                  onClick={() => confirmarCompletado(trabajoSeleccionado)}
-                  disabled={loadingAccion || !trabajoSeleccionado.fecha_cita}
-                  style={{
-                    width: '100%', padding: '14px',
-                    background: !trabajoSeleccionado.fecha_cita ? 'rgba(255,255,255,0.08)' : loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                    color: !trabajoSeleccionado.fecha_cita ? 'rgba(255,255,255,0.3)' : 'white',
-                    border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600',
-                    cursor: !trabajoSeleccionado.fecha_cita ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif'
-                  }}
-                >
-                  {!trabajoSeleccionado.fecha_cita ? '🔒 Agenda primero la cita' : loadingAccion ? 'Procesando...' : '🏁 Confirmar trabajo completado'}
-                </button>
               </div>
             </div>
           )}
 
+          {/* CANDADO: solo cuando el trabajador marcó "Terminé" aparece el botón de confirmar */}
           {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -456,17 +451,26 @@ export default function MisPublicaciones({ onVolver, userId }) {
                   </span>
                 )}
               </button>
+
               <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
                 <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador terminó!</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
-                  ¿Quedó bien? Confirma para liberar el pago de <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong> al trabajador.
+                  ¿Quedó bien? Confirma para liberar el pago de{' '}
+                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>{' '}
+                  al trabajador.
                 </p>
-                <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)} disabled={loadingAccion} style={{
-                  width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-                  color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600',
-                  cursor: 'pointer', fontFamily: 'sans-serif'
-                }}>
+                <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)}
+                  disabled={loadingAccion}
+                  style={{
+                    width: '100%', padding: '14px',
+                    background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75',
+                    color: 'white', border: 'none', borderRadius: '12px',
+                    fontSize: '15px', fontWeight: '600',
+                    cursor: loadingAccion ? 'not-allowed' : 'pointer',
+                    fontFamily: 'sans-serif'
+                  }}
+                >
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
                 </button>
               </div>
@@ -492,7 +496,6 @@ export default function MisPublicaciones({ onVolver, userId }) {
     )
   }
 
-  // ── Lista principal ──
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -517,11 +520,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {cargando && (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
-            Cargando tus publicaciones...
-          </div>
-        )}
+        {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Cargando tus publicaciones...</div>}
 
         {!cargando && pestana === 'activos' && trabajosActivos.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
