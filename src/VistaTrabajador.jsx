@@ -5,6 +5,7 @@ import TrackingTrabajador from './TrackingTrabajador'
 import Calificacion from './Calificacion'
 import PerfilPublico from './PerfilPublico'
 import ChatTrabajo from './ChatTrabajo'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -98,22 +99,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       .update({ status: 'en_revision' })
       .eq('id', trabajo.id)
 
-    // Notificar al cliente
-    const { data: clienteData } = await supabase
-      .from('usuarios')
-      .select('fcm_token')
-      .eq('id', trabajo.cliente_id)
-      .maybeSingle()
-
-    if (clienteData?.fcm_token) {
-      await supabase.functions.invoke('enviar-notificacion', {
-        body: {
-          token: clienteData.fcm_token,
-          titulo: '🔧 El trabajador terminó',
-          cuerpo: `Tu ${trabajo.categoria} está listo. ¡Confírmalo para liberar el pago!`,
-        }
-      })
-    }
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '🔧 El trabajador terminó',
+      cuerpo: `Tu ${trabajo.categoria} está listo. ¡Confírmalo para liberar el pago!`,
+      tipo: 'trabajo_completado',
+      trabajoId: trabajo.id,
+    })
 
     await cargarMisTrabajos()
     await cargarHistorial()
@@ -423,9 +415,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {/* CANDADO: solo aparece si status es aceptado, tiene cita, y no está en_revision */}
+                {/* CANDADO: solo aparece si status es aceptado y trabajador_llego */}
                 {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
-                   <button type="button" onClick={() => marcarCompletado(trabajo)}
+                  <button type="button" onClick={() => marcarCompletado(trabajo)}
                     disabled={loadingCompletar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
@@ -441,7 +433,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
                 {trabajo.status === 'aceptado' && !trabajo.trabajador_llego && (
                   <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                   ⏳ Confirma tu llegada antes de marcar como terminado
+                    ⏳ Confirma tu llegada antes de marcar como terminado
                   </div>
                 )}
               </div>
