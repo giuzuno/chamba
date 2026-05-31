@@ -97,7 +97,7 @@ function MapaDragListener({ onDragStart, onDragEnd }) {
   return null
 }
 
-export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo }) {
+export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones }) {
   const [trabajosPublicados, setTrabajosPublicados] = useState([])
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
@@ -129,9 +129,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
       } catch {
         setCiudad('Tu ubicación')
       }
-    }, () => {
-      setCiudad('Ubicación no disponible')
-    })
+    }, () => { setCiudad('Ubicación no disponible') })
   }
 
   async function cargarTrabajosPublicados() {
@@ -154,64 +152,41 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
   if (pantalla === 'seleccionar') {
     return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   }
-  if (pantalla === 'publicar') {
-    return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
-  }
-  if (pantalla === 'viaje') {
-    return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
-  }
-  if (pantalla === 'publicaciones') {
-    return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
-  }
-  if (pantalla === 'perfil') {
-    return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
-  }
+  if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
+  if (pantalla === 'perfil') return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
 
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
 
       {/* Modal Opciones */}
       {modalOpciones && (
-        <div
-          onClick={() => setModalOpciones(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-            zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#1A1A1A', borderRadius: '20px 20px 0 0',
-              padding: '24px', width: '100%', maxWidth: '480px',
-              border: '0.5px solid rgba(255,255,255,0.1)'
-            }}
-          >
+        <div onClick={() => setModalOpciones(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#1A1A1A', borderRadius: '20px 20px 0 0',
+            padding: '24px', width: '100%', maxWidth: '480px',
+            border: '0.5px solid rgba(255,255,255,0.1)'
+          }}>
             <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
-            <button
-              type="button"
-              onClick={() => { setModalOpciones(false); onCambiarModo() }}
-              style={{
-                width: '100%', padding: '16px', marginBottom: '10px',
-                background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
-                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px',
-                fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-              }}
-            >
+            <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{
+              width: '100%', padding: '16px', marginBottom: '10px',
+              background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
+              border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px',
+              fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+            }}>
               🔧 Cambiar a modo trabajador
             </button>
-            <button
-              type="button"
-              onClick={() => { setModalOpciones(false); onLogout() }}
-              style={{
-                width: '100%', padding: '14px',
-                background: 'transparent', color: 'rgba(255,255,255,0.4)',
-                border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px',
-                fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
-              }}
-            >
+            <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{
+              width: '100%', padding: '14px', background: 'transparent',
+              color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
+              borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
+            }}>
               Cerrar sesión
             </button>
           </div>
@@ -226,15 +201,36 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
       }}>
         <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>📍 {ciudad}</span>
-        <button type="button" onClick={() => setModalOpciones(true)} style={{
-          background: 'rgba(255,255,255,0.06)',
-          color: 'rgba(255,255,255,0.7)',
-          border: '0.5px solid rgba(255,255,255,0.15)',
-          borderRadius: '8px', padding: '6px 12px',
-          fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', fontWeight: '500'
-        }}>
-          ⚙️ Opciones
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Campanita */}
+          <button type="button" onClick={onNotificaciones} style={{
+            background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+            borderRadius: '50%', width: '36px', height: '36px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', position: 'relative', fontSize: '16px'
+          }}>
+            🔔
+            {noLeidas > 0 && (
+              <span style={{
+                position: 'absolute', top: '-3px', right: '-3px',
+                background: '#F09595', color: 'white',
+                borderRadius: '100px', fontSize: '10px', fontWeight: '700',
+                padding: '1px 5px', minWidth: '16px', textAlign: 'center'
+              }}>
+                {noLeidas > 99 ? '99+' : noLeidas}
+              </span>
+            )}
+          </button>
+          {/* Opciones */}
+          <button type="button" onClick={() => setModalOpciones(true)} style={{
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
+            padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
+            fontFamily: 'sans-serif', fontWeight: '500'
+          }}>
+            ⚙️ Opciones
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -282,8 +278,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
                     <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '8px' }}>
                       ${t.ultima_oferta || t.presupuesto} MXN
                     </p>
-                    <button
-                      onClick={() => setPantalla('publicaciones')}
+                    <button onClick={() => setPantalla('publicaciones')}
                       style={{ width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                       Ver trabajo
                     </button>
@@ -294,12 +289,10 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
           })}
         </MapContainer>
 
-        {/* Contador */}
         <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', zIndex: 1000 }}>
           {cargando ? '⏳ Cargando...' : `${trabajosFiltrados.length} trabajo${trabajosFiltrados.length !== 1 ? 's' : ''} cerca`}
         </div>
 
-        {/* Aviso si no hay trabajos */}
         {!cargando && trabajosFiltrados.length === 0 && (
           <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.9)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', zIndex: 1000, whiteSpace: 'nowrap' }}>
             📭 No hay trabajos publicados ahorita
@@ -307,7 +300,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
         )}
       </div>
 
-      {/* Bottom bar — 4 botones, sin "Trabajador" */}
+      {/* Bottom bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-around',
         padding: '12px 0', background: '#0D0D0D',

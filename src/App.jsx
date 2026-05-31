@@ -257,6 +257,8 @@ function AppContenido() {
         userId={session.user.id}
         userEmail={session.user.email}
         onCambiarModo={() => setModo(null)}
+        noLeidas={noLeidas}
+        onNotificaciones={() => setVerNotificaciones(true)}
       />
     )
   }
