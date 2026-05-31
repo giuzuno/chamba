@@ -7,7 +7,6 @@ import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
 import Perfil from './Perfil'
 import PublicarViaje from './PublicarViaje'
-import Notificaciones from './Notificaciones'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -29,8 +28,8 @@ const CATEGORIAS_ICONS_MAPA = {
   'Téc. computadoras': '🖥️', 'Limpieza albercas': '🏊', 'Niñera': '👶',
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
-  'Taxi / Chofer': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵',
-  'Mandados': '🛍️', 'Taxi': '🚕', 'Flete': '🚛',
+  'Taxi / Chofer': '🚕', 'Moto taxi': '🏍️', 'Repartidor moto': '🛵', 'Mandados': '🛍️',
+  'Taxi': '🚕', 'Flete': '🚛',
 }
 
 function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
@@ -104,24 +103,36 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
   const [cargando, setCargando] = useState(false)
   const [pantalla, setPantalla] = useState('mapa')
   const [barVisible, setBarVisible] = useState(true)
-  const [noLeidas, setNoLeidas] = useState(0)
+  const [ciudad, setCiudad] = useState('...')
+  const [modalOpciones, setModalOpciones] = useState(false)
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
   useEffect(() => {
     cargarTrabajosPublicados()
-    cargarNoLeidas()
-
-    const channel = supabase
-      .channel('notif-badge-mapa')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'notificaciones',
-        filter: `usuario_id=eq.${userId}`
-      }, () => cargarNoLeidas())
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
+    obtenerCiudad()
   }, [])
+
+  async function obtenerCiudad() {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+          { headers: { 'Accept-Language': 'es' } }
+        )
+        const data = await res.json()
+        const ciudad = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || 'Tu ubicación'
+        const estado = data.address?.state || ''
+        setCiudad(estado ? `${ciudad}, ${estado}` : ciudad)
+      } catch {
+        setCiudad('Tu ubicación')
+      }
+    }, () => {
+      setCiudad('Ubicación no disponible')
+    })
+  }
 
   async function cargarTrabajosPublicados() {
     setCargando(true)
@@ -136,22 +147,10 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
     setCargando(false)
   }
 
-  async function cargarNoLeidas() {
-    const { count } = await supabase
-      .from('notificaciones')
-      .select('*', { count: 'exact', head: true })
-      .eq('usuario_id', userId)
-      .eq('leida', false)
-    setNoLeidas(count || 0)
-  }
-
   const trabajosFiltrados = categoriaFiltro === 'Todos'
     ? trabajosPublicados
     : trabajosPublicados.filter(t => t.categoria === categoriaFiltro)
 
-  if (pantalla === 'notificaciones') {
-    return <Notificaciones userId={userId} onVolver={() => { setPantalla('mapa'); cargarNoLeidas() }} />
-  }
   if (pantalla === 'seleccionar') {
     return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   }
@@ -171,6 +170,54 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
 
+      {/* Modal Opciones */}
+      {modalOpciones && (
+        <div
+          onClick={() => setModalOpciones(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#1A1A1A', borderRadius: '20px 20px 0 0',
+              padding: '24px', width: '100%', maxWidth: '480px',
+              border: '0.5px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
+            <button
+              type="button"
+              onClick={() => { setModalOpciones(false); onCambiarModo() }}
+              style={{
+                width: '100%', padding: '16px', marginBottom: '10px',
+                background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
+                border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px',
+                fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+              }}
+            >
+              🔧 Cambiar a modo trabajador
+            </button>
+            <button
+              type="button"
+              onClick={() => { setModalOpciones(false); onLogout() }}
+              style={{
+                width: '100%', padding: '14px',
+                background: 'transparent', color: 'rgba(255,255,255,0.4)',
+                border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px',
+                fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
+              }}
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -178,35 +225,16 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
         borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000
       }}>
         <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Salina Cruz, Oax.</span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* Campanita */}
-          <button type="button" onClick={() => setPantalla('notificaciones')} style={{
-            background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
-            borderRadius: '50%', width: '36px', height: '36px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', position: 'relative', fontSize: '16px'
-          }}>
-            🔔
-            {noLeidas > 0 && (
-              <span style={{
-                position: 'absolute', top: '-4px', right: '-4px',
-                background: '#F09595', color: 'white',
-                borderRadius: '100px', fontSize: '9px', fontWeight: '700',
-                padding: '1px 5px', minWidth: '16px', textAlign: 'center'
-              }}>
-                {noLeidas > 99 ? '99+' : noLeidas}
-              </span>
-            )}
-          </button>
-          <button type="button" onClick={onLogout} style={{
-            background: 'transparent', color: 'rgba(255,255,255,0.4)',
-            border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px',
-            padding: '6px 12px', fontSize: '12px', cursor: 'pointer'
-          }}>
-            Salir
-          </button>
-        </div>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>📍 {ciudad}</span>
+        <button type="button" onClick={() => setModalOpciones(true)} style={{
+          background: 'rgba(255,255,255,0.06)',
+          color: 'rgba(255,255,255,0.7)',
+          border: '0.5px solid rgba(255,255,255,0.15)',
+          borderRadius: '8px', padding: '6px 12px',
+          fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', fontWeight: '500'
+        }}>
+          ⚙️ Opciones
+        </button>
       </div>
 
       {/* Filtros */}
@@ -279,7 +307,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
         )}
       </div>
 
-      {/* Bottom bar */}
+      {/* Bottom bar — 4 botones, sin "Trabajador" */}
       <div style={{
         display: 'flex', justifyContent: 'space-around',
         padding: '12px 0', background: '#0D0D0D',
@@ -292,7 +320,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
           ['🗺️', 'Mapa'],
           ['➕', 'Publicar'],
           ['📋', 'Mis trabajos'],
-          ['🔧', 'Trabajador'],
           ['👤', 'Perfil'],
         ].map(([icon, label]) => (
           <button key={label} type="button"
@@ -300,7 +327,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo 
               if (label === 'Mapa') setPantalla('mapa')
               if (label === 'Publicar') setPantalla('seleccionar')
               if (label === 'Mis trabajos') setPantalla('publicaciones')
-              if (label === 'Trabajador') onCambiarModo()
               if (label === 'Perfil') setPantalla('perfil')
             }}
             style={{

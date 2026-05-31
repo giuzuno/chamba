@@ -39,6 +39,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [verPerfilCliente, setVerPerfilCliente] = useState(null)
   const [chatAbierto, setChatAbierto] = useState(null)
   const [mensajeNoPuedoLlegar, setMensajeNoPuedoLlegar] = useState(null)
+  const [modalOpciones, setModalOpciones] = useState(false)
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -92,7 +93,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (data) setHistorial(data)
   }
 
-  // CANDADO: solo el trabajador marca "Terminé" → en_revision
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
     await supabase.from('trabajos')
@@ -133,6 +133,53 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   const esViaje = (trabajo) => trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
+
+  const ModalOpciones = () => (
+    <div
+      onClick={() => setModalOpciones(false)}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#1A1A1A', borderRadius: '20px 20px 0 0',
+          padding: '24px', width: '100%', maxWidth: '480px',
+          border: '0.5px solid rgba(255,255,255,0.1)'
+        }}
+      >
+        <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
+        <button
+          type="button"
+          onClick={() => { setModalOpciones(false); onCambiarModo() }}
+          style={{
+            width: '100%', padding: '16px', marginBottom: '10px',
+            background: 'rgba(55,138,221,0.1)', color: '#378ADD',
+            border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px',
+            fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+          }}
+        >
+          🗺️ Cambiar a modo cliente
+        </button>
+        <button
+          type="button"
+          onClick={() => { setModalOpciones(false); onLogout() }}
+          style={{
+            width: '100%', padding: '14px',
+            background: 'transparent', color: 'rgba(255,255,255,0.4)',
+            border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px',
+            fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
+          }}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  )
 
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
@@ -196,9 +243,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   if (trabajoSeleccionado) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+        {modalOpciones && <ModalOpciones />}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Detalle del trabajo</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Detalle del trabajo</h2>
+          <button type="button" onClick={() => setModalOpciones(true)} style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            ⚙️ Opciones
+          </button>
         </div>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {exitoAceptar ? (
@@ -281,21 +332,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
+      {modalOpciones && <ModalOpciones />}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-            {pestana === 'disponibles' ? 'Trabajos disponibles' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
+            {pestana === 'disponibles' ? 'Modo trabajador' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button type="button" onClick={onCambiarModo} style={{ background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            🗺️ Modo cliente
-          </button>
-          <button type="button" onClick={onLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
-            Salir
-          </button>
-        </div>
+        <button type="button" onClick={() => setModalOpciones(true)} style={{
+          background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+          border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
+          padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
+          fontFamily: 'sans-serif', fontWeight: '500'
+        }}>
+          ⚙️ Opciones
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
@@ -337,7 +390,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>🕐 {tiempoTranscurrido(trabajo.creado_en)} · 📍 Salina Cruz</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>🕐 {tiempoTranscurrido(trabajo.creado_en)}</p>
                       {esViaje(trabajo) && (
                         <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)' }}>
                           🚗 Viaje · {trabajo.distancia_km?.toFixed(1)} km
@@ -415,7 +468,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {/* CANDADO: solo aparece si status es aceptado y trabajador_llego */}
                 {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
                   <button type="button" onClick={() => marcarCompletado(trabajo)}
                     disabled={loadingCompletar === trabajo.id}
@@ -424,7 +476,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {/* CANDADO: cuando ya está en revisión, el trabajador solo espera */}
                 {trabajo.status === 'en_revision' && (
                   <div style={{ padding: '10px 14px', background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '12px', color: '#E8A030', textAlign: 'center' }}>
                     ⏳ Avisaste que terminaste — esperando que el cliente confirme
