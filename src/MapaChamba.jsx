@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
-import Perfil from './Perfil'
+import PerfilCliente from './PerfilCliente'
 import PublicarViaje from './PublicarViaje'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -155,7 +155,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
   if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
-  if (pantalla === 'perfil') return <Perfil onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
+  if (pantalla === 'perfil') return <PerfilCliente onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
 
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
