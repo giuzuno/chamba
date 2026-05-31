@@ -3,24 +3,17 @@ import { supabase } from './supabaseClient'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 delete L.Icon.Default.prototype._getIconUrl
 
 const iconoTrabajador = L.divIcon({
-  html: `<div style="
-    background:#1D9E75;border:3px solid white;border-radius:50%;
-    width:42px;height:42px;display:flex;align-items:center;
-    justify-content:center;font-size:22px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
+  html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">👷</div>`,
   className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
 })
 
 const iconoDestino = L.divIcon({
-  html: `<div style="
-    background:#378ADD;border:3px solid white;border-radius:50%;
-    width:42px;height:42px;display:flex;align-items:center;
-    justify-content:center;font-size:22px;
-    box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
+  html: `<div style="background:#378ADD;border:3px solid white;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
   className: '', iconSize: [42,42], iconAnchor: [21,21], popupAnchor: [0,-24],
 })
 
@@ -55,6 +48,16 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
   async function activarEnCamino() {
     setLoading(true)
     await supabase.from('trabajos').update({ trabajador_en_camino: true }).eq('id', trabajo.id)
+
+    // Notificar al cliente que el trabajador está en camino
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '🚗 El trabajador está en camino',
+      cuerpo: `Tu ${trabajo.categoria} está en camino. Puedes ver su ubicación en tiempo real.`,
+      tipo: 'en_camino',
+      trabajoId: trabajo.id,
+    })
+
     setEnCamino(true)
     iniciarTracking()
     setLoading(false)
@@ -67,6 +70,16 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
       trabajador_llego: true,
       trabajador_en_camino: false,
     }).eq('id', trabajo.id)
+
+    // Notificar al cliente que el trabajador llegó
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '🏠 ¡El trabajador llegó!',
+      cuerpo: `Tu ${trabajo.categoria} llegó a tu domicilio. ¡Ábrele la puerta!`,
+      tipo: 'llegada',
+      trabajoId: trabajo.id,
+    })
+
     setLlego(true)
     setLoading(false)
   }
@@ -77,24 +90,14 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-      }}>
-        <button type="button" onClick={onVolver} style={{
-          background: 'transparent', color: 'rgba(255,255,255,0.6)',
-          border: 'none', fontSize: '20px', cursor: 'pointer'
-        }}>←</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>
           {llego ? '✅ Llegaste' : enCamino ? '🚗 En camino...' : '📍 Ir al trabajo'}
         </h2>
       </div>
 
-      <div style={{
-        padding: '14px 20px', background: 'rgba(29,158,117,0.08)',
-        borderBottom: '0.5px solid rgba(29,158,117,0.2)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-      }}>
+      <div style={{ padding: '14px 20px', background: 'rgba(29,158,117,0.08)', borderBottom: '0.5px solid rgba(29,158,117,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ fontSize: '15px', fontWeight: '600' }}>{trabajo.categoria}</p>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
@@ -121,13 +124,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
           )}
         </MapContainer>
         {enCamino && !llego && (
-          <div style={{
-            position: 'absolute', top: '10px', left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#1D9E75', color: 'white',
-            padding: '6px 16px', borderRadius: '20px',
-            fontSize: '12px', fontWeight: '600', zIndex: 1000
-          }}>
+          <div style={{ position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: '#1D9E75', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', zIndex: 1000 }}>
             🟢 Compartiendo ubicación en tiempo real
           </div>
         )}
@@ -137,19 +134,10 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
 
         {!enCamino && !llego && (
           <>
-            <div style={{
-              background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)',
-              borderRadius: '12px', padding: '14px 16px',
-              fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6'
-            }}>
-              📍 Al tocar "Estoy en camino" el cliente verá tu ubicación en tiempo real en su mapa.
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>
+              📍 Al tocar "Estoy en camino" el cliente verá tu ubicación en tiempo real y recibirá una notificación.
             </div>
-            <button type="button" onClick={activarEnCamino} disabled={loading} style={{
-              width: '100%', padding: '16px',
-              background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-              color: 'white', border: 'none', borderRadius: '14px',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-            }}>
+            <button type="button" onClick={activarEnCamino} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               {loading ? 'Activando...' : '🚗 Estoy en camino'}
             </button>
           </>
@@ -157,33 +145,19 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
 
         {enCamino && !llego && (
           <>
-            <div style={{
-              background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)',
-              borderRadius: '12px', padding: '14px 16px',
-              fontSize: '13px', color: '#1D9E75', textAlign: 'center'
-            }}>
+            <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: '#1D9E75', textAlign: 'center' }}>
               El cliente puede ver tu ubicación en tiempo real 👀
             </div>
-            <button type="button" onClick={confirmarLlegada} disabled={loading} style={{
-              width: '100%', padding: '16px',
-              background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-              color: 'white', border: 'none', borderRadius: '14px',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
-            }}>
+            <button type="button" onClick={confirmarLlegada} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               {loading ? 'Confirmando...' : '✅ Llegué al domicilio'}
             </button>
           </>
         )}
 
         {llego && (
-          <div style={{
-            background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)',
-            borderRadius: '14px', padding: '20px', textAlign: 'center'
-          }}>
+          <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏠</div>
-            <p style={{ fontSize: '16px', fontWeight: '600', color: '#1D9E75', marginBottom: '6px' }}>
-              ¡Llegaste al domicilio!
-            </p>
+            <p style={{ fontSize: '16px', fontWeight: '600', color: '#1D9E75', marginBottom: '6px' }}>¡Llegaste al domicilio!</p>
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
               El cliente fue notificado. Realiza el trabajo y marca como completado cuando termines.
             </p>
