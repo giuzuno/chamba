@@ -23,7 +23,7 @@ const CATEGORIAS_ICONS = {
 
 const CATEGORIAS_VIAJE = ['Taxi', 'Moto taxi', 'Repartidor', 'Repartidor moto', 'Flete', 'Taxi / Chofer', 'Mandados']
 
-export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -60,45 +60,30 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   async function cargarTrabajos(perfil) {
     setCargando(true)
     const categorias = perfil?.categorias_servicio || []
-    let query = supabase
-      .from('trabajos')
-      .select('*')
-      .eq('status', 'publicado')
-      .order('creado_en', { ascending: false })
-    if (categorias.length > 0) {
-      query = query.in('categoria', categorias)
-    }
+    let query = supabase.from('trabajos').select('*').eq('status', 'publicado').order('creado_en', { ascending: false })
+    if (categorias.length > 0) query = query.in('categoria', categorias)
     const { data } = await query
     if (data) setTrabajos(data)
     setCargando(false)
   }
 
   async function cargarMisTrabajos() {
-    const { data } = await supabase
-      .from('trabajos')
-      .select('*')
-      .in('status', ['aceptado', 'en_revision'])
-      .eq('trabajador_id', userId)
+    const { data } = await supabase.from('trabajos').select('*')
+      .in('status', ['aceptado', 'en_revision']).eq('trabajador_id', userId)
       .order('creado_en', { ascending: false })
     if (data) setMisTrabajos(data)
   }
 
   async function cargarHistorial() {
-    const { data } = await supabase
-      .from('trabajos')
-      .select('*')
-      .in('status', ['completado', 'cancelado'])
-      .eq('trabajador_id', userId)
+    const { data } = await supabase.from('trabajos').select('*')
+      .in('status', ['completado', 'cancelado']).eq('trabajador_id', userId)
       .order('creado_en', { ascending: false })
     if (data) setHistorial(data)
   }
 
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
-    await supabase.from('trabajos')
-      .update({ status: 'en_revision' })
-      .eq('id', trabajo.id)
-
+    await supabase.from('trabajos').update({ status: 'en_revision' }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({
       usuarioId: trabajo.cliente_id,
       titulo: '🔧 El trabajador terminó',
@@ -106,7 +91,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       tipo: 'trabajo_completado',
       trabajoId: trabajo.id,
     })
-
     await cargarMisTrabajos()
     await cargarHistorial()
     setLoadingCompletar(null)
@@ -115,8 +99,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function noPuedoLlegar(trabajo) {
     await supabase.from('mensajes').insert({
-      trabajo_id: trabajo.id,
-      emisor_id: userId,
+      trabajo_id: trabajo.id, emisor_id: userId,
       contenido: '⚠️ Hola, no puedo llegar exactamente al punto marcado en el mapa. ¿Podemos acordar un punto de encuentro cercano?',
     })
     setMensajeNoPuedoLlegar(null)
@@ -134,60 +117,72 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   const esViaje = (trabajo) => trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
 
+  // Botones del header reutilizables
+  const HeaderBotones = () => (
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <button type="button" onClick={onNotificaciones} style={{
+        background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+        borderRadius: '50%', width: '38px', height: '38px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', position: 'relative', fontSize: '16px'
+      }}>
+        🔔
+        {noLeidas > 0 && (
+          <span style={{
+            position: 'absolute', top: '-3px', right: '-3px',
+            background: '#F09595', color: 'white',
+            borderRadius: '100px', fontSize: '10px', fontWeight: '700',
+            padding: '1px 5px', minWidth: '16px', textAlign: 'center'
+          }}>
+            {noLeidas > 99 ? '99+' : noLeidas}
+          </span>
+        )}
+      </button>
+      <button type="button" onClick={() => setModalOpciones(true)} style={{
+        background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+        border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
+        padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
+        fontFamily: 'sans-serif', fontWeight: '500'
+      }}>
+        ⚙️ Opciones
+      </button>
+    </div>
+  )
+
   const ModalOpciones = () => (
-    <div
-      onClick={() => setModalOpciones(false)}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-        zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: '#1A1A1A', borderRadius: '20px 20px 0 0',
-          padding: '24px', width: '100%', maxWidth: '480px',
-          border: '0.5px solid rgba(255,255,255,0.1)'
-        }}
-      >
+    <div onClick={() => setModalOpciones(false)} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+      zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#1A1A1A', borderRadius: '20px 20px 0 0',
+        padding: '24px', width: '100%', maxWidth: '480px',
+        border: '0.5px solid rgba(255,255,255,0.1)'
+      }}>
         <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
-        <button
-          type="button"
-          onClick={() => { setModalOpciones(false); onCambiarModo() }}
-          style={{
-            width: '100%', padding: '16px', marginBottom: '10px',
-            background: 'rgba(55,138,221,0.1)', color: '#378ADD',
-            border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px',
-            fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-          }}
-        >
+        <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{
+          width: '100%', padding: '16px', marginBottom: '10px',
+          background: 'rgba(55,138,221,0.1)', color: '#378ADD',
+          border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px',
+          fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+        }}>
           🗺️ Cambiar a modo cliente
         </button>
-        <button
-          type="button"
-          onClick={() => { setModalOpciones(false); onLogout() }}
-          style={{
-            width: '100%', padding: '14px',
-            background: 'transparent', color: 'rgba(255,255,255,0.4)',
-            border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px',
-            fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
-          }}
-        >
+        <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{
+          width: '100%', padding: '14px', background: 'transparent',
+          color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
+          borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
+        }}>
           Cerrar sesión
         </button>
       </div>
     </div>
   )
 
-  if (chatAbierto) {
-    return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
-  }
-
-  if (verPerfilCliente) {
-    return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
-  }
+  if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
+  if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
 
   if (calificando) {
     return (
@@ -205,11 +200,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     return (
       <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
         onAceptado={() => {
-          setNegociando(null)
-          setTrabajoSeleccionado(null)
-          cargarTrabajos(perfilUsuario)
-          cargarMisTrabajos()
-          setPestana('mis')
+          setNegociando(null); setTrabajoSeleccionado(null)
+          cargarTrabajos(perfilUsuario); cargarMisTrabajos(); setPestana('mis')
         }}
       />
     )
@@ -247,9 +239,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAceptar(false) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Detalle del trabajo</h2>
-          <button type="button" onClick={() => setModalOpciones(true)} style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            ⚙️ Opciones
-          </button>
+          <HeaderBotones />
         </div>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {exitoAceptar ? (
@@ -264,9 +254,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 <span style={{ fontSize: '48px' }}>{CATEGORIAS_ICONS[trabajoSeleccionado.categoria] || '✳️'}</span>
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '4px' }}>{trabajoSeleccionado.categoria}</h3>
-                  <span style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>
-                    ${trabajoSeleccionado.ultima_oferta || trabajoSeleccionado.presupuesto} MXN
-                  </span>
+                  <span style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>${trabajoSeleccionado.ultima_oferta || trabajoSeleccionado.presupuesto} MXN</span>
                 </div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
@@ -331,7 +319,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-
       {modalOpciones && <ModalOpciones />}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
@@ -341,14 +328,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
             {pestana === 'disponibles' ? 'Modo trabajador' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
           </p>
         </div>
-        <button type="button" onClick={() => setModalOpciones(true)} style={{
-          background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-          border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
-          padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
-          fontFamily: 'sans-serif', fontWeight: '500'
-        }}>
-          ⚙️ Opciones
-        </button>
+        <HeaderBotones />
       </div>
 
       <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
@@ -364,7 +344,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
         {pestana === 'disponibles' && (
           <>
             {perfilUsuario && (!perfilUsuario.categorias_servicio || perfilUsuario.categorias_servicio.length === 0) && (
@@ -424,8 +403,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
                     {esViaje(trabajo) && trabajo.origen_lat && (
                       <div style={{ marginTop: '6px', display: 'flex', gap: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                        <span>📍 Origen</span><span>→</span><span>🏁 Destino</span>
-                        <span>· {trabajo.distancia_km?.toFixed(1)} km</span>
+                        <span>📍 Origen</span><span>→</span><span>🏁 Destino</span><span>· {trabajo.distancia_km?.toFixed(1)} km</span>
                       </div>
                     )}
                     {trabajo.fecha_cita && (
@@ -443,45 +421,37 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 <button type="button" onClick={() => setChatAbierto(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   💬 Chat con el cliente
                 </button>
-
                 {esViaje(trabajo) && trabajo.status === 'aceptado' && (
                   <button type="button" onClick={() => setMensajeNoPuedoLlegar(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(232,160,48,0.08)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     ⚠️ No puedo llegar al punto — coordinar con cliente
                   </button>
                 )}
-
                 {trabajo.cliente_id && (
                   <button type="button" onClick={() => setVerPerfilCliente(trabajo.cliente_id)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(55,138,221,0.08)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     👤 Ver perfil del cliente
                   </button>
                 )}
-
                 {trabajo.status === 'aceptado' && trabajo.fecha_cita && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                     🚗 Ir al trabajo — compartir ubicación
                   </button>
                 )}
-
                 {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                     🟢 En camino — ver mapa
                   </button>
                 )}
-
                 {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
-                  <button type="button" onClick={() => marcarCompletado(trabajo)}
-                    disabled={loadingCompletar === trabajo.id}
+                  <button type="button" onClick={() => marcarCompletado(trabajo)} disabled={loadingCompletar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
                   </button>
                 )}
-
                 {trabajo.status === 'en_revision' && (
                   <div style={{ padding: '10px 14px', background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '12px', color: '#E8A030', textAlign: 'center' }}>
                     ⏳ Avisaste que terminaste — esperando que el cliente confirme
                   </div>
                 )}
-
                 {trabajo.status === 'aceptado' && !trabajo.trabajador_llego && (
                   <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
                     ⏳ Confirma tu llegada antes de marcar como terminado
@@ -515,9 +485,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block', background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595', border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.4)' : 'rgba(240,149,149,0.3)'}`, fontWeight: '500' }}>
                       {trabajo.status === 'completado' ? '🏁 Completado' : '❌ Cancelado'}
                     </span>
-                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>
-                      {tiempoTranscurrido(trabajo.creado_en)}
-                    </span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>{tiempoTranscurrido(trabajo.creado_en)}</span>
                   </div>
                 </div>
               </div>
