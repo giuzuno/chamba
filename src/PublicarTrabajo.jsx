@@ -32,24 +32,41 @@ const CATEGORIAS = [
   { icon: '✳️', nombre: 'Otros' },
 ]
 
+const HORARIOS = [
+  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+  '19:00', '20:00'
+]
+
 export default function PublicarTrabajo({ onVolver, userId }) {
   const [categoria, setCategoria] = useState('')
   const [otroServicio, setOtroServicio] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [presupuesto, setPresupuesto] = useState(300)
+  const [fecha, setFecha] = useState('')
+  const [hora, setHora] = useState('')
   const [loading, setLoading] = useState(false)
   const [exito, setExito] = useState(false)
   const [error, setError] = useState('')
   const [confirmando, setConfirmando] = useState(false)
   const [ubicacion, setUbicacion] = useState(null)
 
+  const hoy = new Date().toISOString().split('T')[0]
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
   const iconCategoria = CATEGORIAS.find(c => c.nombre === categoria)?.icon || '✳️'
+
+  function formatearFecha(f) {
+    if (!f) return ''
+    const d = new Date(f + 'T12:00:00')
+    return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+  }
 
   function verConfirmacion() {
     if (!categoria) { setError('Selecciona una categoría'); return }
     if (categoria === 'Otros' && !otroServicio) { setError('Describe qué servicio necesitas'); return }
     if (!descripcion) { setError('Describe el trabajo'); return }
+    if (!fecha) { setError('Selecciona la fecha en que lo necesitas'); return }
+    if (!hora) { setError('Selecciona la hora en que lo necesitas'); return }
     setError('')
 
     navigator.geolocation.getCurrentPosition(
@@ -66,17 +83,17 @@ export default function PublicarTrabajo({ onVolver, userId }) {
 
   async function publicar() {
     setLoading(true)
-    const { data, error } = await supabase.from('trabajos').insert({
+    const { error } = await supabase.from('trabajos').insert({
       cliente_id: userId,
       categoria: categoriaFinal,
       descripcion,
       presupuesto,
+      fecha_cita: fecha,
+      hora_cita: hora,
       lat: ubicacion.lat,
       lng: ubicacion.lng,
       status: 'publicado'
     })
-    console.log('data:', data)
-    console.log('error:', error)
     if (error) { setError(error.message); setConfirmando(false) }
     else setExito(true)
     setLoading(false)
@@ -84,25 +101,16 @@ export default function PublicarTrabajo({ onVolver, userId }) {
 
   if (exito) {
     return (
-      <div style={{
-        minHeight: '100vh', background: '#0D0D0D',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        fontFamily: 'sans-serif', padding: '24px', textAlign: 'center'
-      }}>
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
         <div style={{ fontSize: '60px', marginBottom: '20px' }}>🎉</div>
-        <h2 style={{ color: '#1D9E75', fontSize: '24px', fontWeight: '800', marginBottom: '10px' }}>
-          ¡Trabajo publicado!
-        </h2>
-        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '32px', maxWidth: '300px' }}>
+        <h2 style={{ color: '#1D9E75', fontSize: '24px', fontWeight: '800', marginBottom: '10px' }}>¡Trabajo publicado!</h2>
+        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px', maxWidth: '300px' }}>
           Los trabajadores de <strong style={{ color: 'white' }}>{categoriaFinal}</strong> cerca de ti ya pueden ver tu trabajo.
         </p>
-        <button type="button" onClick={onVolver} style={{
-          background: '#1D9E75', color: 'white', border: 'none',
-          borderRadius: '12px', padding: '14px 32px',
-          fontSize: '15px', fontWeight: '500', cursor: 'pointer',
-          fontFamily: 'sans-serif'
-        }}>
+        <p style={{ color: '#1D9E75', fontSize: '14px', marginBottom: '32px' }}>
+          📅 {formatearFecha(fecha)} a las {hora} hrs
+        </p>
+        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Ver mapa
         </button>
       </div>
@@ -112,29 +120,15 @@ export default function PublicarTrabajo({ onVolver, userId }) {
   if (confirmando) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '16px 20px',
-          borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-        }}>
-          <button type="button" onClick={() => setConfirmando(false)} style={{
-            background: 'transparent', color: 'rgba(255,255,255,0.6)',
-            border: 'none', fontSize: '20px', cursor: 'pointer'
-          }}>←</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+          <button type="button" onClick={() => setConfirmando(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Confirmar publicación</h2>
         </div>
 
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
-            Revisa los detalles antes de publicar:
-          </p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Revisa los detalles antes de publicar:</p>
 
-          <div style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '0.5px solid rgba(255,255,255,0.1)',
-            borderRadius: '16px', overflow: 'hidden'
-          }}>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '32px' }}>{iconCategoria}</span>
               <div>
@@ -156,6 +150,14 @@ export default function PublicarTrabajo({ onVolver, userId }) {
                 <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', lineHeight: '1.5' }}>{descripcion}</p>
               </div>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '32px' }}>📅</span>
+              <div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>CUÁNDO LO NECESITAS</p>
+                <p style={{ fontSize: '15px', fontWeight: '600', color: '#1D9E75', textTransform: 'capitalize' }}>{formatearFecha(fecha)}</p>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {hora} hrs</p>
+              </div>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px' }}>
               <span style={{ fontSize: '32px' }}>📍</span>
               <div>
@@ -165,32 +167,16 @@ export default function PublicarTrabajo({ onVolver, userId }) {
             </div>
           </div>
 
-          <div style={{
-            background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)',
-            borderRadius: '12px', padding: '12px 16px',
-            fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5'
-          }}>
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
             ✓ Los trabajadores de <strong style={{ color: '#1D9E75' }}>{categoriaFinal}</strong> cerca de ti podrán ver y aceptar tu trabajo.
           </div>
 
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-          <button type="button" onClick={publicar} disabled={loading} style={{
-            width: '100%', padding: '16px',
-            background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75',
-            color: 'white', border: 'none', borderRadius: '14px',
-            fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-            fontFamily: 'sans-serif'
-          }}>
+          <button type="button" onClick={publicar} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {loading ? 'Publicando...' : '✅ Confirmar y publicar'}
           </button>
-
-          <button type="button" onClick={() => setConfirmando(false)} style={{
-            width: '100%', padding: '14px', background: 'transparent',
-            color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
-            borderRadius: '14px', fontSize: '15px', cursor: 'pointer',
-            fontFamily: 'sans-serif'
-          }}>
+          <button type="button" onClick={() => setConfirmando(false)} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             Editar trabajo
           </button>
         </div>
@@ -200,23 +186,17 @@ export default function PublicarTrabajo({ onVolver, userId }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)'
-      }}>
-        <button type="button" onClick={onVolver} style={{
-          background: 'transparent', color: 'rgba(255,255,255,0.6)',
-          border: 'none', fontSize: '20px', cursor: 'pointer'
-        }}>←</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Publicar trabajo</h2>
       </div>
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
+        {/* Categoría */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            ¿Qué necesitas?
+            ¿Qué necesitas? *
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
             {CATEGORIAS.map(cat => (
@@ -225,12 +205,11 @@ export default function PublicarTrabajo({ onVolver, userId }) {
                 style={{
                   background: categoria === cat.nombre ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.05)',
                   border: categoria === cat.nombre ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px', padding: '10px 6px',
-                  cursor: 'pointer', fontFamily: 'sans-serif',
+                  borderRadius: '12px', padding: '10px 6px', cursor: 'pointer', fontFamily: 'sans-serif',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
                 }}>
                 <span style={{ fontSize: '22px' }}>{cat.icon}</span>
-                <span style={{ fontSize: '10px', color: categoria === cat.nombre ? '#1D9E75' : 'rgba(255,255,255,0.5)' }}>
+                <span style={{ fontSize: '10px', color: categoria === cat.nombre ? '#1D9E75' : 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
                   {cat.nombre}
                 </span>
               </button>
@@ -239,35 +218,25 @@ export default function PublicarTrabajo({ onVolver, userId }) {
           {categoria === 'Otros' && (
             <input type="text" placeholder="¿Qué servicio necesitas?"
               value={otroServicio} onChange={e => setOtroServicio(e.target.value)}
-              style={{
-                width: '100%', marginTop: '12px',
-                background: 'rgba(255,255,255,0.06)', border: '0.5px solid #1D9E75',
-                borderRadius: '12px', padding: '12px 16px',
-                color: 'white', fontSize: '14px',
-                fontFamily: 'sans-serif', outline: 'none'
-              }}
+              style={{ width: '100%', marginTop: '12px', background: 'rgba(255,255,255,0.06)', border: '0.5px solid #1D9E75', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
             />
           )}
         </div>
 
+        {/* Descripción */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Describe el trabajo
+            Describe el trabajo *
           </p>
           <textarea
             placeholder="Ej. Cambiar 3 contactos y revisar el tablero eléctrico..."
             value={descripcion} onChange={e => setDescripcion(e.target.value)}
-            rows={4}
-            style={{
-              width: '100%', background: 'rgba(255,255,255,0.06)',
-              border: '0.5px solid rgba(255,255,255,0.15)',
-              borderRadius: '12px', padding: '14px 16px',
-              color: 'white', fontSize: '14px',
-              fontFamily: 'sans-serif', resize: 'none', outline: 'none'
-            }}
+            rows={3}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
           />
         </div>
 
+        {/* Presupuesto */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Cuánto pagas
@@ -283,14 +252,56 @@ export default function PublicarTrabajo({ onVolver, userId }) {
           </div>
         </div>
 
+        {/* Fecha */}
+        <div>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            ¿Para cuándo lo necesitas? *
+          </p>
+          <input
+            type="date" min={hoy} value={fecha}
+            onChange={e => { setFecha(e.target.value); setError('') }}
+            style={{
+              width: '100%', background: 'rgba(255,255,255,0.06)',
+              border: fecha ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)',
+              borderRadius: '12px', padding: '14px 16px',
+              color: 'white', fontSize: '15px', fontFamily: 'sans-serif',
+              outline: 'none', colorScheme: 'dark'
+            }}
+          />
+          {fecha && (
+            <p style={{ fontSize: '13px', color: '#1D9E75', marginTop: '8px', textTransform: 'capitalize' }}>
+              📅 {formatearFecha(fecha)}
+            </p>
+          )}
+        </div>
+
+        {/* Hora */}
+        <div>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            ¿A qué hora? *
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            {HORARIOS.map(h => (
+              <button key={h} type="button"
+                onClick={() => { setHora(h); setError('') }}
+                style={{
+                  background: hora === h ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.05)',
+                  border: hora === h ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.1)',
+                  borderRadius: '10px', padding: '10px 6px',
+                  color: hora === h ? '#1D9E75' : 'rgba(255,255,255,0.6)',
+                  fontSize: '13px', fontWeight: hora === h ? '600' : '400',
+                  cursor: 'pointer', fontFamily: 'sans-serif'
+                }}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-        <button type="button" onClick={verConfirmacion} style={{
-          width: '100%', padding: '16px',
-          background: '#1D9E75', color: 'white', border: 'none',
-          borderRadius: '14px', fontSize: '16px', fontWeight: '600',
-          cursor: 'pointer', fontFamily: 'sans-serif', marginTop: '8px'
-        }}>
+        <button type="button" onClick={verConfirmacion} style={{ width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginTop: '8px' }}>
           Revisar y publicar →
         </button>
 
