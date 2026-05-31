@@ -8,66 +8,39 @@ import Privacidad from './Privacidad'
 import Notificaciones from './Notificaciones'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 
-// ── Toast clicable ──
 function Toast({ toast, onClick }) {
   if (!toast) return null
-
   const iconos = {
-    'trabajo_aceptado': '✅',
-    'trabajo_completado': '🔧',
-    'pago_liberado': '💰',
-    'contraoferta': '💬',
-    'disputa': '⚠️',
-    'calificacion': '⭐',
-    'mensaje': '💬',
-    'llegada': '🏠',
-    'en_camino': '🚗',
-    'recordatorio': '📅',
-    'general': '🔔',
+    'trabajo_aceptado': '✅', 'trabajo_completado': '🔧', 'pago_liberado': '💰',
+    'contraoferta': '💬', 'disputa': '⚠️', 'calificacion': '⭐',
+    'mensaje': '💬', 'llegada': '🏠', 'en_camino': '🚗',
+    'recordatorio': '📅', 'general': '🔔',
   }
   const icono = iconos[toast.tipo] || '🔔'
-
   return (
-    <div
-      onClick={onClick}
-      style={{
-        position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)',
-        background: '#1A1A1A', border: '1px solid rgba(29,158,117,0.4)',
-        borderRadius: '16px', padding: '12px 16px',
-        zIndex: 99999, maxWidth: '340px', width: 'calc(100% - 32px)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        cursor: 'pointer', fontFamily: 'sans-serif',
-        display: 'flex', alignItems: 'center', gap: '12px',
-        animation: 'slideDown 0.3s ease',
-      }}
-    >
+    <div onClick={onClick} style={{
+      position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)',
+      background: '#1A1A1A', border: '1px solid rgba(29,158,117,0.4)',
+      borderRadius: '16px', padding: '12px 16px',
+      zIndex: 99999, maxWidth: '340px', width: 'calc(100% - 32px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      cursor: 'pointer', fontFamily: 'sans-serif',
+      display: 'flex', alignItems: 'center', gap: '12px',
+      animation: 'slideDown 0.3s ease',
+    }}>
       <style>{`
         @keyframes slideDown {
           from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
-
-      {/* Ícono */}
-      <div style={{
-        width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
-        background: 'rgba(29,158,117,0.15)', border: '1px solid rgba(29,158,117,0.3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px'
-      }}>
+      <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'rgba(29,158,117,0.15)', border: '1px solid rgba(29,158,117,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
         {icono}
       </div>
-
-      {/* Texto */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px', lineHeight: '1.3' }}>
-          {toast.titulo}
-        </p>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {toast.cuerpo}
-        </p>
+        <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px', lineHeight: '1.3' }}>{toast.titulo}</p>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{toast.cuerpo}</p>
       </div>
-
-      {/* Indicador toca */}
       <div style={{ fontSize: '11px', color: 'rgba(29,158,117,0.7)', flexShrink: 0 }}>Ver →</div>
     </div>
   )
@@ -75,53 +48,25 @@ function Toast({ toast, onClick }) {
 
 function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, onNotificaciones }) {
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0D0D0D',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'sans-serif', padding: '24px', position: 'relative'
-    }}>
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', position: 'relative' }}>
       <div style={{ position: 'absolute', top: '16px', right: '20px' }}>
-        <button type="button" onClick={onNotificaciones} style={{
-          background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
-          borderRadius: '50%', width: '42px', height: '42px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', position: 'relative', fontSize: '18px'
-        }}>
+        <button type="button" onClick={onNotificaciones} style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', fontSize: '18px' }}>
           🔔
           {noLeidas > 0 && (
-            <span style={{
-              position: 'absolute', top: '-4px', right: '-4px',
-              background: '#F09595', color: 'white',
-              borderRadius: '100px', fontSize: '10px', fontWeight: '700',
-              padding: '1px 6px', minWidth: '18px', textAlign: 'center'
-            }}>
+            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>
               {noLeidas > 99 ? '99+' : noLeidas}
             </span>
           )}
         </button>
       </div>
-
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>chamba</h1>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Salina Cruz, Oaxaca</p>
-        {nombre && (
-          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>
-            Hola, {nombre.split(' ')[0]} 👋
-          </p>
-        )}
+        {nombre && <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>Hola, {nombre.split(' ')[0]} 👋</p>}
       </div>
-
-      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '24px', textAlign: 'center' }}>
-        ¿Qué deseas hacer hoy?
-      </p>
-
+      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '24px', textAlign: 'center' }}>¿Qué deseas hacer hoy?</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '360px' }}>
-        <button type="button" onClick={onCliente} style={{
-          background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
-          borderRadius: '20px', padding: '28px 24px', cursor: 'pointer', fontFamily: 'sans-serif',
-          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
-        }}>
+        <button type="button" onClick={onCliente} style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '20px', padding: '28px 24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🛍️</div>
           <div>
             <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Solicitar un servicio</p>
@@ -132,12 +77,7 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
             </div>
           </div>
         </button>
-
-        <button type="button" onClick={onTrabajador} style={{
-          background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
-          borderRadius: '20px', padding: '28px 24px', cursor: 'pointer', fontFamily: 'sans-serif',
-          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px',
-        }}>
+        <button type="button" onClick={onTrabajador} style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '20px', padding: '28px 24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0, background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🔧</div>
           <div>
             <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>Quiero trabajar</p>
@@ -149,17 +89,12 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
           </div>
         </button>
       </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', maxWidth: '360px', margin: '24px 0 16px' }}>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
         <span style={{ color: 'rgba(255,255,255,0.08)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
       </div>
-
-      <button type="button" onClick={onLogout} style={{
-        background: 'transparent', color: 'rgba(255,255,255,0.25)',
-        border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif'
-      }}>
+      <button type="button" onClick={onLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.25)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
         Cerrar sesión
       </button>
     </div>
@@ -178,6 +113,10 @@ function AppContenido() {
   const [noLeidas, setNoLeidas] = useState(0)
   const [verNotificaciones, setVerNotificaciones] = useState(false)
   const [toastActivo, setToastActivo] = useState(null)
+  // Para navegación desde toast
+  const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
+  const [navegarAActivos, setNavegarAActivos] = useState(false)
+  const [navegarAPerfil, setNavegarAPerfil] = useState(false)
   const toastTimer = useRef(null)
 
   useEffect(() => {
@@ -206,7 +145,6 @@ function AppContenido() {
         filter: `usuario_id=eq.${session.user.id}`
       }, (payload) => {
         cargarNoLeidas()
-        // Mostrar toast con datos de la notificación guardada
         if (payload.new) {
           mostrarToast({
             titulo: payload.new.titulo,
@@ -233,11 +171,8 @@ function AppContenido() {
   useEffect(() => {
     if (session) {
       solicitarPermiso().then(async token => {
-        if (token) {
-          await supabase.from('usuarios').update({ fcm_token: token }).eq('id', session.user.id)
-        }
+        if (token) await supabase.from('usuarios').update({ fcm_token: token }).eq('id', session.user.id)
       })
-      // FCM foreground — cuando la app está abierta
       const unsubscribe = escucharNotificaciones((payload) => {
         cargarNoLeidas()
         mostrarToast({
@@ -252,19 +187,40 @@ function AppContenido() {
   }, [session])
 
   function mostrarToast(datos) {
-    // Cancelar timer anterior si había un toast
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToastActivo(datos)
-    toastTimer.current = setTimeout(() => {
-      setToastActivo(null)
-    }, 5000)
+    toastTimer.current = setTimeout(() => setToastActivo(null), 5000)
   }
 
   function alTocarToast() {
+    const toast = toastActivo
     setToastActivo(null)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    // Abrir historial de notificaciones
-    setVerNotificaciones(true)
+
+    if (!toast) return
+
+    // Notificaciones del CLIENTE — llevar a Mis publicaciones
+    const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'trabajo_aceptado', 'contraoferta', 'disputa']
+    // Notificaciones del TRABAJADOR — llevar a Activos
+    const tiposTrabajador = ['pago_liberado']
+    // Calificación — llevar a Perfil
+    const tiposPerfil = ['calificacion']
+
+    if (tiposCliente.includes(toast.tipo)) {
+      // Ir a modo cliente → Mis publicaciones
+      setModo('cliente')
+      setNavegarAMisPublicaciones(true)
+    } else if (tiposTrabajador.includes(toast.tipo)) {
+      // Ir a modo trabajador → pestaña Activos
+      setModo('trabajador')
+      setNavegarAActivos(true)
+    } else if (tiposPerfil.includes(toast.tipo)) {
+      // Ir a perfil según modo actual
+      setNavegarAPerfil(true)
+    } else {
+      // Por defecto abrir historial de notificaciones
+      setVerNotificaciones(true)
+    }
   }
 
   async function handleLogin(e) {
@@ -286,6 +242,9 @@ function AppContenido() {
   async function handleLogout() {
     await supabase.auth.signOut()
     setModo(null); setNombreUsuario(''); setNoLeidas(0)
+    setNavegarAMisPublicaciones(false)
+    setNavegarAActivos(false)
+    setNavegarAPerfil(false)
   }
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
@@ -326,6 +285,9 @@ function AppContenido() {
             onCambiarModo={() => setModo(null)}
             noLeidas={noLeidas}
             onNotificaciones={() => setVerNotificaciones(true)}
+            // Navegación desde toast
+            irAActivos={navegarAActivos}
+            onNavegacionCompletada={() => { setNavegarAActivos(false); setNavegarAPerfil(false) }}
           />
         </>
       )
@@ -341,6 +303,9 @@ function AppContenido() {
           onCambiarModo={() => setModo(null)}
           noLeidas={noLeidas}
           onNotificaciones={() => setVerNotificaciones(true)}
+          // Navegación desde toast
+          irAMisPublicaciones={navegarAMisPublicaciones}
+          onNavegacionCompletada={() => { setNavegarAMisPublicaciones(false); setNavegarAPerfil(false) }}
         />
       </>
     )

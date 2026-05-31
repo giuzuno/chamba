@@ -43,7 +43,7 @@ function horasParaCita(trabajo) {
   return `${Math.round(diffHoras)} hrs`
 }
 
-export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, onNavegacionCompletada }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -67,6 +67,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     cargarMisTrabajos()
     cargarHistorial()
   }, [])
+
+  useEffect(() => {
+    if (irAActivos) {
+      setPestana('mis')
+      onNavegacionCompletada?.()
+    }
+  }, [irAActivos])
 
   async function cargarPerfilUsuario() {
     const { data } = await supabase.from('usuarios')

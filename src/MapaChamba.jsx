@@ -43,11 +43,7 @@ function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
         <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '8px' }}>
           Selecciona el tipo de servicio que quieres publicar
         </p>
-        <button type="button" onClick={onServicio} style={{
-          background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
-          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
-          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
-        }}>
+        <button type="button" onClick={onServicio} style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🔧</div>
           <div>
             <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Contratar un servicio</p>
@@ -58,11 +54,7 @@ function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
             </div>
           </div>
         </button>
-        <button type="button" onClick={onViaje} style={{
-          background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
-          borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
-          textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px'
-        }}>
+        <button type="button" onClick={onViaje} style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '20px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ width: '60px', height: '60px', borderRadius: '16px', flexShrink: 0, background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🚕</div>
           <div>
             <p style={{ fontSize: '18px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>Solicitar un viaje</p>
@@ -97,7 +89,7 @@ function MapaDragListener({ onDragStart, onDragEnd }) {
   return null
 }
 
-export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones }) {
+export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAMisPublicaciones, onNavegacionCompletada }) {
   const [trabajosPublicados, setTrabajosPublicados] = useState([])
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
@@ -107,6 +99,14 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   const [modalOpciones, setModalOpciones] = useState(false)
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
+
+  // Navegar a Mis publicaciones desde toast
+  useEffect(() => {
+    if (irAMisPublicaciones) {
+      setPantalla('publicaciones')
+      onNavegacionCompletada?.()
+    }
+  }, [irAMisPublicaciones])
 
   useEffect(() => {
     cargarTrabajosPublicados()
@@ -126,9 +126,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         const ciudad = data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || 'Tu ubicación'
         const estado = data.address?.state || ''
         setCiudad(estado ? `${ciudad}, ${estado}` : ciudad)
-      } catch {
-        setCiudad('Tu ubicación')
-      }
+      } catch { setCiudad('Tu ubicación') }
     }, () => { setCiudad('Ubicación no disponible') })
   }
 
@@ -149,9 +147,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
     ? trabajosPublicados
     : trabajosPublicados.filter(t => t.categoria === categoriaFiltro)
 
-  if (pantalla === 'seleccionar') {
-    return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
-  }
+  if (pantalla === 'seleccionar') return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
   if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} />
@@ -162,31 +158,14 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
       {/* Modal Opciones */}
       {modalOpciones && (
-        <div onClick={() => setModalOpciones(false)} style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: '#1A1A1A', borderRadius: '20px 20px 0 0',
-            padding: '24px', width: '100%', maxWidth: '480px',
-            border: '0.5px solid rgba(255,255,255,0.1)'
-          }}>
+        <div onClick={() => setModalOpciones(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#1A1A1A', borderRadius: '20px 20px 0 0', padding: '24px', width: '100%', maxWidth: '480px', border: '0.5px solid rgba(255,255,255,0.1)' }}>
             <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
-            <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{
-              width: '100%', padding: '16px', marginBottom: '10px',
-              background: 'rgba(29,158,117,0.1)', color: '#1D9E75',
-              border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px',
-              fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-            }}>
+            <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{ width: '100%', padding: '16px', marginBottom: '10px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
               🔧 Cambiar a modo trabajador
             </button>
-            <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{
-              width: '100%', padding: '14px', background: 'transparent',
-              color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
-              borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
-            }}>
+            <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               Cerrar sesión
             </button>
           </div>
@@ -194,58 +173,28 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
       )}
 
       {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 20px', background: '#0D0D0D',
-        borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: '#0D0D0D', borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000 }}>
         <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>📍 {ciudad}</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* Campanita */}
-          <button type="button" onClick={onNotificaciones} style={{
-            background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
-            borderRadius: '50%', width: '36px', height: '36px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', position: 'relative', fontSize: '16px'
-          }}>
+          <button type="button" onClick={onNotificaciones} style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', fontSize: '16px' }}>
             🔔
             {noLeidas > 0 && (
-              <span style={{
-                position: 'absolute', top: '-3px', right: '-3px',
-                background: '#F09595', color: 'white',
-                borderRadius: '100px', fontSize: '10px', fontWeight: '700',
-                padding: '1px 5px', minWidth: '16px', textAlign: 'center'
-              }}>
+              <span style={{ position: 'absolute', top: '-3px', right: '-3px', background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 5px', minWidth: '16px', textAlign: 'center' }}>
                 {noLeidas > 99 ? '99+' : noLeidas}
               </span>
             )}
           </button>
-          {/* Opciones */}
-          <button type="button" onClick={() => setModalOpciones(true)} style={{
-            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-            border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
-            padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
-            fontFamily: 'sans-serif', fontWeight: '500'
-          }}>
+          <button type="button" onClick={() => setModalOpciones(true)} style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', fontWeight: '500' }}>
             ⚙️ Opciones
           </button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div style={{
-        display: 'flex', gap: '8px', padding: '10px 16px',
-        overflowX: 'auto', background: '#0D0D0D',
-        borderBottom: '0.5px solid rgba(255,255,255,0.08)'
-      }}>
+      <div style={{ display: 'flex', gap: '8px', padding: '10px 16px', overflowX: 'auto', background: '#0D0D0D', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {CATEGORIAS.map(cat => (
-          <button key={cat} type="button" onClick={() => setCategoriaFiltro(cat)} style={{
-            background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)',
-            color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)',
-            border: 'none', borderRadius: '20px', padding: '6px 14px', fontSize: '12px',
-            cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'sans-serif'
-          }}>
+          <button key={cat} type="button" onClick={() => setCategoriaFiltro(cat)} style={{ background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '20px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'sans-serif' }}>
             {cat}
           </button>
         ))}
@@ -255,10 +204,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
           <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          <MapaDragListener
-            onDragStart={() => setBarVisible(false)}
-            onDragEnd={() => setBarVisible(true)}
-          />
+          <MapaDragListener onDragStart={() => setBarVisible(false)} onDragEnd={() => setBarVisible(true)} />
           {trabajosFiltrados.map(t => {
             const icono = L.divIcon({
               html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">${CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</div>`,
@@ -278,8 +224,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
                     <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '8px' }}>
                       ${t.ultima_oferta || t.presupuesto} MXN
                     </p>
-                    <button onClick={() => setPantalla('publicaciones')}
-                      style={{ width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                    <button onClick={() => setPantalla('publicaciones')} style={{ width: '100%', padding: '7px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                       Ver trabajo
                     </button>
                   </div>
@@ -288,11 +233,9 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
             )
           })}
         </MapContainer>
-
         <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', zIndex: 1000 }}>
           {cargando ? '⏳ Cargando...' : `${trabajosFiltrados.length} trabajo${trabajosFiltrados.length !== 1 ? 's' : ''} cerca`}
         </div>
-
         {!cargando && trabajosFiltrados.length === 0 && (
           <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.9)', border: '0.5px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '10px 20px', borderRadius: '20px', fontSize: '13px', zIndex: 1000, whiteSpace: 'nowrap' }}>
             📭 No hay trabajos publicados ahorita
@@ -301,20 +244,8 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
       </div>
 
       {/* Bottom bar */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-around',
-        padding: '12px 0', background: '#0D0D0D',
-        borderTop: '0.5px solid rgba(255,255,255,0.1)',
-        transform: barVisible ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 0.3s ease',
-        position: 'relative', zIndex: 1000
-      }}>
-        {[
-          ['🗺️', 'Mapa'],
-          ['➕', 'Publicar'],
-          ['📋', 'Mis trabajos'],
-          ['👤', 'Perfil'],
-        ].map(([icon, label]) => (
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0', background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.1)', transform: barVisible ? 'translateY(0)' : 'translateY(100%)', transition: 'transform 0.3s ease', position: 'relative', zIndex: 1000 }}>
+        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
           <button key={label} type="button"
             onClick={() => {
               if (label === 'Mapa') setPantalla('mapa')
@@ -338,7 +269,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
           </button>
         ))}
       </div>
-
     </div>
   )
 }
