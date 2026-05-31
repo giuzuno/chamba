@@ -24,6 +24,25 @@ const CATEGORIAS_ICONS = {
 
 const CATEGORIAS_VIAJE = ['Taxi', 'Moto taxi', 'Repartidor', 'Repartidor moto', 'Flete', 'Taxi / Chofer', 'Mandados']
 
+function puedeIrAlTrabajo(trabajo) {
+  if (!trabajo.fecha_cita || !trabajo.hora_cita) return false
+  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+  const ahora = new Date()
+  const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
+  // Puede salir entre 2 horas antes y 4 horas después (por retrasos)
+  return diffHoras <= 2 && diffHoras > -4
+}
+
+function horasParaCita(trabajo) {
+  if (!trabajo.fecha_cita || !trabajo.hora_cita) return null
+  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+  const ahora = new Date()
+  const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
+  if (diffHoras <= 0) return null
+  if (diffHoras < 1) return `${Math.round(diffHoras * 60)} min`
+  return `${Math.round(diffHoras)} hrs`
+}
+
 export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
@@ -228,8 +247,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>DESCRIPCIÓN</p>
                   <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>{trabajoSeleccionado.descripcion}</p>
                 </div>
-
-                {/* Fecha y hora — siempre visible */}
                 {trabajoSeleccionado.fecha_cita && (
                   <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', background: 'rgba(29,158,117,0.05)' }}>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>CUÁNDO LO NECESITAN</p>
@@ -241,7 +258,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     </p>
                   </div>
                 )}
-
                 {esViaje(trabajoSeleccionado) && trabajoSeleccionado.origen_lat && (
                   <>
                     <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -264,7 +280,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     </div>
                   </>
                 )}
-
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>UBICACIÓN</p>
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>📍 {trabajoSeleccionado.lat?.toFixed(4)}, {trabajoSeleccionado.lng?.toFixed(4)}</p>
@@ -354,10 +369,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.ultima_oferta || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
-
-                    {/* Fecha y hora destacadas */}
                     {trabajo.fecha_cita && (
-                      <div style={{ marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '12px', color: '#1D9E75', fontWeight: '600', background: 'rgba(29,158,117,0.1)', padding: '2px 8px', borderRadius: '6px', border: '0.5px solid rgba(29,158,117,0.3)' }}>
                           📅 {trabajo.fecha_cita}
                         </span>
@@ -366,7 +379,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                         </span>
                       </div>
                     )}
-
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Publicado {tiempoTranscurrido(trabajo.creado_en)}</p>
                       {esViaje(trabajo) && (
@@ -422,39 +434,58 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 <button type="button" onClick={() => setChatAbierto(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   💬 Chat con el cliente
                 </button>
+
                 {esViaje(trabajo) && trabajo.status === 'aceptado' && (
                   <button type="button" onClick={() => setMensajeNoPuedoLlegar(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(232,160,48,0.08)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     ⚠️ No puedo llegar al punto — coordinar con cliente
                   </button>
                 )}
+
                 {trabajo.cliente_id && (
                   <button type="button" onClick={() => setVerPerfilCliente(trabajo.cliente_id)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(55,138,221,0.08)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     👤 Ver perfil del cliente
                   </button>
                 )}
-                {trabajo.status === 'aceptado' && trabajo.fecha_cita && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
-                  <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
-                    🚗 Ir al trabajo — compartir ubicación
-                  </button>
+
+                {/* CANDADO DE TIEMPO: solo puede ir si faltan 2 hrs o menos */}
+                {trabajo.status === 'aceptado' && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
+                  puedeIrAlTrabajo(trabajo) ? (
+                    <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
+                      🚗 Ir al trabajo — compartir ubicación
+                    </button>
+                  ) : (
+                    <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: '8px' }}>
+                      ⏰ Podrás salir cuando falten 2 hrs · cita a las {trabajo.hora_cita?.slice(0, 5)}
+                      {horasParaCita(trabajo) && (
+                        <span style={{ display: 'block', marginTop: '2px', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>
+                          Faltan aprox. {horasParaCita(trabajo)}
+                        </span>
+                      )}
+                    </div>
+                  )
                 )}
+
                 {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                     🟢 En camino — ver mapa
                   </button>
                 )}
+
                 {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
                   <button type="button" onClick={() => marcarCompletado(trabajo)} disabled={loadingCompletar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
                   </button>
                 )}
+
                 {trabajo.status === 'en_revision' && (
                   <div style={{ padding: '10px 14px', background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '12px', color: '#E8A030', textAlign: 'center' }}>
                     ⏳ Avisaste que terminaste — esperando que el cliente confirme
                   </div>
                 )}
+
                 {trabajo.status === 'aceptado' && !trabajo.trabajador_llego && (
-                  <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                  <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: '6px' }}>
                     ⏳ Confirma tu llegada antes de marcar como terminado
                   </div>
                 )}
