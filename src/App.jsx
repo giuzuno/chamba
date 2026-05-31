@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import MapaChamba from './MapaChamba'
@@ -8,14 +8,78 @@ import Privacidad from './Privacidad'
 import Notificaciones from './Notificaciones'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 
+// ── Toast clicable ──
+function Toast({ toast, onClick }) {
+  if (!toast) return null
+
+  const iconos = {
+    'trabajo_aceptado': '✅',
+    'trabajo_completado': '🔧',
+    'pago_liberado': '💰',
+    'contraoferta': '💬',
+    'disputa': '⚠️',
+    'calificacion': '⭐',
+    'mensaje': '💬',
+    'llegada': '🏠',
+    'en_camino': '🚗',
+    'recordatorio': '📅',
+    'general': '🔔',
+  }
+  const icono = iconos[toast.tipo] || '🔔'
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)',
+        background: '#1A1A1A', border: '1px solid rgba(29,158,117,0.4)',
+        borderRadius: '16px', padding: '12px 16px',
+        zIndex: 99999, maxWidth: '340px', width: 'calc(100% - 32px)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        cursor: 'pointer', fontFamily: 'sans-serif',
+        display: 'flex', alignItems: 'center', gap: '12px',
+        animation: 'slideDown 0.3s ease',
+      }}
+    >
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
+
+      {/* Ícono */}
+      <div style={{
+        width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
+        background: 'rgba(29,158,117,0.15)', border: '1px solid rgba(29,158,117,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px'
+      }}>
+        {icono}
+      </div>
+
+      {/* Texto */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px', lineHeight: '1.3' }}>
+          {toast.titulo}
+        </p>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {toast.cuerpo}
+        </p>
+      </div>
+
+      {/* Indicador toca */}
+      <div style={{ fontSize: '11px', color: 'rgba(29,158,117,0.7)', flexShrink: 0 }}>Ver →</div>
+    </div>
+  )
+}
+
 function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, onNotificaciones }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#0D0D0D',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'sans-serif', padding: '24px',
-      position: 'relative'
+      fontFamily: 'sans-serif', padding: '24px', position: 'relative'
     }}>
       <div style={{ position: 'absolute', top: '16px', right: '20px' }}>
         <button type="button" onClick={onNotificaciones} style={{
@@ -39,12 +103,8 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>
-          chamba
-        </h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
-          Salina Cruz, Oaxaca
-        </p>
+        <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>chamba</h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Salina Cruz, Oaxaca</p>
         {nombre && (
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>
             Hola, {nombre.split(' ')[0]} 👋
@@ -117,6 +177,8 @@ function AppContenido() {
   const [nombreUsuario, setNombreUsuario] = useState('')
   const [noLeidas, setNoLeidas] = useState(0)
   const [verNotificaciones, setVerNotificaciones] = useState(false)
+  const [toastActivo, setToastActivo] = useState(null)
+  const toastTimer = useRef(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session) })
@@ -142,7 +204,18 @@ function AppContenido() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notificaciones',
         filter: `usuario_id=eq.${session.user.id}`
-      }, () => { cargarNoLeidas() })
+      }, (payload) => {
+        cargarNoLeidas()
+        // Mostrar toast con datos de la notificación guardada
+        if (payload.new) {
+          mostrarToast({
+            titulo: payload.new.titulo,
+            cuerpo: payload.new.cuerpo,
+            tipo: payload.new.tipo,
+            trabajoId: payload.new.trabajo_id,
+          })
+        }
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [session])
@@ -164,32 +237,34 @@ function AppContenido() {
           await supabase.from('usuarios').update({ fcm_token: token }).eq('id', session.user.id)
         }
       })
+      // FCM foreground — cuando la app está abierta
       const unsubscribe = escucharNotificaciones((payload) => {
-        const titulo = payload.notification?.title || ''
-        const cuerpo = payload.notification?.body || ''
-        mostrarToast(`${titulo}: ${cuerpo}`)
         cargarNoLeidas()
+        mostrarToast({
+          titulo: payload.notification?.title || '',
+          cuerpo: payload.notification?.body || '',
+          tipo: payload.data?.tipo || 'general',
+          trabajoId: payload.data?.trabajo_id || null,
+        })
       })
       return () => unsubscribe()
     }
   }, [session])
 
-  function mostrarToast(mensaje) {
-    const toast = document.createElement('div')
-    toast.innerText = mensaje
-    toast.style.cssText = `
-      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-      background: #1D9E75; color: white; padding: 12px 20px;
-      border-radius: 12px; font-size: 14px; font-family: sans-serif;
-      z-index: 99999; max-width: 320px; text-align: center;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    `
-    document.body.appendChild(toast)
-    setTimeout(() => {
-      toast.style.opacity = '0'
-      toast.style.transition = 'opacity 0.5s'
-      setTimeout(() => { if (document.body.contains(toast)) document.body.removeChild(toast) }, 500)
-    }, 4000)
+  function mostrarToast(datos) {
+    // Cancelar timer anterior si había un toast
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToastActivo(datos)
+    toastTimer.current = setTimeout(() => {
+      setToastActivo(null)
+    }, 5000)
+  }
+
+  function alTocarToast() {
+    setToastActivo(null)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    // Abrir historial de notificaciones
+    setVerNotificaciones(true)
   }
 
   async function handleLogin(e) {
@@ -227,20 +302,39 @@ function AppContenido() {
 
     if (!modo) {
       return (
-        <SeleccionModo
-          nombre={nombreUsuario}
-          noLeidas={noLeidas}
-          onCliente={() => setModo('cliente')}
-          onTrabajador={() => setModo('trabajador')}
-          onLogout={handleLogout}
-          onNotificaciones={() => setVerNotificaciones(true)}
-        />
+        <>
+          <Toast toast={toastActivo} onClick={alTocarToast} />
+          <SeleccionModo
+            nombre={nombreUsuario} noLeidas={noLeidas}
+            onCliente={() => setModo('cliente')}
+            onTrabajador={() => setModo('trabajador')}
+            onLogout={handleLogout}
+            onNotificaciones={() => setVerNotificaciones(true)}
+          />
+        </>
       )
     }
 
     if (modo === 'trabajador') {
       return (
-        <VistaTrabajador
+        <>
+          <Toast toast={toastActivo} onClick={alTocarToast} />
+          <VistaTrabajador
+            onLogout={handleLogout}
+            userId={session.user.id}
+            userEmail={session.user.email}
+            onCambiarModo={() => setModo(null)}
+            noLeidas={noLeidas}
+            onNotificaciones={() => setVerNotificaciones(true)}
+          />
+        </>
+      )
+    }
+
+    return (
+      <>
+        <Toast toast={toastActivo} onClick={alTocarToast} />
+        <MapaChamba
           onLogout={handleLogout}
           userId={session.user.id}
           userEmail={session.user.email}
@@ -248,18 +342,7 @@ function AppContenido() {
           noLeidas={noLeidas}
           onNotificaciones={() => setVerNotificaciones(true)}
         />
-      )
-    }
-
-    return (
-      <MapaChamba
-        onLogout={handleLogout}
-        userId={session.user.id}
-        userEmail={session.user.email}
-        onCambiarModo={() => setModo(null)}
-        noLeidas={noLeidas}
-        onNotificaciones={() => setVerNotificaciones(true)}
-      />
+      </>
     )
   }
 
