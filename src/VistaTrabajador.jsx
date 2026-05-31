@@ -5,6 +5,7 @@ import TrackingTrabajador from './TrackingTrabajador'
 import Calificacion from './Calificacion'
 import PerfilPublico from './PerfilPublico'
 import ChatTrabajo from './ChatTrabajo'
+import PerfilTrabajador from './PerfilTrabajador'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 const CATEGORIAS_ICONS = {
@@ -40,6 +41,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [chatAbierto, setChatAbierto] = useState(null)
   const [mensajeNoPuedoLlegar, setMensajeNoPuedoLlegar] = useState(null)
   const [modalOpciones, setModalOpciones] = useState(false)
+  const [verPerfil, setVerPerfil] = useState(false)
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -48,11 +50,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }, [])
 
   async function cargarPerfilUsuario() {
-    const { data } = await supabase
-      .from('usuarios')
+    const { data } = await supabase.from('usuarios')
       .select('categorias_servicio, radio_alertas, lat, lng')
-      .eq('id', userId)
-      .maybeSingle()
+      .eq('id', userId).maybeSingle()
     if (data) setPerfilUsuario(data)
     cargarTrabajos(data)
   }
@@ -117,7 +117,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   const esViaje = (trabajo) => trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
 
-  // Botones del header reutilizables
   const HeaderBotones = () => (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       <button type="button" onClick={onNotificaciones} style={{
@@ -128,12 +127,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       }}>
         🔔
         {noLeidas > 0 && (
-          <span style={{
-            position: 'absolute', top: '-3px', right: '-3px',
-            background: '#F09595', color: 'white',
-            borderRadius: '100px', fontSize: '10px', fontWeight: '700',
-            padding: '1px 5px', minWidth: '16px', textAlign: 'center'
-          }}>
+          <span style={{ position: 'absolute', top: '-3px', right: '-3px', background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 5px', minWidth: '16px', textAlign: 'center' }}>
             {noLeidas > 99 ? '99+' : noLeidas}
           </span>
         )}
@@ -141,8 +135,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       <button type="button" onClick={() => setModalOpciones(true)} style={{
         background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
         border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px',
-        padding: '6px 12px', fontSize: '12px', cursor: 'pointer',
-        fontFamily: 'sans-serif', fontWeight: '500'
+        padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', fontWeight: '500'
       }}>
         ⚙️ Opciones
       </button>
@@ -150,62 +143,31 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   )
 
   const ModalOpciones = () => (
-    <div onClick={() => setModalOpciones(false)} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-      zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: '#1A1A1A', borderRadius: '20px 20px 0 0',
-        padding: '24px', width: '100%', maxWidth: '480px',
-        border: '0.5px solid rgba(255,255,255,0.1)'
-      }}>
+    <div onClick={() => setModalOpciones(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#1A1A1A', borderRadius: '20px 20px 0 0', padding: '24px', width: '100%', maxWidth: '480px', border: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Opciones</p>
-        <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{
-          width: '100%', padding: '16px', marginBottom: '10px',
-          background: 'rgba(55,138,221,0.1)', color: '#378ADD',
-          border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px',
-          fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-        }}>
+        <button type="button" onClick={() => { setModalOpciones(false); onCambiarModo() }} style={{ width: '100%', padding: '16px', marginBottom: '10px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
           🗺️ Cambiar a modo cliente
         </button>
-        <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{
-          width: '100%', padding: '14px', background: 'transparent',
-          color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)',
-          borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif'
-        }}>
+        <button type="button" onClick={() => { setModalOpciones(false); onLogout() }} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Cerrar sesión
         </button>
       </div>
     </div>
   )
 
+  // ── Pantallas que reemplazan la vista principal ──
+  if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} onVolver={() => { setVerPerfil(false); cargarPerfilUsuario() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
-
-  if (calificando) {
-    return (
-      <Calificacion trabajo={calificando} userId={userId} rolCalificador="trabajador"
-        onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }}
-      />
-    )
-  }
-
-  if (tracking) {
-    return <TrackingTrabajador trabajo={tracking} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
-  }
-
-  if (negociando) {
-    return (
-      <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
-        onAceptado={() => {
-          setNegociando(null); setTrabajoSeleccionado(null)
-          cargarTrabajos(perfilUsuario); cargarMisTrabajos(); setPestana('mis')
-        }}
-      />
-    )
-  }
+  if (calificando) return <Calificacion trabajo={calificando} userId={userId} rolCalificador="trabajador" onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }} />
+  if (tracking) return <TrackingTrabajador trabajo={tracking} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
+  if (negociando) return (
+    <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
+      onAceptado={() => { setNegociando(null); setTrabajoSeleccionado(null); cargarTrabajos(perfilUsuario); cargarMisTrabajos(); setPestana('mis') }}
+    />
+  )
 
   if (mensajeNoPuedoLlegar) {
     return (
@@ -213,9 +175,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
         <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '28px', maxWidth: '340px', width: '100%' }}>
           <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>⚠️</div>
           <h3 style={{ fontSize: '18px', fontWeight: '700', textAlign: 'center', marginBottom: '12px' }}>¿No puedes llegar al punto?</h3>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: '1.6', marginBottom: '20px' }}>
-            Se enviará este mensaje al cliente automáticamente y se abrirá el chat para coordinar:
-          </p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: '1.6', marginBottom: '20px' }}>Se enviará este mensaje al cliente automáticamente y se abrirá el chat:</p>
           <div style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 14px', fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5', marginBottom: '20px', fontStyle: 'italic' }}>
             "⚠️ Hola, no puedo llegar exactamente al punto marcado. ¿Podemos acordar un punto de encuentro cercano?"
           </div>
@@ -321,34 +281,39 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       {modalOpciones && <ModalOpciones />}
 
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
-            {pestana === 'disponibles' ? 'Modo trabajador' : pestana === 'mis' ? 'Mis trabajos activos' : 'Historial'}
-          </p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Modo trabajador</p>
         </div>
         <HeaderBotones />
       </div>
 
+      {/* Pestañas */}
       <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {[
           ['disponibles', '🔍', 'Disponibles', trabajos.length],
           ['mis', '✅', 'Activos', misTrabajos.length],
           ['historial', '🏁', 'Historial', historial.length],
+          ['perfil', '👤', 'Perfil', 0],
         ].map(([key, icon, label, count]) => (
-          <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          <button key={key} type="button" onClick={() => {
+            if (key === 'perfil') { setVerPerfil(true); return }
+            setPestana(key)
+          }} style={{ flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {icon} {label} {count > 0 && `(${count})`}
           </button>
         ))}
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
         {pestana === 'disponibles' && (
           <>
             {perfilUsuario && (!perfilUsuario.categorias_servicio || perfilUsuario.categorias_servicio.length === 0) && (
               <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#E8A030', textAlign: 'center' }}>
-                ⚠️ Configura tus servicios en tu perfil para ver solo los trabajos de tu especialidad.
+                ⚠️ Configura tus servicios en la pestaña <strong>Perfil</strong> para ver trabajos de tu especialidad.
               </div>
             )}
             {cargando && <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Buscando trabajos cerca...</div>}
@@ -477,9 +442,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{trabajo.categoria}</span>
-                      <span style={{ fontSize: '15px', fontWeight: '700', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595' }}>
-                        ${trabajo.precio_acordado || trabajo.presupuesto}
-                      </span>
+                      <span style={{ fontSize: '15px', fontWeight: '700', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>{trabajo.descripcion}</p>
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block', background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595', border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.4)' : 'rgba(240,149,149,0.3)'}`, fontWeight: '500' }}>
