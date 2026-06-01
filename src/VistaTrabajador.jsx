@@ -42,7 +42,7 @@ function horasParaCita(trabajo) {
   return `${Math.round(diffHoras)} hrs`
 }
 
-export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, trabajoIdInicial, onNavegacionCompletada }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, trabajoIdInicial, onNavegacionCompletada, irAPerfil, onPerfilAbierto }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -74,6 +74,14 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       onNavegacionCompletada?.()
     }
   }, [irAActivos])
+
+  // Si viene del onboarding como trabajador → abrir perfil directo
+  useEffect(() => {
+    if (irAPerfil) {
+      setVerPerfil(true)
+      onPerfilAbierto?.()
+    }
+  }, [irAPerfil])
 
   // Abrir trabajo específico desde toast
   useEffect(() => {
