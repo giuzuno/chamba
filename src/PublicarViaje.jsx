@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -17,16 +18,14 @@ const iconoDestino = L.divIcon({
 })
 
 const TIPOS_VIAJE = [
-  { id: 'taxi', icon: '🚕', label: 'Taxi', desc: 'Traslado en auto', precioPorKm: 15 },
-  { id: 'mototaxi', icon: '🏍️', label: 'Moto taxi', desc: 'Rápido y económico', precioPorKm: 8 },
-  { id: 'repartidor', icon: '🛵', label: 'Repartidor', desc: 'Entrega o mandado', precioPorKm: 10 },
-  { id: 'flete', icon: '🚛', label: 'Flete', desc: 'Mudanza o carga', precioPorKm: 25 },
+  { id: 'taxi', icon: '🚕', label: 'Taxi / Chofer', desc: 'Traslado cómodo en auto', precioPorKm: 15, minimo: 50, categoria: 'Taxi / Chofer' },
+  { id: 'mototaxi', icon: '🏍️', label: 'Moto taxi', desc: 'Rápido y económico', precioPorKm: 8, minimo: 30, categoria: 'Moto taxi' },
+  { id: 'repartidor', icon: '🛵', label: 'Repartidor moto', desc: 'Paquetes y mandados', precioPorKm: 10, minimo: 35, categoria: 'Repartidor moto' },
+  { id: 'flete', icon: '🚛', label: 'Fletes', desc: 'Mudanza o carga pesada', precioPorKm: 25, minimo: 150, categoria: 'Fletes' },
 ]
 
 function SeleccionarPunto({ onSeleccionar }) {
-  useMapEvents({
-    click(e) { onSeleccionar([e.latlng.lat, e.latlng.lng]) }
-  })
+  useMapEvents({ click(e) { onSeleccionar([e.latlng.lat, e.latlng.lng]) } })
   return null
 }
 
@@ -34,10 +33,18 @@ function calcularDistancia(lat1, lng1, lat2, lng2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2)
+  const a = Math.sin(dLat/2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function calcularETA(distanciaKm, tipo) {
+  const velocidades = { taxi: 25, mototaxi: 30, repartidor: 25, flete: 18 }
+  const vel = velocidades[tipo] || 25
+  const minutos = Math.round((distanciaKm / vel) * 60)
+  if (minutos < 5) return 'menos de 5 min'
+  if (minutos < 60) return `aprox. ${minutos} min`
+  return `aprox. ${Math.floor(minutos/60)}h ${minutos%60}min`
 }
 
 export default function PublicarViaje({ onVolver, userId }) {
@@ -47,16 +54,24 @@ export default function PublicarViaje({ onVolver, userId }) {
   const [origen, setOrigen] = useState(null)
   const [destino, setDestino] = useState(null)
   const [origenEsActual, setOrigenEsActual] = useState(true)
-  const [destinoEsActual, setDestinoEsActual] = useState(false)
   const [seleccionandoPunto, setSeleccionandoPunto] = useState(null)
   const [descripcion, setDescripcion] = useState('')
+  const [esAhora, setEsAhora] = useState(true)
   const [publicando, setPublicando] = useState(false)
   const [exito, setExito] = useState(false)
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      pos => setUbicacionActual([pos.coords.latitude, pos.coords.longitude]),
-      () => setUbicacionActual([16.1833, -95.2000])
+      pos => {
+        const pos2 = [pos.coords.latitude, pos.coords.longitude]
+        setUbicacionActual(pos2)
+        setOrigen(pos2) // default origen = ubicación actual
+      },
+      () => {
+        const fallback = [16.1833, -95.2000]
+        setUbicacionActual(fallback)
+        setOrigen(fallback)
+      }
     )
   }, [])
 
@@ -64,23 +79,25 @@ export default function PublicarViaje({ onVolver, userId }) {
     if (origenEsActual && ubicacionActual) setOrigen(ubicacionActual)
   }, [origenEsActual, ubicacionActual])
 
-  useEffect(() => {
-    if (destinoEsActual && ubicacionActual) setDestino(ubicacionActual)
-  }, [destinoEsActual, ubicacionActual])
-
   const tipoSeleccionado = TIPOS_VIAJE.find(t => t.id === tipo)
   const distancia = origen && destino ? calcularDistancia(origen[0], origen[1], destino[0], destino[1]) : 0
-  const precioEstimado = tipoSeleccionado ? Math.round(distancia * tipoSeleccionado.precioPorKm) : 0
+  const precioBase = tipoSeleccionado ? Math.max(
+    tipoSeleccionado.minimo,
+    Math.round(distancia * tipoSeleccionado.precioPorKm)
+  ) : 0
+  const eta = tipoSeleccionado ? calcularETA(distancia, tipo) : ''
   const centro = ubicacionActual || [16.1833, -95.2000]
+  const rutaLinea = origen && destino ? [origen, destino] : []
 
   async function publicarViaje() {
     if (!origen || !destino || !tipo) return
     setPublicando(true)
-    await supabase.from('trabajos').insert({
+
+    const { data: trabajo } = await supabase.from('trabajos').insert({
       cliente_id: userId,
-      categoria: tipoSeleccionado.label,
+      categoria: tipoSeleccionado.categoria,
       descripcion: descripcion || `${tipoSeleccionado.label} — ${distancia.toFixed(1)} km`,
-      presupuesto: precioEstimado,
+      presupuesto: precioBase,
       lat: origen[0],
       lng: origen[1],
       origen_lat: origen[0],
@@ -89,8 +106,34 @@ export default function PublicarViaje({ onVolver, userId }) {
       destino_lng: destino[1],
       distancia_km: parseFloat(distancia.toFixed(2)),
       es_viaje: true,
+      fecha_cita: new Date().toISOString().split('T')[0],
+      hora_cita: new Date().toTimeString().slice(0,5),
       status: 'publicado',
-    })
+    }).select().single()
+
+    // Notificar a choferes disponibles
+    if (trabajo) {
+      try {
+        const { data: choferes } = await supabase
+          .from('usuarios')
+          .select('id')
+          .contains('categorias_servicio', [tipoSeleccionado.categoria])
+          .neq('id', userId)
+
+        if (choferes && choferes.length > 0) {
+          for (const chofer of choferes) {
+            await enviarNotificacionCompleta({
+              usuarioId: chofer.id,
+              titulo: `${tipoSeleccionado.icon} Nuevo viaje — ${distancia.toFixed(1)} km`,
+              cuerpo: `$${precioBase} MXN · ETA destino: ${eta}${descripcion ? ' · ' + descripcion.slice(0,40) : ''}`,
+              tipo: 'trabajo_aceptado',
+              trabajoId: trabajo.id,
+            })
+          }
+        }
+      } catch (e) { console.log('Error notificando choferes:', e) }
+    }
+
     setExito(true)
     setPublicando(false)
   }
@@ -100,10 +143,14 @@ export default function PublicarViaje({ onVolver, userId }) {
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>{tipoSeleccionado?.icon}</div>
         <h2 style={{ color: '#1D9E75', fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>¡Viaje publicado!</h2>
-        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>Los choferes cerca verán tu solicitud.</p>
-        <p style={{ color: '#1D9E75', fontSize: '28px', fontWeight: '800', marginBottom: '32px' }}>${precioEstimado} MXN estimado</p>
+        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>Los choferes disponibles ya fueron notificados.</p>
+        <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', marginBottom: '24px', width: '100%', maxWidth: '300px' }}>
+          <p style={{ fontSize: '32px', fontWeight: '800', color: '#1D9E75', marginBottom: '4px' }}>${precioBase} MXN</p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>{distancia.toFixed(1)} km · {eta}</p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>El chofer puede negociar el precio antes de aceptar</p>
+        </div>
         <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-          Volver al mapa
+          Ver mis publicaciones
         </button>
       </div>
     )
@@ -119,8 +166,7 @@ export default function PublicarViaje({ onVolver, userId }) {
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>
             {paso === 1 ? '¿Qué tipo de servicio?' :
              paso === 2 ? '📍 ¿Desde dónde?' :
-             paso === 3 ? '🏁 ¿Hacia dónde?' :
-             '✅ Confirmar viaje'}
+             paso === 3 ? '🏁 ¿Hacia dónde?' : '✅ Confirmar viaje'}
           </h2>
           {tipoSeleccionado && paso > 1 && (
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
@@ -135,73 +181,68 @@ export default function PublicarViaje({ onVolver, userId }) {
         </div>
       </div>
 
-      {/* ── Paso 1: Tipo ── */}
+      {/* Paso 1 — Tipo */}
       {paso === 1 && (
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
-            Selecciona el tipo de servicio que necesitas
-          </p>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Selecciona el tipo de servicio</p>
           {TIPOS_VIAJE.map(t => (
             <button key={t.id} type="button" onClick={() => { setTipo(t.id); setPaso(2) }} style={{
               background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)',
-              borderRadius: '16px', padding: '20px', cursor: 'pointer', fontFamily: 'sans-serif',
+              borderRadius: '16px', padding: '18px 20px', cursor: 'pointer', fontFamily: 'sans-serif',
               textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px'
             }}>
-              <span style={{ fontSize: '40px' }}>{t.icon}</span>
-              <div>
-                <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '4px' }}>{t.label}</p>
+              <span style={{ fontSize: '36px' }}>{t.icon}</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '3px' }}>{t.label}</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>{t.desc}</p>
-                <p style={{ fontSize: '12px', color: '#1D9E75' }}>${t.precioPorKm} MXN/km estimado</p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <span style={{ fontSize: '12px', color: '#1D9E75' }}>${t.precioPorKm}/km</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>Mínimo ${t.minimo}</span>
+                </div>
               </div>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '18px' }}>›</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Paso 2: Origen ── */}
+      {/* Paso 2 — Origen */}
       {paso === 2 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)' }}>
-          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flexShrink: 0 }}>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>¿Desde dónde saldrá el servicio?</p>
-
-            <button type="button" onClick={() => { setOrigenEsActual(true); setSeleccionandoPunto(null) }} style={{
-              padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>¿Desde dónde?</p>
+            <button type="button" onClick={() => { setOrigenEsActual(true); setOrigen(ubicacionActual); setSeleccionandoPunto(null) }} style={{
+              padding: '12px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
               background: origenEsActual ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)',
               display: 'flex', alignItems: 'center', gap: '12px',
               borderLeft: `3px solid ${origenEsActual ? '#1D9E75' : 'transparent'}`
             }}>
-              <span style={{ fontSize: '20px' }}>📍</span>
-              <div style={{ textAlign: 'left' }}>
+              <span style={{ fontSize: '18px' }}>📍</span>
+              <div style={{ textAlign: 'left', flex: 1 }}>
                 <p style={{ fontSize: '14px', fontWeight: '600', color: origenEsActual ? '#1D9E75' : 'white' }}>Mi ubicación actual</p>
                 <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Usar GPS automáticamente</p>
               </div>
-              {origenEsActual && <span style={{ marginLeft: 'auto', color: '#1D9E75' }}>✓</span>}
+              {origenEsActual && <span style={{ color: '#1D9E75', fontWeight: '700' }}>✓</span>}
             </button>
-
             <button type="button" onClick={() => { setOrigenEsActual(false); setSeleccionandoPunto('origen') }} style={{
-              padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
+              padding: '12px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
               background: !origenEsActual ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)',
               display: 'flex', alignItems: 'center', gap: '12px',
               borderLeft: `3px solid ${!origenEsActual ? '#1D9E75' : 'transparent'}`
             }}>
-              <span style={{ fontSize: '20px' }}>🗺️</span>
-              <div style={{ textAlign: 'left' }}>
+              <span style={{ fontSize: '18px' }}>🗺️</span>
+              <div style={{ textAlign: 'left', flex: 1 }}>
                 <p style={{ fontSize: '14px', fontWeight: '600', color: !origenEsActual ? '#1D9E75' : 'white' }}>Elegir en el mapa</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                  {!origenEsActual && origen ? '✅ Punto marcado' : 'Toca el mapa para marcar el origen'}
-                </p>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{!origenEsActual && origen ? '✅ Punto marcado' : 'Toca el mapa'}</p>
               </div>
-              {!origenEsActual && origen && <span style={{ marginLeft: 'auto', color: '#1D9E75' }}>✓</span>}
+              {!origenEsActual && origen && <span style={{ color: '#1D9E75', fontWeight: '700' }}>✓</span>}
             </button>
           </div>
-
           <div style={{ flex: 1, position: 'relative' }}>
             {ubicacionActual && (
-              <MapContainer center={centro} zoom={14} style={{ height: '100%', width: '100%' }}>
+              <MapContainer center={centro} zoom={15} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {seleccionandoPunto === 'origen' && (
-                  <SeleccionarPunto onSeleccionar={pos => { setOrigen(pos); setSeleccionandoPunto(null) }} />
-                )}
+                {seleccionandoPunto === 'origen' && <SeleccionarPunto onSeleccionar={pos => { setOrigen(pos); setSeleccionandoPunto(null) }} />}
                 {origen && <Marker position={origen} icon={iconoOrigen}><Popup>📍 Origen</Popup></Marker>}
               </MapContainer>
             )}
@@ -211,8 +252,7 @@ export default function PublicarViaje({ onVolver, userId }) {
               </div>
             )}
           </div>
-
-          <div style={{ padding: '16px', flexShrink: 0 }}>
+          <div style={{ padding: '14px 16px', flexShrink: 0 }}>
             <button type="button" onClick={() => setPaso(3)} disabled={!origen} style={{
               width: '100%', padding: '15px',
               background: origen ? '#1D9E75' : 'rgba(255,255,255,0.08)',
@@ -220,58 +260,42 @@ export default function PublicarViaje({ onVolver, userId }) {
               border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600',
               cursor: origen ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif'
             }}>
-              {origen ? 'Continuar →' : 'Selecciona el origen primero'}
+              {origen ? 'Continuar — marcar destino →' : 'Selecciona el origen'}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Paso 3: Destino ── */}
+      {/* Paso 3 — Destino */}
       {paso === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)' }}>
-          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flexShrink: 0 }}>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>¿A dónde va el servicio?</p>
-
-            <button type="button" onClick={() => { setDestinoEsActual(true); setSeleccionandoPunto(null) }} style={{
-              padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
-              background: destinoEsActual ? 'rgba(55,138,221,0.2)' : 'rgba(255,255,255,0.06)',
-              display: 'flex', alignItems: 'center', gap: '12px',
-              borderLeft: `3px solid ${destinoEsActual ? '#378ADD' : 'transparent'}`
-            }}>
-              <span style={{ fontSize: '20px' }}>📍</span>
-              <div style={{ textAlign: 'left' }}>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: destinoEsActual ? '#378ADD' : 'white' }}>Mi ubicación actual</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Usar GPS automáticamente</p>
+          <div style={{ padding: '14px 16px', flexShrink: 0 }}>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>¿A dónde vas? Toca el mapa para marcar el destino</p>
+            {!seleccionandoPunto && !destino && (
+              <button type="button" onClick={() => setSeleccionandoPunto('destino')} style={{ width: '100%', padding: '12px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                🏁 Marcar destino en el mapa
+              </button>
+            )}
+            {destino && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(55,138,221,0.1)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '12px', padding: '10px 14px' }}>
+                <div>
+                  <p style={{ fontSize: '13px', color: '#378ADD', fontWeight: '600' }}>🏁 Destino marcado</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{destino[0].toFixed(4)}, {destino[1].toFixed(4)}</p>
+                </div>
+                <button type="button" onClick={() => { setDestino(null); setSeleccionandoPunto('destino') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  Cambiar
+                </button>
               </div>
-              {destinoEsActual && <span style={{ marginLeft: 'auto', color: '#378ADD' }}>✓</span>}
-            </button>
-
-            <button type="button" onClick={() => { setDestinoEsActual(false); setSeleccionandoPunto('destino') }} style={{
-              padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif',
-              background: !destinoEsActual ? 'rgba(55,138,221,0.2)' : 'rgba(255,255,255,0.06)',
-              display: 'flex', alignItems: 'center', gap: '12px',
-              borderLeft: `3px solid ${!destinoEsActual ? '#378ADD' : 'transparent'}`
-            }}>
-              <span style={{ fontSize: '20px' }}>🗺️</span>
-              <div style={{ textAlign: 'left' }}>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: !destinoEsActual ? '#378ADD' : 'white' }}>Elegir en el mapa</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                  {!destinoEsActual && destino ? '✅ Punto marcado' : 'Toca el mapa para marcar el destino'}
-                </p>
-              </div>
-              {!destinoEsActual && destino && <span style={{ marginLeft: 'auto', color: '#378ADD' }}>✓</span>}
-            </button>
+            )}
           </div>
-
           <div style={{ flex: 1, position: 'relative' }}>
             {ubicacionActual && (
               <MapContainer center={centro} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {seleccionandoPunto === 'destino' && (
-                  <SeleccionarPunto onSeleccionar={pos => { setDestino(pos); setSeleccionandoPunto(null) }} />
-                )}
+                {seleccionandoPunto === 'destino' && <SeleccionarPunto onSeleccionar={pos => { setDestino(pos); setSeleccionandoPunto(null) }} />}
                 {origen && <Marker position={origen} icon={iconoOrigen}><Popup>📍 Origen</Popup></Marker>}
                 {destino && <Marker position={destino} icon={iconoDestino}><Popup>🏁 Destino</Popup></Marker>}
+                {rutaLinea.length === 2 && <Polyline positions={rutaLinea} color="#1D9E75" weight={3} dashArray="8,6" opacity={0.8} />}
               </MapContainer>
             )}
             {seleccionandoPunto === 'destino' && (
@@ -279,9 +303,27 @@ export default function PublicarViaje({ onVolver, userId }) {
                 👆 Toca el mapa para marcar el destino
               </div>
             )}
+            {/* Mini resumen de distancia y precio */}
+            {destino && distancia > 0 && (
+              <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.95)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '14px', padding: '10px 18px', zIndex: 1000, display: 'flex', gap: '20px', whiteSpace: 'nowrap' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>{distancia.toFixed(1)} km</p>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Distancia</p>
+                </div>
+                <div style={{ width: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>${precioBase}</p>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Estimado</p>
+                </div>
+                <div style={{ width: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>{eta}</p>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Duración</p>
+                </div>
+              </div>
+            )}
           </div>
-
-          <div style={{ padding: '16px', flexShrink: 0 }}>
+          <div style={{ padding: '14px 16px', flexShrink: 0 }}>
             <button type="button" onClick={() => setPaso(4)} disabled={!destino} style={{
               width: '100%', padding: '15px',
               background: destino ? '#1D9E75' : 'rgba(255,255,255,0.08)',
@@ -289,98 +331,82 @@ export default function PublicarViaje({ onVolver, userId }) {
               border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600',
               cursor: destino ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif'
             }}>
-              {destino ? 'Continuar →' : 'Selecciona el destino primero'}
+              {destino ? 'Confirmar ruta →' : 'Marca el destino primero'}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Paso 4: Confirmar ── */}
+      {/* Paso 4 — Confirmar */}
       {paso === 4 && (
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
-
-            {/* Tipo */}
-            <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '32px' }}>{tipoSeleccionado?.icon}</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '16px', fontWeight: '700' }}>{tipoSeleccionado?.label}</p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{tipoSeleccionado?.desc}</p>
-              </div>
-              <button type="button" onClick={() => setPaso(1)} style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ✏️
-              </button>
+          {/* Mapa con ruta */}
+          {origen && destino && (
+            <div style={{ height: '180px', borderRadius: '16px', overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.1)' }}>
+              <MapContainer
+                center={[(origen[0] + destino[0])/2, (origen[1] + destino[1])/2]}
+                zoom={13} style={{ height: '100%', width: '100%' }}
+                zoomControl={false} dragging={false} scrollWheelZoom={false}
+              >
+                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <Marker position={origen} icon={iconoOrigen} />
+                <Marker position={destino} icon={iconoDestino} />
+                <Polyline positions={[origen, destino]} color="#1D9E75" weight={3} dashArray="8,6" opacity={0.9} />
+              </MapContainer>
             </div>
+          )}
 
-            {/* Origen con botón editar */}
-            <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <span style={{ fontSize: '20px' }}>📍</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>ORIGEN</p>
-                <p style={{ fontSize: '13px', color: 'white' }}>
-                  {origenEsActual ? 'Mi ubicación actual' : `${origen?.[0].toFixed(4)}, ${origen?.[1].toFixed(4)}`}
-                </p>
-              </div>
-              <button type="button" onClick={() => setPaso(2)} style={{ background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0 }}>
-                ✏️ Cambiar
-              </button>
+          {/* Resumen precio */}
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${precioBase} MXN</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                {distancia.toFixed(1)} km · {tipoSeleccionado?.icon} {tipoSeleccionado?.label}
+              </p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                El chofer puede negociar antes de aceptar
+              </p>
             </div>
-
-            {/* Destino con botón editar */}
-            <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <span style={{ fontSize: '20px' }}>🏁</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DESTINO</p>
-                <p style={{ fontSize: '13px', color: 'white' }}>
-                  {destinoEsActual ? 'Mi ubicación actual' : `${destino?.[0].toFixed(4)}, ${destino?.[1].toFixed(4)}`}
-                </p>
-              </div>
-              <button type="button" onClick={() => setPaso(3)} style={{ background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0 }}>
-                ✏️ Cambiar
-              </button>
-            </div>
-
-            {/* Distancia y precio */}
-            <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DISTANCIA</p>
-                <p style={{ fontSize: '14px', color: 'white' }}>{distancia.toFixed(1)} km</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>PRECIO ESTIMADO</p>
-                <p style={{ fontSize: '22px', fontWeight: '800', color: '#1D9E75' }}>${precioEstimado} MXN</p>
-              </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#378ADD' }}>⏱️ {eta}</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>duración estimada</p>
             </div>
           </div>
 
-          {/* Aviso acceso */}
-          <div style={{ background: 'rgba(186,117,23,0.08)', border: '0.5px solid rgba(186,117,23,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>
-            ⚠️ Si el chofer no puede llegar exactamente al punto marcado, te contactará por el chat para acordar un punto de encuentro cercano.
+          {/* Detalles */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ fontSize: '16px' }}>📍</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>ORIGEN</p>
+                <p style={{ fontSize: '13px', color: 'white' }}>{origenEsActual ? 'Mi ubicación actual' : `${origen?.[0].toFixed(4)}, ${origen?.[1].toFixed(4)}`}</p>
+              </div>
+              <button type="button" onClick={() => setPaso(2)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>✏️</button>
+            </div>
+            <div style={{ padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ fontSize: '16px' }}>🏁</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>DESTINO</p>
+                <p style={{ fontSize: '13px', color: 'white' }}>{destino?.[0].toFixed(4)}, {destino?.[1].toFixed(4)}</p>
+              </div>
+              <button type="button" onClick={() => setPaso(3)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>✏️</button>
+            </div>
           </div>
 
           {/* Nota adicional */}
           <div>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Nota adicional (opcional)
-            </p>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nota al chofer (opcional)</p>
             <textarea
-              placeholder="Ej: Son 3 cajas medianas, llegar antes de las 3pm, acceso por calle lateral..."
-              value={descripcion}
-              onChange={e => setDescripcion(e.target.value)}
-              rows={3}
-              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
+              placeholder="Ej: Son 3 cajas medianas, llegar antes de las 3pm, voy con niños..."
+              value={descripcion} onChange={e => setDescripcion(e.target.value)}
+              rows={2}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
             />
           </div>
 
-          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            💡 Precio estimado: {distancia.toFixed(1)} km × ${tipoSeleccionado?.precioPorKm} MXN/km. El chofer puede negociar antes de aceptar.
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ color: 'rgba(255,255,255,0.08)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
-            <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '12px', padding: '12px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+            ⚠️ Si el chofer no puede llegar exactamente al punto marcado, te contactará por chat para acordar un punto de encuentro.
           </div>
 
           <button type="button" onClick={publicarViaje} disabled={publicando} style={{
@@ -389,12 +415,11 @@ export default function PublicarViaje({ onVolver, userId }) {
             color: 'white', border: 'none', borderRadius: '14px',
             fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif'
           }}>
-            {publicando ? 'Publicando...' : `${tipoSeleccionado?.icon} Publicar viaje — $${precioEstimado} MXN`}
+            {publicando ? 'Publicando...' : `${tipoSeleccionado?.icon} Solicitar — $${precioBase} MXN`}
           </button>
 
         </div>
       )}
-
     </div>
   )
 }
