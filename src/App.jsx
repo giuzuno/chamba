@@ -28,12 +28,7 @@ function Toast({ toast, onClick }) {
       display: 'flex', alignItems: 'center', gap: '12px',
       animation: 'slideDown 0.3s ease',
     }}>
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
+      <style>{`@keyframes slideDown { from { opacity:0; transform:translateX(-50%) translateY(-20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
       <div style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0, background: 'rgba(29,158,117,0.15)', border: '1px solid rgba(29,158,117,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
         {icono}
       </div>
@@ -52,11 +47,7 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
       <div style={{ position: 'absolute', top: '16px', right: '20px' }}>
         <button type="button" onClick={onNotificaciones} style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', fontSize: '18px' }}>
           🔔
-          {noLeidas > 0 && (
-            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>
-              {noLeidas > 99 ? '99+' : noLeidas}
-            </span>
-          )}
+          {noLeidas > 0 && <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>{noLeidas > 99 ? '99+' : noLeidas}</span>}
         </button>
       </div>
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
@@ -94,9 +85,7 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
         <span style={{ color: 'rgba(255,255,255,0.08)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.08)' }} />
       </div>
-      <button type="button" onClick={onLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.25)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-        Cerrar sesión
-      </button>
+      <button type="button" onClick={onLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.25)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>Cerrar sesión</button>
     </div>
   )
 }
@@ -113,10 +102,10 @@ function AppContenido() {
   const [noLeidas, setNoLeidas] = useState(0)
   const [verNotificaciones, setVerNotificaciones] = useState(false)
   const [toastActivo, setToastActivo] = useState(null)
-  // Para navegación desde toast
+  // Navegación desde toast
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
-  const [navegarAPerfil, setNavegarAPerfil] = useState(false)
+  const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const toastTimer = useRef(null)
 
   useEffect(() => {
@@ -129,8 +118,7 @@ function AppContenido() {
 
   useEffect(() => {
     if (session) {
-      supabase.from('usuarios').select('nombre')
-        .eq('id', session.user.id).maybeSingle()
+      supabase.from('usuarios').select('nombre').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => { if (data?.nombre) setNombreUsuario(data.nombre) })
     }
   }, [session])
@@ -160,11 +148,9 @@ function AppContenido() {
 
   async function cargarNoLeidas() {
     if (!session) return
-    const { count } = await supabase
-      .from('notificaciones')
+    const { count } = await supabase.from('notificaciones')
       .select('*', { count: 'exact', head: true })
-      .eq('usuario_id', session.user.id)
-      .eq('leida', false)
+      .eq('usuario_id', session.user.id).eq('leida', false)
     setNoLeidas(count || 0)
   }
 
@@ -196,29 +182,24 @@ function AppContenido() {
     const toast = toastActivo
     setToastActivo(null)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-
     if (!toast) return
 
-    // Notificaciones del CLIENTE — llevar a Mis publicaciones
-    const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'trabajo_aceptado', 'contraoferta', 'disputa']
-    // Notificaciones del TRABAJADOR — llevar a Activos
-    const tiposTrabajador = ['pago_liberado']
-    // Calificación — llevar a Perfil
-    const tiposPerfil = ['calificacion']
+    // Tipos que llevan al cliente → MisPublicaciones con trabajo específico
+    const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa', 'general']
+    // Tipos que llevan al trabajador → Activos con trabajo específico
+    const tiposTrabajador = ['pago_liberado', 'trabajo_aceptado']
 
     if (tiposCliente.includes(toast.tipo)) {
-      // Ir a modo cliente → Mis publicaciones
       setModo('cliente')
       setNavegarAMisPublicaciones(true)
+      if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId)
     } else if (tiposTrabajador.includes(toast.tipo)) {
-      // Ir a modo trabajador → pestaña Activos
       setModo('trabajador')
       setNavegarAActivos(true)
-    } else if (tiposPerfil.includes(toast.tipo)) {
-      // Ir a perfil según modo actual
-      setNavegarAPerfil(true)
+      if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId)
+    } else if (toast.tipo === 'calificacion') {
+      setVerNotificaciones(true)
     } else {
-      // Por defecto abrir historial de notificaciones
       setVerNotificaciones(true)
     }
   }
@@ -242,33 +223,23 @@ function AppContenido() {
   async function handleLogout() {
     await supabase.auth.signOut()
     setModo(null); setNombreUsuario(''); setNoLeidas(0)
-    setNavegarAMisPublicaciones(false)
-    setNavegarAActivos(false)
-    setNavegarAPerfil(false)
+    setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
 
   if (session) {
     if (verNotificaciones) {
-      return (
-        <Notificaciones
-          userId={session.user.id}
-          onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }}
-        />
-      )
+      return <Notificaciones userId={session.user.id} onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }} />
     }
 
     if (!modo) {
       return (
         <>
           <Toast toast={toastActivo} onClick={alTocarToast} />
-          <SeleccionModo
-            nombre={nombreUsuario} noLeidas={noLeidas}
-            onCliente={() => setModo('cliente')}
-            onTrabajador={() => setModo('trabajador')}
-            onLogout={handleLogout}
-            onNotificaciones={() => setVerNotificaciones(true)}
+          <SeleccionModo nombre={nombreUsuario} noLeidas={noLeidas}
+            onCliente={() => setModo('cliente')} onTrabajador={() => setModo('trabajador')}
+            onLogout={handleLogout} onNotificaciones={() => setVerNotificaciones(true)}
           />
         </>
       )
@@ -279,15 +250,12 @@ function AppContenido() {
         <>
           <Toast toast={toastActivo} onClick={alTocarToast} />
           <VistaTrabajador
-            onLogout={handleLogout}
-            userId={session.user.id}
-            userEmail={session.user.email}
-            onCambiarModo={() => setModo(null)}
-            noLeidas={noLeidas}
+            onLogout={handleLogout} userId={session.user.id} userEmail={session.user.email}
+            onCambiarModo={() => setModo(null)} noLeidas={noLeidas}
             onNotificaciones={() => setVerNotificaciones(true)}
-            // Navegación desde toast
             irAActivos={navegarAActivos}
-            onNavegacionCompletada={() => { setNavegarAActivos(false); setNavegarAPerfil(false) }}
+            trabajoIdInicial={trabajoIdInicial}
+            onNavegacionCompletada={() => { setNavegarAActivos(false); setTrabajoIdInicial(null) }}
           />
         </>
       )
@@ -297,15 +265,12 @@ function AppContenido() {
       <>
         <Toast toast={toastActivo} onClick={alTocarToast} />
         <MapaChamba
-          onLogout={handleLogout}
-          userId={session.user.id}
-          userEmail={session.user.email}
-          onCambiarModo={() => setModo(null)}
-          noLeidas={noLeidas}
+          onLogout={handleLogout} userId={session.user.id} userEmail={session.user.email}
+          onCambiarModo={() => setModo(null)} noLeidas={noLeidas}
           onNotificaciones={() => setVerNotificaciones(true)}
-          // Navegación desde toast
           irAMisPublicaciones={navegarAMisPublicaciones}
-          onNavegacionCompletada={() => { setNavegarAMisPublicaciones(false); setNavegarAPerfil(false) }}
+          trabajoIdInicial={trabajoIdInicial}
+          onNavegacionCompletada={() => { setNavegarAMisPublicaciones(false); setTrabajoIdInicial(null) }}
         />
       </>
     )
@@ -317,21 +282,11 @@ function AppContenido() {
         <h1 style={{ color: '#1D9E75', fontSize: '32px', fontWeight: '800', marginBottom: '4px' }}>chamba</h1>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '32px' }}>Salina Cruz, Oaxaca</p>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <input id="email" name="email" type="email" placeholder="Tu correo"
-            value={email} onChange={e => setEmail(e.target.value)} required
-            style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
-          />
-          <input id="password" name="password" type="password" placeholder="Contraseña"
-            value={password} onChange={e => setPassword(e.target.value)} required
-            style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
-          />
+          <input id="email" name="email" type="email" placeholder="Tu correo" value={email} onChange={e => setEmail(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
+          <input id="password" name="password" type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
-          <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>
-            {loading ? 'Cargando...' : 'Entrar'}
-          </button>
-          <button type="button" onClick={handleRegister} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>
-            Crear cuenta
-          </button>
+          <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>{loading ? 'Cargando...' : 'Entrar'}</button>
+          <button type="button" onClick={handleRegister} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
           <div style={{ textAlign: 'center', marginTop: '4px' }}>
             <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
           </div>

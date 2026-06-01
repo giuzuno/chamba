@@ -40,7 +40,7 @@ function formatearFecha(f) {
   return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export default function MisPublicaciones({ onVolver, userId }) {
+export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial }) {
   const [trabajos, setTrabajos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [trabajoSeleccionado, setTrabajoSeleccionado] = useState(null)
@@ -54,6 +54,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
   const [abrirDisputa, setAbrirDisputa] = useState(null)
 
   useEffect(() => { cargarMisTrabajos() }, [])
+
+  // Abrir trabajo específico desde toast
+  useEffect(() => {
+    if (trabajoIdInicial && trabajos.length > 0) {
+      const t = trabajos.find(t => t.id === trabajoIdInicial)
+      if (t) seleccionarTrabajo(t)
+    }
+  }, [trabajoIdInicial, trabajos])
 
   useEffect(() => {
     const channel = supabase
