@@ -230,7 +230,24 @@ function AppContenido() {
 
   if (session) {
     if (verNotificaciones) {
-      return <Notificaciones userId={session.user.id} onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }} />
+      return <Notificaciones
+        userId={session.user.id}
+        onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }}
+        onIrATrabajo={(trabajoId, tipo) => {
+          setVerNotificaciones(false)
+          cargarNoLeidas()
+          const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa', 'general']
+          const tiposTrabajador = ['pago_liberado', 'trabajo_aceptado']
+          setTrabajoIdInicial(trabajoId)
+          if (tiposCliente.includes(tipo)) {
+            setModo('cliente')
+            setNavegarAMisPublicaciones(true)
+          } else if (tiposTrabajador.includes(tipo)) {
+            setModo('trabajador')
+            setNavegarAActivos(true)
+          }
+        }}
+      />
     }
 
     if (!modo) {
