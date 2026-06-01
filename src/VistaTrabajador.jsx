@@ -29,7 +29,6 @@ function puedeIrAlTrabajo(trabajo) {
   const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
   const ahora = new Date()
   const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
-  // Puede salir entre 2 horas antes y 4 horas después (por retrasos)
   return diffHoras <= 2 && diffHoras > -4
 }
 
@@ -54,6 +53,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [negociando, setNegociando] = useState(null)
   const [pestana, setPestana] = useState('disponibles')
   const [loadingCompletar, setLoadingCompletar] = useState(null)
+  const [loadingIniciar, setLoadingIniciar] = useState(null)
   const [tracking, setTracking] = useState(null)
   const [calificando, setCalificando] = useState(null)
   const [verPerfilCliente, setVerPerfilCliente] = useState(null)
@@ -107,9 +107,26 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (data) setHistorial(data)
   }
 
+  async function iniciarTrabajo(trabajo) {
+    setLoadingIniciar(trabajo.id)
+    await supabase.from('trabajos').update({ trabajo_iniciado: true }).eq('id', trabajo.id)
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.cliente_id,
+      titulo: '🔨 ¡El trabajador comenzó!',
+      cuerpo: `Tu ${trabajo.categoria} ya está en progreso.`,
+      tipo: 'general',
+      trabajoId: trabajo.id,
+    })
+    await cargarMisTrabajos()
+    setLoadingIniciar(null)
+  }
+
   async function marcarCompletado(trabajo) {
     setLoadingCompletar(trabajo.id)
-    await supabase.from('trabajos').update({ status: 'en_revision' }).eq('id', trabajo.id)
+    await supabase.from('trabajos').update({
+      status: 'en_revision',
+      en_revision_desde: new Date().toISOString(),
+    }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({
       usuarioId: trabajo.cliente_id,
       titulo: '🔧 El trabajador terminó',
@@ -248,7 +265,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <span style={{ fontSize: '22px', fontWeight: '700', color: '#1D9E75' }}>${trabajoSeleccionado.ultima_oferta || trabajoSeleccionado.presupuesto} MXN</span>
                 </div>
               </div>
-
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>DESCRIPCIÓN</p>
@@ -257,35 +273,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 {trabajoSeleccionado.fecha_cita && (
                   <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', background: 'rgba(29,158,117,0.05)' }}>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>CUÁNDO LO NECESITAN</p>
-                    <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', textTransform: 'capitalize' }}>
-                      📅 {formatearFecha(trabajoSeleccionado.fecha_cita)}
-                    </p>
-                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
-                      🕐 {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs
-                    </p>
+                    <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', textTransform: 'capitalize' }}>📅 {formatearFecha(trabajoSeleccionado.fecha_cita)}</p>
+                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>🕐 {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs</p>
                   </div>
-                )}
-                {esViaje(trabajoSeleccionado) && trabajoSeleccionado.origen_lat && (
-                  <>
-                    <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '18px' }}>📍</span>
-                      <div>
-                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>ORIGEN</p>
-                        <p style={{ fontSize: '13px', color: 'white' }}>{trabajoSeleccionado.origen_lat.toFixed(4)}, {trabajoSeleccionado.origen_lng.toFixed(4)}</p>
-                      </div>
-                    </div>
-                    <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '18px' }}>🏁</span>
-                      <div>
-                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DESTINO</p>
-                        <p style={{ fontSize: '13px', color: 'white' }}>{trabajoSeleccionado.destino_lat.toFixed(4)}, {trabajoSeleccionado.destino_lng.toFixed(4)}</p>
-                      </div>
-                    </div>
-                    <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>DISTANCIA</p>
-                      <p style={{ fontSize: '14px', color: 'white' }}>{trabajoSeleccionado.distancia_km?.toFixed(1)} km</p>
-                    </div>
-                  </>
                 )}
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>UBICACIÓN</p>
@@ -296,7 +286,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {tiempoTranscurrido(trabajoSeleccionado.creado_en)}</p>
                 </div>
               </div>
-
               {trabajoSeleccionado.cliente_id && (
                 <button type="button" onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)} style={{ width: '100%', padding: '13px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   👤 Ver perfil del cliente
@@ -324,7 +313,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       {modalOpciones && <ModalOpciones />}
-
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div>
           <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
@@ -378,12 +366,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
                     {trabajo.fecha_cita && (
                       <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '12px', color: '#1D9E75', fontWeight: '600', background: 'rgba(29,158,117,0.1)', padding: '2px 8px', borderRadius: '6px', border: '0.5px solid rgba(29,158,117,0.3)' }}>
-                          📅 {trabajo.fecha_cita}
-                        </span>
-                        <span style={{ fontSize: '12px', color: '#1D9E75', fontWeight: '600', background: 'rgba(29,158,117,0.1)', padding: '2px 8px', borderRadius: '6px', border: '0.5px solid rgba(29,158,117,0.3)' }}>
-                          🕐 {trabajo.hora_cita?.slice(0, 5)} hrs
-                        </span>
+                        <span style={{ fontSize: '12px', color: '#1D9E75', fontWeight: '600', background: 'rgba(29,158,117,0.1)', padding: '2px 8px', borderRadius: '6px', border: '0.5px solid rgba(29,158,117,0.3)' }}>📅 {trabajo.fecha_cita}</span>
+                        <span style={{ fontSize: '12px', color: '#1D9E75', fontWeight: '600', background: 'rgba(29,158,117,0.1)', padding: '2px 8px', borderRadius: '6px', border: '0.5px solid rgba(29,158,117,0.3)' }}>🕐 {trabajo.hora_cita?.slice(0, 5)} hrs</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
@@ -410,7 +394,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               </div>
             )}
             {misTrabajos.map(trabajo => (
-              <div key={trabajo.id} style={{ background: trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.08)' : 'rgba(29,158,117,0.06)', border: `0.5px solid ${trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.3)' : 'rgba(29,158,117,0.2)'}`, borderRadius: '16px', padding: '16px 18px' }}>
+              <div key={trabajo.id} style={{ background: trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.08)' : trabajo.trabajo_iniciado ? 'rgba(55,138,221,0.06)' : 'rgba(29,158,117,0.06)', border: `0.5px solid ${trabajo.status === 'en_revision' ? 'rgba(232,160,48,0.3)' : trabajo.trabajo_iniciado ? 'rgba(55,138,221,0.2)' : 'rgba(29,158,117,0.2)'}`, borderRadius: '16px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
                   <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -419,11 +403,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trabajo.descripcion}</p>
-                    {esViaje(trabajo) && trabajo.origen_lat && (
-                      <div style={{ marginTop: '6px', display: 'flex', gap: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                        <span>📍 Origen</span><span>→</span><span>🏁 Destino</span><span>· {trabajo.distancia_km?.toFixed(1)} km</span>
-                      </div>
-                    )}
                     {trabajo.fecha_cita && (
                       <p style={{ fontSize: '12px', color: '#1D9E75', marginTop: '4px', fontWeight: '600' }}>
                         📅 {trabajo.fecha_cita} · 🕐 {trabajo.hora_cita?.slice(0, 5)} hrs
@@ -432,7 +411,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <div style={{ marginTop: '6px' }}>
                       {trabajo.status === 'en_revision'
                         ? <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
-                        : <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
+                        : trabajo.trabajo_iniciado
+                          ? <span style={{ fontSize: '11px', color: '#378ADD', fontWeight: '500' }}>🔨 Trabajo en progreso</span>
+                          : <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
                       }
                     </div>
                   </div>
@@ -454,7 +435,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {/* CANDADO DE TIEMPO: solo puede ir si faltan 2 hrs o menos */}
+                {/* Candado de tiempo para tracking */}
                 {trabajo.status === 'aceptado' && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   puedeIrAlTrabajo(trabajo) ? (
                     <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
@@ -463,11 +444,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   ) : (
                     <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: '8px' }}>
                       ⏰ Podrás salir cuando falten 2 hrs · cita a las {trabajo.hora_cita?.slice(0, 5)}
-                      {horasParaCita(trabajo) && (
-                        <span style={{ display: 'block', marginTop: '2px', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>
-                          Faltan aprox. {horasParaCita(trabajo)}
-                        </span>
-                      )}
+                      {horasParaCita(trabajo) && <span style={{ display: 'block', marginTop: '2px', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>Faltan aprox. {horasParaCita(trabajo)}</span>}
                     </div>
                   )
                 )}
@@ -478,7 +455,16 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && (
+                {/* Llegó pero no ha iniciado */}
+                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && !trabajo.trabajo_iniciado && (
+                  <button type="button" onClick={() => iniciarTrabajo(trabajo)} disabled={loadingIniciar === trabajo.id}
+                    style={{ width: '100%', padding: '10px', background: loadingIniciar === trabajo.id ? 'rgba(55,138,221,0.3)' : 'rgba(55,138,221,0.8)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
+                    {loadingIniciar === trabajo.id ? 'Registrando...' : '🔨 Empecé el trabajo'}
+                  </button>
+                )}
+
+                {/* Inició — puede marcar terminado */}
+                {trabajo.status === 'aceptado' && trabajo.trabajo_iniciado && (
                   <button type="button" onClick={() => marcarCompletado(trabajo)} disabled={loadingCompletar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingCompletar === trabajo.id ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                     {loadingCompletar === trabajo.id ? 'Procesando...' : '🔧 Terminé — avisar al cliente'}
@@ -519,9 +505,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                       <span style={{ fontSize: '15px', fontWeight: '700', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595' }}>${trabajo.precio_acordado || trabajo.presupuesto}</span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>{trabajo.descripcion}</p>
-                    {trabajo.fecha_cita && (
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>📅 {trabajo.fecha_cita} · 🕐 {trabajo.hora_cita?.slice(0, 5)} hrs</p>
-                    )}
+                    {trabajo.fecha_cita && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>📅 {trabajo.fecha_cita} · 🕐 {trabajo.hora_cita?.slice(0, 5)} hrs</p>}
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block', background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595', border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.4)' : 'rgba(240,149,149,0.3)'}`, fontWeight: '500' }}>
                       {trabajo.status === 'completado' ? '🏁 Completado' : '❌ Cancelado'}
                     </span>

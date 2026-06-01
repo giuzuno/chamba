@@ -92,10 +92,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     const { data } = await supabase
       .from('trabajos').select('*').eq('cliente_id', userId)
       .order('creado_en', { ascending: false })
-    if (data) {
-      setTrabajos(data)
-      cargarMensajesNoLeidos(data)
-    }
+    if (data) { setTrabajos(data); cargarMensajesNoLeidos(data) }
     setCargando(false)
   }
 
@@ -175,6 +172,26 @@ export default function MisPublicaciones({ onVolver, userId }) {
     setCalificando(trabajo)
   }
 
+  // Cliente rechaza el "terminé" — devuelve a en progreso
+  async function noHaTerminado(trabajo) {
+    setLoadingAccion(true)
+    await supabase.from('trabajos').update({
+      status: 'aceptado',
+      trabajo_iniciado: true,
+      en_revision_desde: null,
+    }).eq('id', trabajo.id)
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.trabajador_id,
+      titulo: '❌ El cliente dice que no terminaste',
+      cuerpo: `El cliente rechazó tu reporte de ${trabajo.categoria}. Por favor revisa y termina el trabajo.`,
+      tipo: 'general',
+      trabajoId: trabajo.id,
+    })
+    await cargarMisTrabajos()
+    setLoadingAccion(false)
+    setExitoAccion('Devuelto a en progreso — el trabajador fue notificado.')
+  }
+
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
@@ -189,6 +206,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
     if (s === 'en_disputa') return { texto: '⚠️ En disputa', bg: 'rgba(240,149,149,0.1)', color: '#F09595', border: 'rgba(240,149,149,0.3)' }
     if (s === 'publicado' && trabajo.quien_oferto === 'trabajador') return { texto: '💬 Contraoferta recibida', bg: 'rgba(186,117,23,0.15)', color: '#E8A030', border: 'rgba(186,117,23,0.4)' }
     if (s === 'publicado') return { texto: '⏳ Esperando trabajadores', bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
+    if (s === 'aceptado' && trabajo.trabajo_iniciado) return { texto: '🔨 Trabajo en progreso', bg: 'rgba(55,138,221,0.15)', color: '#378ADD', border: 'rgba(55,138,221,0.3)' }
     if (s === 'aceptado') return { texto: '✅ Trabajo aceptado', bg: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: 'rgba(29,158,117,0.3)' }
     if (s === 'en_revision') return { texto: '🔧 Trabajador terminó — confirma tú', bg: 'rgba(55,138,221,0.15)', color: '#378ADD', border: 'rgba(55,138,221,0.4)' }
     if (s === 'completado') return { texto: '🏁 Completado', bg: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: 'rgba(29,158,117,0.4)' }
@@ -201,8 +219,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
-      setChatAbierto(null)
-      marcarMensajesLeidos(chatAbierto.id)
+      setChatAbierto(null); marcarMensajesLeidos(chatAbierto.id)
     }} />
   }
 
@@ -241,11 +258,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: '6px'
           }}>
             💬 Chat
-            {noLeidos > 0 && (
-              <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>
-                {noLeidos}
-              </span>
-            )}
+            {noLeidos > 0 && <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>{noLeidos}</span>}
           </button>
         </div>
 
@@ -269,7 +282,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           </div>
 
-          {/* Fecha y hora acordada */}
+          {/* Fecha */}
           {trabajoSeleccionado.fecha_cita && (
             <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '28px' }}>📅</span>
@@ -286,24 +299,21 @@ export default function MisPublicaciones({ onVolver, userId }) {
             <div style={{ background: 'rgba(240,149,149,0.08)', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
               <p style={{ fontSize: '32px', marginBottom: '10px' }}>⚠️</p>
               <p style={{ fontSize: '15px', color: '#F09595', fontWeight: '700', marginBottom: '6px' }}>Disputa en proceso</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>
-                El equipo de Chamba está revisando tu caso. Esto puede tomar hasta 48 horas.
-              </p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.6' }}>El equipo de Chamba está revisando tu caso. Esto puede tomar hasta 48 horas.</p>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{ marginTop: '14px', width: '100%', padding: '12px', background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 💬 Chat con el trabajador
               </button>
             </div>
           )}
 
-          {/* Mensajes del trabajador cuando está publicado */}
+          {/* Publicado — mensajes */}
           {trabajoSeleccionado.status === 'publicado' && (
             <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
               width: '100%', padding: '13px',
               background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(55,138,221,0.08)',
               color: noLeidos > 0 ? '#F09595' : '#378ADD',
               border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(55,138,221,0.3)'}`,
-              borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-              cursor: 'pointer', fontFamily: 'sans-serif',
+              borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
             }}>
               💬 {noLeidos > 0 ? `Ver mensajes del trabajador (${noLeidos} nuevo${noLeidos > 1 ? 's' : ''})` : 'Ver mensajes del trabajador'}
@@ -330,12 +340,10 @@ export default function MisPublicaciones({ onVolver, userId }) {
             )}
           </div>
 
-          {/* Historial negociación */}
+          {/* Negociación */}
           {negociaciones.length > 0 && (
             <div>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Historial de negociación
-              </p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Historial de negociación</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <div style={{ background: 'rgba(55,138,221,0.15)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '12px', padding: '10px 14px', maxWidth: '70%' }}>
@@ -345,17 +353,11 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 </div>
                 {negociaciones.map(n => (
                   <div key={n.id} style={{ display: 'flex', justifyContent: n.ofertado_por === 'trabajador' ? 'flex-start' : 'flex-end' }}>
-                    <div style={{
-                      background: n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.15)' : 'rgba(55,138,221,0.15)',
-                      border: `0.5px solid ${n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.3)' : 'rgba(55,138,221,0.3)'}`,
-                      borderRadius: '12px', padding: '10px 14px', maxWidth: '70%'
-                    }}>
+                    <div style={{ background: n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.15)' : 'rgba(55,138,221,0.15)', border: `0.5px solid ${n.ofertado_por === 'trabajador' ? 'rgba(186,117,23,0.3)' : 'rgba(55,138,221,0.3)'}`, borderRadius: '12px', padding: '10px 14px', maxWidth: '70%' }}>
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>
                         {n.ofertado_por === 'trabajador' ? 'Trabajador' : 'Tú'} · {tiempoTranscurrido(n.creado_en)}
                       </p>
-                      <p style={{ fontSize: '18px', fontWeight: '700', color: n.ofertado_por === 'trabajador' ? '#E8A030' : '#378ADD' }}>
-                        ${n.monto} MXN
-                      </p>
+                      <p style={{ fontSize: '18px', fontWeight: '700', color: n.ofertado_por === 'trabajador' ? '#E8A030' : '#378ADD' }}>${n.monto} MXN</p>
                     </div>
                   </div>
                 ))}
@@ -378,7 +380,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             </div>
           )}
 
-          {/* Trabajo aceptado */}
+          {/* Aceptado */}
           {trabajoSeleccionado.status === 'aceptado' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -386,15 +388,14 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
                 color: noLeidos > 0 ? '#F09595' : '#1D9E75',
                 border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
-                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif',
+                borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}>
                 💬 Chat con el trabajador
                 {noLeidos > 0 && <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px' }}>{noLeidos}</span>}
               </button>
 
-              {/* Tracking en tiempo real */}
+              {/* Tracking */}
               {trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
                 <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid #1D9E75', borderRadius: '14px', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -405,13 +406,9 @@ export default function MisPublicaciones({ onVolver, userId }) {
                     <div style={{ height: '220px' }}>
                       <MapContainer center={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
                         <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <Marker position={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]} icon={iconoTrabajador}>
-                          <Popup>👷 Trabajador en camino</Popup>
-                        </Marker>
+                        <Marker position={[trabajoSeleccionado.trabajador_lat, trabajoSeleccionado.trabajador_lng]} icon={iconoTrabajador}><Popup>👷 Trabajador en camino</Popup></Marker>
                         {trabajoSeleccionado.lat && trabajoSeleccionado.lng && (
-                          <Marker position={[trabajoSeleccionado.lat, trabajoSeleccionado.lng]} icon={iconoCliente}>
-                            <Popup>🏠 Tu domicilio</Popup>
-                          </Marker>
+                          <Marker position={[trabajoSeleccionado.lat, trabajoSeleccionado.lng]} icon={iconoCliente}><Popup>🏠 Tu domicilio</Popup></Marker>
                         )}
                       </MapContainer>
                     </div>
@@ -419,23 +416,30 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 </div>
               )}
 
-              {trabajoSeleccionado.trabajador_llego && (
+              {trabajoSeleccionado.trabajador_llego && !trabajoSeleccionado.trabajo_iniciado && (
                 <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '14px', color: '#1D9E75', fontWeight: '600' }}>
-                  🏠 ¡El trabajador llegó a tu domicilio!
+                  🏠 ¡El trabajador llegó! Esperando que inicie el trabajo...
                 </div>
               )}
 
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
-                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo en progreso</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)' }}>
-                  Cuando el trabajador termine, te avisará y podrás confirmar el pago de{' '}
-                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
-                </p>
-              </div>
+              {trabajoSeleccionado.trabajo_iniciado && (
+                <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '14px', color: '#378ADD', fontWeight: '600' }}>
+                  🔨 ¡El trabajador ya comenzó! Trabajo en progreso...
+                </div>
+              )}
+
+              {!trabajoSeleccionado.trabajo_iniciado && !trabajoSeleccionado.trabajador_en_camino && !trabajoSeleccionado.trabajador_llego && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: '6px' }}>🤝 Trabajo aceptado</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)' }}>
+                    El trabajador llegará el día acordado. Cuando empiece te avisaremos.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* En revisión — confirmar pago */}
+          {/* En revisión */}
           {trabajoSeleccionado.status === 'en_revision' && !exitoAccion && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
@@ -443,8 +447,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 background: noLeidos > 0 ? 'rgba(240,149,149,0.08)' : 'rgba(29,158,117,0.1)',
                 color: noLeidos > 0 ? '#F09595' : '#1D9E75',
                 border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.3)' : 'rgba(29,158,117,0.3)'}`,
-                borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                cursor: 'pointer', fontFamily: 'sans-serif',
+                borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}>
                 💬 Chat con el trabajador
@@ -453,20 +456,25 @@ export default function MisPublicaciones({ onVolver, userId }) {
 
               <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
-                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador terminó!</p>
+                <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador dice que terminó!</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
-                  ¿Quedó bien? Confirma para liberar el pago de{' '}
-                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>{' '}
-                  al trabajador.
+                  ¿Quedó bien? Confirma para liberar{' '}
+                  <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
                 </p>
                 <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)} disabled={loadingAccion}
-                  style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+                  style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
+                </button>
+
+                {/* NUEVO — No ha terminado */}
+                <button type="button" onClick={() => noHaTerminado(trabajoSeleccionado)} disabled={loadingAccion}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(232,160,48,0.1)', color: '#E8A030', border: '1px solid rgba(232,160,48,0.3)', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+                  ❌ No ha terminado — devolver al trabajador
                 </button>
               </div>
 
               <button type="button" onClick={() => setAbrirDisputa(trabajoSeleccionado)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ⚠️ Hay un problema — abrir disputa
+                ⚠️ Hay un problema grave — abrir disputa
               </button>
             </div>
           )}
@@ -503,8 +511,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
             flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
             background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
             color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
-            fontSize: '13px', fontWeight: pestana === key ? '600' : '400',
-            cursor: 'pointer', fontFamily: 'sans-serif'
+            fontSize: '13px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif'
           }}>
             {label} {count > 0 && `(${count})`}
           </button>
@@ -541,8 +548,7 @@ export default function MisPublicaciones({ onVolver, userId }) {
                 : trabajo.status === 'en_revision' ? '1px solid rgba(55,138,221,0.4)'
                 : trabajo.quien_oferto === 'trabajador' && trabajo.status === 'publicado' ? '1px solid rgba(186,117,23,0.4)'
                 : noLeidos > 0 ? '1px solid rgba(240,149,149,0.3)' : '0.5px solid rgba(255,255,255,0.08)',
-              borderRadius: '16px', padding: '16px 18px', cursor: 'pointer',
-              fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
+              borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
@@ -554,23 +560,16 @@ export default function MisPublicaciones({ onVolver, userId }) {
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}</span>
                     </div>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>
-                    {trabajo.descripcion}
-                  </p>
-                  {trabajo.fecha_cita && (
-                    <p style={{ fontSize: '11px', color: '#1D9E75', marginBottom: '4px', fontWeight: '500' }}>
-                      📅 {trabajo.fecha_cita} · 🕐 {trabajo.hora_cita?.slice(0, 5)} hrs
-                    </p>
-                  )}
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>{trabajo.descripcion}</p>
+                  {trabajo.fecha_cita && <p style={{ fontSize: '11px', color: '#1D9E75', marginBottom: '4px', fontWeight: '500' }}>📅 {trabajo.fecha_cita} · 🕐 {trabajo.hora_cita?.slice(0, 5)} hrs</p>}
                   {trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>
-                      🚗 Trabajador en camino
-                    </span>
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>🚗 Trabajador en camino</span>
                   )}
-                  {trabajo.trabajador_llego && trabajo.status === 'aceptado' && (
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>
-                      🏠 Trabajador llegó
-                    </span>
+                  {trabajo.trabajador_llego && trabajo.status === 'aceptado' && !trabajo.trabajo_iniciado && (
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(29,158,117,0.2)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>🏠 Trabajador llegó</span>
+                  )}
+                  {trabajo.trabajo_iniciado && trabajo.status === 'aceptado' && (
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.4)', fontWeight: '600', marginBottom: '4px', display: 'inline-block' }}>🔨 En progreso</span>
                   )}
                   <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: badge.bg, color: badge.color, border: `0.5px solid ${badge.border}`, fontWeight: '500', display: 'inline-block' }}>
                     {badge.texto}
