@@ -110,10 +110,42 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
+  const [apellido, setApellido] = useState('')
+
+  function generarUsername(nombre, apellido) {
+    const base = `${nombre.trim().split(' ')[0]}_${apellido.trim().split(' ')[0]}`
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9_]/g, '')
+    return base
+  }
+
+  async function usernameDisponible(username) {
+    const { data } = await supabase.from('usuarios').select('id').eq('username', username).maybeSingle()
+    return !data
+  }
+
   async function guardarNombreYRol(rol) {
     if (!nombre.trim()) { setError('Escribe tu nombre'); return }
+    if (!apellido.trim()) { setError('Escribe tu apellido'); return }
     setGuardando(true)
-    await supabase.from('usuarios').upsert({ id: userId, email: userEmail, nombre: nombre.trim() })
+
+    // Generar username único
+    let username = generarUsername(nombre, apellido)
+    let disponible = await usernameDisponible(username)
+    if (!disponible) {
+      let i = 2
+      while (!disponible) {
+        username = `${generarUsername(nombre, apellido)}_${i}`
+        disponible = await usernameDisponible(username)
+        i++
+      }
+    }
+
+    await supabase.from('usuarios').upsert({
+      id: userId, email: userEmail,
+      nombre: nombre.trim(), apellido: apellido.trim(), username
+    })
     setGuardando(false)
     onCompletado(rol, nombre.trim())
   }
@@ -146,14 +178,23 @@ function Onboarding({ userId, userEmail, onCompletado }) {
         </div>
         <div style={{ width: '100%', maxWidth: '340px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>¿Cómo te llamas?</h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>Los clientes y trabajadores verán tu nombre en la app.</p>
-          <input type="text" placeholder="Tu nombre completo" value={nombre}
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>Tu nombre real — así te verán clientes y trabajadores.</p>
+          <input type="text" placeholder="Nombre(s)" value={nombre}
             onChange={e => { setNombre(e.target.value); setError('') }} autoFocus
-            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${error ? '#F09595' : nombre ? '#1D9E75' : 'rgba(255,255,255,0.15)'}`, borderRadius: '14px', padding: '16px 18px', color: 'white', fontSize: '16px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '8px' }}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${error && !nombre ? '#F09595' : nombre ? '#1D9E75' : 'rgba(255,255,255,0.15)'}`, borderRadius: '14px', padding: '16px 18px', color: 'white', fontSize: '16px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '10px' }}
           />
+          <input type="text" placeholder="Apellido(s)" value={apellido}
+            onChange={e => { setApellido(e.target.value); setError('') }}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${error && !apellido ? '#F09595' : apellido ? '#1D9E75' : 'rgba(255,255,255,0.15)'}`, borderRadius: '14px', padding: '16px 18px', color: 'white', fontSize: '16px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '8px' }}
+          />
+          {nombre && apellido && (
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '8px' }}>
+              Tu usuario será: <span style={{ color: '#1D9E75' }}>@{nombre.trim().split(' ')[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')}_{apellido.trim().split(' ')[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')}</span>
+            </p>
+          )}
           {error && <p style={{ color: '#F09595', fontSize: '13px', marginBottom: '8px' }}>{error}</p>}
-          <button type="button" onClick={() => { if (!nombre.trim()) { setError('Escribe tu nombre'); return } setPaso(3) }}
-            style={{ width: '100%', padding: '16px', background: nombre.trim() ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: nombre.trim() ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: nombre.trim() ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
+          <button type="button" onClick={() => { if (!nombre.trim()) { setError('Escribe tu nombre'); return } if (!apellido.trim()) { setError('Escribe tu apellido'); return } setPaso(3) }}
+            style={{ width: '100%', padding: '16px', background: nombre.trim() && apellido.trim() ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: nombre.trim() && apellido.trim() ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: nombre.trim() && apellido.trim() ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
             Continuar →
           </button>
         </div>
