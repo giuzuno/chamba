@@ -7,6 +7,7 @@ import PublicarTrabajo from './PublicarTrabajo'
 import MisPublicaciones from './MisPublicaciones'
 import PerfilCliente from './PerfilCliente'
 import PublicarViaje from './PublicarViaje'
+import BuscarTrabajadores from './BuscarTrabajadores'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -152,6 +153,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
   if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} trabajoIdInicial={trabajoIdInicial} onTrabajoAbierto={() => {}} />
   if (pantalla === 'perfil') return <PerfilCliente onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
+  if (pantalla === 'buscar') return <BuscarTrabajadores userId={userId} onVolver={() => setPantalla('mapa')} />
 
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
@@ -245,11 +247,12 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
       {/* Bottom bar */}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0', background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.1)', transform: barVisible ? 'translateY(0)' : 'translateY(100%)', transition: 'transform 0.3s ease', position: 'relative', zIndex: 1000 }}>
-        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
+        {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['🔍', 'Buscar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
           <button key={label} type="button"
             onClick={() => {
               if (label === 'Mapa') setPantalla('mapa')
               if (label === 'Publicar') setPantalla('seleccionar')
+              if (label === 'Buscar') setPantalla('buscar')
               if (label === 'Mis trabajos') setPantalla('publicaciones')
               if (label === 'Perfil') setPantalla('perfil')
             }}
@@ -257,6 +260,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
               background: 'transparent', border: 'none',
               color: (pantalla === 'mapa' && label === 'Mapa') ||
                      (['seleccionar','publicar','viaje'].includes(pantalla) && label === 'Publicar') ||
+                     (pantalla === 'buscar' && label === 'Buscar') ||
                      (pantalla === 'publicaciones' && label === 'Mis trabajos') ||
                      (pantalla === 'perfil' && label === 'Perfil')
                 ? '#1D9E75' : 'rgba(255,255,255,0.5)',
