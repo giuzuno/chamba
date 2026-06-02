@@ -89,6 +89,10 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [ratingReal, setRatingReal] = useState(null)
   const [totalTrabajos, setTotalTrabajos] = useState(0)
   const [resenas, setResenas] = useState([])
+  const [gananciaTotal, setGananciaTotal] = useState(0)
+  const [trabajosCompletados, setTrabajosCompletados] = useState(0)
+  const [mejorMes, setMejorMes] = useState(null)
+  const [rachaMeses, setRachaMeses] = useState(0)
 
   useEffect(() => {
     cargarPerfil()
@@ -120,15 +124,52 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   }
 
   async function cargarStats() {
-    const { data } = await supabase.from('calificaciones')
+    // Calificaciones
+    const { data: cals } = await supabase.from('calificaciones')
       .select('estrellas, comentario, creado_en')
       .eq('calificado_id', userId)
       .order('creado_en', { ascending: false })
-    if (data && data.length > 0) {
-      const promedio = data.reduce((acc, c) => acc + c.estrellas, 0) / data.length
+    if (cals && cals.length > 0) {
+      const promedio = cals.reduce((acc, c) => acc + c.estrellas, 0) / cals.length
       setRatingReal(parseFloat(promedio.toFixed(1)))
-      setTotalTrabajos(data.length)
-      setResenas(data.filter(c => c.comentario))
+      setTotalTrabajos(cals.length)
+      setResenas(cals.filter(c => c.comentario))
+    }
+
+    // Trabajos completados y ganancias
+    const { data: trabajos } = await supabase.from('trabajos')
+      .select('precio_acordado, presupuesto, creado_en')
+      .eq('trabajador_id', userId)
+      .eq('status', 'completado')
+    if (trabajos && trabajos.length > 0) {
+      setTrabajosCompletados(trabajos.length)
+      const total = trabajos.reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
+      setGananciaTotal(total)
+
+      // Mejor mes
+      const porMes = {}
+      trabajos.forEach(t => {
+        const mes = new Date(t.creado_en).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+        if (!porMes[mes]) porMes[mes] = { count: 0, ganancias: 0 }
+        porMes[mes].count++
+        porMes[mes].ganancias += (t.precio_acordado || t.presupuesto || 0)
+      })
+      const mejor = Object.entries(porMes).sort((a, b) => b[1].ganancias - a[1].ganancias)[0]
+      if (mejor) setMejorMes({ mes: mejor[0], ...mejor[1] })
+
+      // Racha: meses consecutivos con al menos 1 trabajo
+      const mesesConTrabajo = new Set(trabajos.map(t => {
+        const d = new Date(t.creado_en)
+        return `${d.getFullYear()}-${d.getMonth()}`
+      }))
+      let racha = 0
+      const ahora = new Date()
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1)
+        if (mesesConTrabajo.has(`${d.getFullYear()}-${d.getMonth()}`)) racha++
+        else break
+      }
+      setRachaMeses(racha)
     }
   }
 
@@ -267,7 +308,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
 
           {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
-            {[['info', 'Mi info'], ['servicios', 'Servicios'], ['resenas', `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`]].map(([key, label]) => (
+            {[['info', 'Mi info'], ['servicios', 'Servicios'], ['stats', '📊 Stats'], ['resenas', `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`]].map(([key, label]) => (
               <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 {label}
               </button>
@@ -389,6 +430,62 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                   </strong>.
                 </div>
               </>
+            )}
+
+            {pestana === 'stats' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Ganancias totales */}
+                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ganancias totales</p>
+                  <p style={{ fontSize: '40px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>
+                    ${gananciaTotal.toLocaleString('es-MX')}
+                  </p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>MXN acumulados en Chamba</p>
+                </div>
+
+                {/* Grid de stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '32px', fontWeight: '800', color: '#378ADD' }}>{trabajosCompletados}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Trabajos completados</p>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '32px', fontWeight: '800', color: '#F5A623' }}>{ratingReal || '—'}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Rating promedio ⭐</p>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '32px', fontWeight: '800', color: '#E8A030' }}>{rachaMeses}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+                      {rachaMeses === 1 ? 'Mes activo' : 'Meses seguidos'} 🔥
+                    </p>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>
+                      {trabajosCompletados > 0 ? `$${Math.round(gananciaTotal / trabajosCompletados).toLocaleString('es-MX')}` : '—'}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Promedio por trabajo</p>
+                  </div>
+                </div>
+
+                {/* Mejor mes */}
+                {mejorMes && (
+                  <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🏆 Mejor mes</p>
+                      <p style={{ fontSize: '15px', fontWeight: '700', color: '#E8A030', textTransform: 'capitalize' }}>{mejorMes.mes}</p>
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{mejorMes.count} trabajo{mejorMes.count > 1 ? 's' : ''}</p>
+                    </div>
+                    <p style={{ fontSize: '22px', fontWeight: '800', color: '#E8A030' }}>${mejorMes.ganancias.toLocaleString('es-MX')}</p>
+                  </div>
+                )}
+
+                {trabajosCompletados === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📊</div>
+                    <p>Completa trabajos para ver tus estadísticas.</p>
+                  </div>
+                )}
+              </div>
             )}
 
             {pestana === 'resenas' && (
