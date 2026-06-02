@@ -10,6 +10,7 @@ import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 import LogoChamba from './LogoChamba'
+import PanelAdmin from './PanelAdmin'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -258,6 +259,7 @@ function AppContenido() {
   const [verNotificaciones, setVerNotificaciones] = useState(false)
   const [toastActivo, setToastActivo] = useState(null)
   const [esNuevo, setEsNuevo] = useState(false)
+  const [esAdmin, setEsAdmin] = useState(false)
   const [onboardingCompletado, setOnboardingCompletado] = useState(false)
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
@@ -275,9 +277,10 @@ function AppContenido() {
 
   useEffect(() => {
     if (session) {
-      supabase.from('usuarios').select('nombre').eq('id', session.user.id).maybeSingle()
+      supabase.from('usuarios').select('nombre, es_admin').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => {
-          if (data?.nombre) { setNombreUsuario(data.nombre); setEsNuevo(false) }
+          if (data?.es_admin) { setEsAdmin(true); setEsNuevo(false) }
+          else if (data?.nombre) { setNombreUsuario(data.nombre); setEsNuevo(false) }
           else setEsNuevo(true)
         })
     }
@@ -354,7 +357,7 @@ function AppContenido() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false)
+    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false)
     setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
 
@@ -364,6 +367,7 @@ function AppContenido() {
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
 
   if (session) {
+    if (esAdmin) return <PanelAdmin onLogout={handleLogout} />
     if (esNuevo) return <Onboarding userId={session.user.id} userEmail={session.user.email} onCompletado={onboardingTerminado} />
 
     if (verNotificaciones) {
