@@ -200,6 +200,13 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setExitoAccion('Devuelto a en progreso — el trabajador fue notificado.')
   }
 
+  function compartirWhatsApp(trabajo) {
+    const precio = trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto
+    const texto = `Necesito un ${trabajo.categoria} en Salina Cruz. Presupuesto: $${precio} MXN.\n\n${trabajo.descripcion}\n\n📲 Contáctame por Chamba: https://chamba-delta.vercel.app`
+    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`
+    window.open(url, '_blank')
+  }
+
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
@@ -258,16 +265,21 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
           <button type="button" onClick={() => { setTrabajoSeleccionado(null); setExitoAccion('') }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Mi publicación</h2>
-          <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
-            background: noLeidos > 0 ? 'rgba(240,149,149,0.15)' : 'rgba(29,158,117,0.15)',
-            color: noLeidos > 0 ? '#F09595' : '#1D9E75',
-            border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.4)' : 'rgba(29,158,117,0.3)'}`,
-            borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600',
-            cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: '6px'
-          }}>
-            💬 Chat
-            {noLeidos > 0 && <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>{noLeidos}</span>}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" onClick={() => compartirWhatsApp(trabajoSeleccionado)} style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366', border: '1px solid rgba(37,211,102,0.3)', borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              📲 WhatsApp
+            </button>
+            <button type="button" onClick={() => { setChatAbierto(trabajoSeleccionado); marcarMensajesLeidos(trabajoSeleccionado.id) }} style={{
+              background: noLeidos > 0 ? 'rgba(240,149,149,0.15)' : 'rgba(29,158,117,0.15)',
+              color: noLeidos > 0 ? '#F09595' : '#1D9E75',
+              border: `1px solid ${noLeidos > 0 ? 'rgba(240,149,149,0.4)' : 'rgba(29,158,117,0.3)'}`,
+              borderRadius: '10px', padding: '6px 12px', fontSize: '13px', fontWeight: '600',
+              cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: '6px'
+            }}>
+              💬 Chat
+              {noLeidos > 0 && <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', minWidth: '18px', textAlign: 'center' }}>{noLeidos}</span>}
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
