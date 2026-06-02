@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <!-- Pin -->
+  <path d="M100 10 C55 10 18 47 18 92 C18 160 100 230 100 230 C100 230 182 160 182 92 C182 47 145 10 100 10Z" fill="#1D9E75"/>
+  <circle cx="100" cy="86" r="44" fill="#0A2E20"/>
+  <text x="100" y="105" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="900" font-size="56">C</text>
+  <!-- Nombre -->
+  <text x="210" y="120" fill="#1D9E75" font-family="Arial, sans-serif" font-weight="900" font-size="72" letter-spacing="-2">Chamba</text>
+</svg>

@@ -9,6 +9,7 @@ import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
+import LogoChamba from './LogoChamba'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -120,7 +121,8 @@ function Onboarding({ userId, userEmail, onCompletado }) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
         <div style={{ fontSize: '72px', marginBottom: '24px' }}>👋</div>
-        <h1 style={{ color: '#1D9E75', fontSize: '36px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-1px' }}>Bienvenido a Chamba</h1>
+        <LogoChamba size='lg' />
+        <h1 style={{ color: 'white', fontSize: '28px', fontWeight: '800', marginBottom: '8px' }}>Bienvenido a Chamba</h1>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', marginBottom: '8px', maxWidth: '300px', lineHeight: '1.6' }}>La plataforma de servicios locales de Salina Cruz, Oaxaca.</p>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '48px' }}>En 2 pasos estarás listo para empezar</p>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -205,8 +207,7 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
         </button>
       </div>
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ color: '#1D9E75', fontSize: '40px', fontWeight: '800', marginBottom: '4px', letterSpacing: '-1px' }}>chamba</h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Salina Cruz, Oaxaca</p>
+        <LogoChamba size='lg' />
         {nombre && <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>Hola, {nombre.split(' ')[0]} 👋</p>}
       </div>
       <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '24px', textAlign: 'center' }}>¿Qué deseas hacer hoy?</p>
@@ -426,8 +427,7 @@ function AppContenido() {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px' }}>
       <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '40px 32px', width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ color: '#1D9E75', fontSize: '32px', fontWeight: '800', marginBottom: '4px' }}>chamba</h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '32px' }}>Salina Cruz, Oaxaca</p>
+        <div style={{ marginBottom: '32px' }}><LogoChamba size='md' /></div>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <input id="email" name="email" type="email" placeholder="Tu correo" value={email} onChange={e => setEmail(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
           <input id="password" name="password" type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />

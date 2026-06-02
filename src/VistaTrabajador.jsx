@@ -7,6 +7,7 @@ import PerfilPublico from './PerfilPublico'
 import ChatTrabajo from './ChatTrabajo'
 import PerfilTrabajador from './PerfilTrabajador'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import LogoChamba from './LogoChamba'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -334,8 +335,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       {modalOpciones && <ModalOpciones />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div>
-          <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Modo trabajador</p>
+          <LogoChamba size='sm' />
         </div>
         <HeaderBotones />
       </div>

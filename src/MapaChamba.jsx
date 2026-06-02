@@ -8,6 +8,7 @@ import MisPublicaciones from './MisPublicaciones'
 import PerfilCliente from './PerfilCliente'
 import PublicarViaje from './PublicarViaje'
 import BuscarTrabajadores from './BuscarTrabajadores'
+import LogoChamba from './LogoChamba'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -176,7 +177,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: '#0D0D0D', borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000 }}>
-        <h1 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800' }}>chamba</h1>
+        <LogoChamba size='sm' />
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>📍 {ciudad}</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button type="button" onClick={onNotificaciones} style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', fontSize: '16px' }}>
