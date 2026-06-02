@@ -56,6 +56,11 @@ async function enviarPush(token: string, titulo: string, cuerpo: string, accessT
   })
 }
 
+async function notificar(supabase: any, usuarioId: string, titulo: string, cuerpo: string, tipo: string, trabajoId: string, fcmToken: string | null, accessToken: string) {
+  await supabase.from('notificaciones').insert({ usuario_id: usuarioId, titulo, cuerpo, tipo, trabajo_id: trabajoId })
+  if (fcmToken) await enviarPush(fcmToken, titulo, cuerpo, accessToken)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -66,62 +71,90 @@ serve(async (req) => {
     )
     const serviceAccount = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT')!)
     const accessToken = await getAccessToken(serviceAccount)
-
     const ahora = new Date()
-    const limite = new Date(ahora.getTime() - 30 * 60 * 1000).toISOString()
 
-    const { data: trabajos } = await supabase
+    let completados = 0
+    let cancelados = 0
+
+    // ── 1. AUTO-COMPLETAR pagos en revision > 30 min ──
+    const limite30min = new Date(ahora.getTime() - 30 * 60 * 1000).toISOString()
+    const { data: enRevision } = await supabase
       .from('trabajos')
       .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id')
       .eq('status', 'en_revision')
       .not('en_revision_desde', 'is', null)
-      .lt('en_revision_desde', limite)
+      .lt('en_revision_desde', limite30min)
 
-    if (!trabajos || trabajos.length === 0) {
-      return new Response(JSON.stringify({ ok: true, completados: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    let completados = 0
-
-    for (const trabajo of trabajos) {
+    for (const trabajo of (enRevision || [])) {
       await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
-
       const precio = trabajo.precio_acordado || trabajo.presupuesto
 
-      const { data: usuarios } = await supabase
-        .from('usuarios').select('id, fcm_token')
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token')
         .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
-
       const cliente = usuarios?.find((u: any) => u.id === trabajo.cliente_id)
       const trabajador = usuarios?.find((u: any) => u.id === trabajo.trabajador_id)
 
-      const tituloTrabajador = '💰 ¡Pago liberado automáticamente!'
-      const cuerpoTrabajador = `Se confirmó automáticamente tu ${trabajo.categoria}. $${precio} MXN liberados.`
-      if (trabajador?.fcm_token) await enviarPush(trabajador.fcm_token, tituloTrabajador, cuerpoTrabajador, accessToken)
       if (trabajo.trabajador_id) {
-        await supabase.from('notificaciones').insert({
-          usuario_id: trabajo.trabajador_id, titulo: tituloTrabajador,
-          cuerpo: cuerpoTrabajador, tipo: 'pago_liberado', trabajo_id: trabajo.id,
-        })
+        await notificar(supabase, trabajo.trabajador_id,
+          'Pago liberado automaticamente',
+          `Se confirmo automaticamente tu ${trabajo.categoria}. $${precio} MXN liberados.`,
+          'pago_liberado', trabajo.id, trabajador?.fcm_token || null, accessToken)
       }
-
-      const tituloCliente = '🏁 Pago confirmado automáticamente'
-      const cuerpoCliente = `Tu ${trabajo.categoria} fue confirmado automáticamente después de 30 min. $${precio} MXN liberados al trabajador.`
-      if (cliente?.fcm_token) await enviarPush(cliente.fcm_token, tituloCliente, cuerpoCliente, accessToken)
       if (trabajo.cliente_id) {
-        await supabase.from('notificaciones').insert({
-          usuario_id: trabajo.cliente_id, titulo: tituloCliente,
-          cuerpo: cuerpoCliente, tipo: 'general', trabajo_id: trabajo.id,
-        })
+        await notificar(supabase, trabajo.cliente_id,
+          'Pago confirmado automaticamente',
+          `Tu ${trabajo.categoria} fue confirmado automaticamente despues de 30 min. $${precio} MXN liberados al trabajador.`,
+          'general', trabajo.id, cliente?.fcm_token || null, accessToken)
       }
-
       completados++
-      console.log(`Auto-completado trabajo ${trabajo.id}`)
     }
 
-    return new Response(JSON.stringify({ ok: true, completados }), {
+    // ── 2. AUTO-CANCELAR trabajos vencidos ──
+    // Si pasaron 2 horas de la cita y el trabajador NO marco en camino → cancelar
+    const limite2hrs = new Date(ahora.getTime() - 2 * 60 * 60 * 1000).toISOString()
+    const hoy = ahora.toISOString().split('T')[0]
+
+    const { data: vencidos } = await supabase
+      .from('trabajos')
+      .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id, fecha_cita, hora_cita')
+      .eq('status', 'aceptado')
+      .eq('trabajador_en_camino', false)
+      .not('fecha_cita', 'is', null)
+      .not('hora_cita', 'is', null)
+      .lte('fecha_cita', hoy)
+
+    for (const trabajo of (vencidos || [])) {
+      // Calcular si la cita pasó hace más de 2 horas
+      const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+      const diffMs = ahora.getTime() - citaDateTime.getTime()
+      const diffHoras = diffMs / (1000 * 60 * 60)
+
+      if (diffHoras < 2) continue // Aún no han pasado 2 hrs
+
+      await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
+
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token')
+        .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
+      const cliente = usuarios?.find((u: any) => u.id === trabajo.cliente_id)
+      const trabajador = usuarios?.find((u: any) => u.id === trabajo.trabajador_id)
+
+      if (trabajo.cliente_id) {
+        await notificar(supabase, trabajo.cliente_id,
+          'Trabajo cancelado automaticamente',
+          `Tu ${trabajo.categoria} fue cancelado porque el trabajador no se presento a tiempo.`,
+          'general', trabajo.id, cliente?.fcm_token || null, accessToken)
+      }
+      if (trabajo.trabajador_id) {
+        await notificar(supabase, trabajo.trabajador_id,
+          'Trabajo cancelado por inasistencia',
+          `El trabajo de ${trabajo.categoria} fue cancelado automaticamente por no presentarte a tiempo.`,
+          'general', trabajo.id, trabajador?.fcm_token || null, accessToken)
+      }
+      cancelados++
+      console.log(`Auto-cancelado trabajo ${trabajo.id} — cita vencida hace ${diffHoras.toFixed(1)} hrs`)
+    }
+
+    return new Response(JSON.stringify({ ok: true, completados, cancelados }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
