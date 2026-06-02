@@ -624,6 +624,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 </div>
               </div>
             </button>
+            </div>
           )
         })}
       </div>
