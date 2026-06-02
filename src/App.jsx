@@ -266,6 +266,15 @@ function AppContenido() {
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
   const toastTimer = useRef(null)
+  const [sinInternet, setSinInternet] = useState(!navigator.onLine)
+
+  useEffect(() => {
+    const online = () => setSinInternet(false)
+    const offline = () => setSinInternet(true)
+    window.addEventListener('online', online)
+    window.addEventListener('offline', offline)
+    return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offline) }
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session) })
@@ -360,6 +369,19 @@ function AppContenido() {
     setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false)
     setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
+
+  if (sinInternet) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: 'white', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '64px', marginBottom: '24px' }}>📡</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px', color: 'white' }}>Sin conexión</h2>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', maxWidth: '280px', lineHeight: '1.6', marginBottom: '32px' }}>
+        Chamba necesita internet para funcionar. Revisa tu conexión y vuelve a intentarlo.
+      </p>
+      <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '3px solid rgba(29,158,117,0.3)', borderTop: '3px solid #1D9E75', animation: 'spin 1s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '12px', marginTop: '20px' }}>Reconectando automáticamente...</p>
+    </div>
+  )
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
 
