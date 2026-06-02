@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
-export default function PanelAdmin({ onLogout }) {
+export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [pestana, setPestana] = useState('dashboard')
   const [stats, setStats] = useState({})
   const [trabajos, setTrabajos] = useState([])
@@ -113,8 +113,8 @@ export default function PanelAdmin({ onLogout }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ background: '#1D9E75', borderRadius: '8px', padding: '6px 10px', fontSize: '14px', fontWeight: '700' }}>C</div>
           <div>
-            <p style={{ fontSize: '15px', fontWeight: '700', color: '#1D9E75' }}>Chamba Admin</p>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Panel de administración</p>
+            <p style={{ fontSize: '15px', fontWeight: '700', color: '#1D9E75' }}>Hola, {nombreAdmin} 👋</p>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Panel de administración · Chamba</p>
           </div>
         </div>
         <button type="button" onClick={onLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.3)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>

@@ -52,6 +52,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [pestana, setPestana] = useState('activos')
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState({})
   const [abrirDisputa, setAbrirDisputa] = useState(null)
+  const [menuAbierto, setMenuAbierto] = useState(null) // id del trabajo con menu abierto
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -198,6 +199,14 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     await cargarMisTrabajos()
     setLoadingAccion(false)
     setExitoAccion('Devuelto a en progreso — el trabajador fue notificado.')
+  }
+
+  async function cancelarDesdeMenu(trabajo) {
+    setMenuAbierto(null)
+    setLoadingAccion(true)
+    await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
+    await cargarMisTrabajos()
+    setLoadingAccion(false)
   }
 
   function compartirWhatsApp(trabajo) {
@@ -559,6 +568,21 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
           const badge = statusBadge(trabajo)
           const noLeidos = mensajesNoLeidos[trabajo.id] || 0
           return (
+            <div key={trabajo.id} style={{ position: 'relative' }}>
+            {/* Menú ··· */}
+            {menuAbierto === trabajo.id && (
+              <div onClick={() => setMenuAbierto(null)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
+            )}
+            {menuAbierto === trabajo.id && (
+              <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '6px', zIndex: 200, minWidth: '180px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                <button type="button" onClick={() => cancelarDesdeMenu(trabajo)} style={{ width: '100%', padding: '10px 14px', background: 'transparent', color: '#F09595', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ❌ Cancelar trabajo
+                </button>
+                <button type="button" onClick={() => { setMenuAbierto(null); compartirWhatsApp(trabajo) }} style={{ width: '100%', padding: '10px 14px', background: 'transparent', color: '#25D366', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📲 Compartir por WhatsApp
+                </button>
+              </div>
+            )}
             <button key={trabajo.id} type="button" onClick={() => seleccionarTrabajo(trabajo)} style={{
               background: trabajo.status === 'en_disputa' ? 'rgba(240,149,149,0.08)'
                 : trabajo.status === 'en_revision' ? 'rgba(55,138,221,0.08)'
@@ -578,6 +602,9 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {noLeidos > 0 && <span style={{ background: '#F09595', color: 'white', borderRadius: '100px', fontSize: '10px', fontWeight: '700', padding: '1px 7px' }}>{noLeidos}</span>}
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${trabajo.precio_acordado || trabajo.ultima_oferta || trabajo.presupuesto}</span>
+                      <button type="button" onClick={e => { e.stopPropagation(); setMenuAbierto(menuAbierto === trabajo.id ? null : trabajo.id) }} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '16px', cursor: 'pointer', padding: '2px 6px', lineHeight: 1 }}>
+                        ···
+                      </button>
                     </div>
                   </div>
                   <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '6px' }}>{trabajo.descripcion}</p>

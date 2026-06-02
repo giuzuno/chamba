@@ -11,6 +11,7 @@ import PerfilCliente from './PerfilCliente'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 import LogoChamba from './LogoChamba'
 import PanelAdmin from './PanelAdmin'
+import Terminos from './Terminos'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -109,6 +110,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   const [nombre, setNombre] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [pendienteRol, setPendienteRol] = useState(null)
 
   const [apellido, setApellido] = useState('')
 
@@ -147,7 +149,8 @@ function Onboarding({ userId, userEmail, onCompletado }) {
       nombre: nombre.trim(), apellido: apellido.trim(), username
     })
     setGuardando(false)
-    onCompletado(rol, nombre.trim())
+    setPendienteRol(rol)
+    setPaso(4)
   }
 
   if (paso === 1) {
@@ -200,6 +203,10 @@ function Onboarding({ userId, userEmail, onCompletado }) {
         </div>
       </div>
     )
+  }
+
+  if (paso === 4) {
+    return <Terminos onAceptar={() => onCompletado(pendienteRol, nombre.trim())} />
   }
 
   return (
@@ -430,7 +437,7 @@ function AppContenido() {
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
 
   if (session) {
-    if (esAdmin) return <PanelAdmin onLogout={handleLogout} />
+    if (esAdmin) return <PanelAdmin onLogout={handleLogout} nombreAdmin={nombreUsuario || 'Admin'} />
     if (esNuevo) return <Onboarding userId={session.user.id} userEmail={session.user.email} onCompletado={onboardingTerminado} />
 
     if (verNotificaciones) {
