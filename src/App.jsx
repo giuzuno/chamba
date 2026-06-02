@@ -41,9 +41,69 @@ function Toast({ toast, onClick }) {
   )
 }
 
+// ── Recuperar contraseña ──
+function RecuperarPassword({ onVolver }) {
+  const [emailRec, setEmailRec] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [enviado, setEnviado] = useState(false)
+  const [error, setError] = useState('')
+
+  async function enviarCorreo(e) {
+    e.preventDefault()
+    if (!emailRec.trim()) { setError('Escribe tu correo'); return }
+    setLoading(true); setError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(emailRec.trim(), {
+      redirectTo: 'https://chamba-delta.vercel.app'
+    })
+    if (error) setError(error.message)
+    else setEnviado(true)
+    setLoading(false)
+  }
+
+  if (enviado) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '60px', marginBottom: '20px' }}>📬</div>
+        <h2 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>¡Correo enviado!</h2>
+        <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.6', marginBottom: '8px' }}>
+          Revisa tu bandeja de entrada en <strong style={{ color: 'white' }}>{emailRec}</strong>
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '32px' }}>
+          El enlace expira en 1 hora. Revisa también spam.
+        </p>
+        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          Volver al inicio
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px' }}>
+      <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '40px 32px', width: '100%', maxWidth: '400px' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '20px', cursor: 'pointer', marginBottom: '20px' }}>←</button>
+        <h2 style={{ color: 'white', fontSize: '22px', fontWeight: '800', marginBottom: '8px' }}>¿Olvidaste tu contraseña?</h2>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px', lineHeight: '1.5' }}>
+          Te enviaremos un enlace para crear una nueva contraseña.
+        </p>
+        <form onSubmit={enviarCorreo} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <input type="email" placeholder="Tu correo registrado"
+            value={emailRec} onChange={e => { setEmailRec(e.target.value); setError('') }}
+            style={{ background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${error ? '#F09595' : 'rgba(255,255,255,0.15)'}`, borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
+          />
+          {error && <p style={{ color: '#F09595', fontSize: '13px' }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{ background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}>
+            {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Onboarding ──
 function Onboarding({ userId, userEmail, onCompletado }) {
-  const [paso, setPaso] = useState(1) // 1=bienvenida, 2=nombre, 3=rol
+  const [paso, setPaso] = useState(1)
   const [nombre, setNombre] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -51,9 +111,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   async function guardarNombreYRol(rol) {
     if (!nombre.trim()) { setError('Escribe tu nombre'); return }
     setGuardando(true)
-    await supabase.from('usuarios').upsert({
-      id: userId, email: userEmail, nombre: nombre.trim()
-    })
+    await supabase.from('usuarios').upsert({ id: userId, email: userEmail, nombre: nombre.trim() })
     setGuardando(false)
     onCompletado(rol, nombre.trim())
   }
@@ -63,13 +121,9 @@ function Onboarding({ userId, userEmail, onCompletado }) {
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
         <div style={{ fontSize: '72px', marginBottom: '24px' }}>👋</div>
         <h1 style={{ color: '#1D9E75', fontSize: '36px', fontWeight: '800', marginBottom: '8px', letterSpacing: '-1px' }}>Bienvenido a Chamba</h1>
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', marginBottom: '8px', maxWidth: '300px', lineHeight: '1.6' }}>
-          La plataforma de servicios locales de Salina Cruz, Oaxaca.
-        </p>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '48px' }}>
-          En 2 pasos estarás listo para empezar
-        </p>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '40px' }}>
+        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', marginBottom: '8px', maxWidth: '300px', lineHeight: '1.6' }}>La plataforma de servicios locales de Salina Cruz, Oaxaca.</p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '48px' }}>En 2 pasos estarás listo para empezar</p>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {['⚡ Electricistas', '🔧 Plomeros', '🚕 Taxis', '🍳 Cocineras'].map(s => (
             <span key={s} style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '100px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)' }}>{s}</span>
           ))}
@@ -84,28 +138,19 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   if (paso === 2) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
-        {/* Indicador de pasos */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '40px' }}>
-          {[1, 2].map(n => (
-            <div key={n} style={{ width: n === 1 ? '24px' : '8px', height: '8px', borderRadius: '4px', background: n === 1 ? '#1D9E75' : 'rgba(255,255,255,0.15)', transition: 'all 0.3s' }} />
-          ))}
+          {[1,2].map(n => <div key={n} style={{ width: n===1?'24px':'8px', height:'8px', borderRadius:'4px', background: n===1?'#1D9E75':'rgba(255,255,255,0.15)', transition:'all 0.3s' }} />)}
         </div>
         <div style={{ width: '100%', maxWidth: '340px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>¿Cómo te llamas?</h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>
-            Los clientes y trabajadores verán tu nombre en la app.
-          </p>
-          <input
-            type="text" placeholder="Tu nombre completo"
-            value={nombre} onChange={e => { setNombre(e.target.value); setError('') }}
-            autoFocus
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>Los clientes y trabajadores verán tu nombre en la app.</p>
+          <input type="text" placeholder="Tu nombre completo" value={nombre}
+            onChange={e => { setNombre(e.target.value); setError('') }} autoFocus
             style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${error ? '#F09595' : nombre ? '#1D9E75' : 'rgba(255,255,255,0.15)'}`, borderRadius: '14px', padding: '16px 18px', color: 'white', fontSize: '16px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '8px' }}
           />
-          {error && <p style={{ color: '#F09595', fontSize: '13px', marginBottom: '16px' }}>{error}</p>}
-          <button type="button" onClick={() => {
-            if (!nombre.trim()) { setError('Escribe tu nombre'); return }
-            setPaso(3)
-          }} style={{ width: '100%', padding: '16px', background: nombre.trim() ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: nombre.trim() ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: nombre.trim() ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
+          {error && <p style={{ color: '#F09595', fontSize: '13px', marginBottom: '8px' }}>{error}</p>}
+          <button type="button" onClick={() => { if (!nombre.trim()) { setError('Escribe tu nombre'); return } setPaso(3) }}
+            style={{ width: '100%', padding: '16px', background: nombre.trim() ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: nombre.trim() ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: nombre.trim() ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
             Continuar →
           </button>
         </div>
@@ -115,43 +160,28 @@ function Onboarding({ userId, userEmail, onCompletado }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
-      {/* Indicador de pasos */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '40px' }}>
-        {[1, 2].map(n => (
-          <div key={n} style={{ width: n === 2 ? '24px' : '8px', height: '8px', borderRadius: '4px', background: n === 2 ? '#1D9E75' : 'rgba(255,255,255,0.4)', transition: 'all 0.3s' }} />
-        ))}
+        {[1,2].map(n => <div key={n} style={{ width: n===2?'24px':'8px', height:'8px', borderRadius:'4px', background: n===2?'#1D9E75':'rgba(255,255,255,0.4)', transition:'all 0.3s' }} />)}
       </div>
       <div style={{ width: '100%', maxWidth: '340px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '6px' }}>Hola, {nombre.split(' ')[0]} 👋</h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px' }}>¿Qué quieres hacer en Chamba?</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <button type="button" onClick={() => guardarNombreYRol('cliente')} disabled={guardando} style={{
-            background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)',
-            borderRadius: '18px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
-            textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px'
-          }}>
+          <button type="button" onClick={() => guardarNombreYRol('cliente')} disabled={guardando} style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '18px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🛍️</div>
             <div>
               <p style={{ fontSize: '17px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Contratar servicios</p>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.4' }}>Busco electricistas, plomeros, taxis y más</p>
             </div>
           </button>
-          <button type="button" onClick={() => guardarNombreYRol('trabajador')} disabled={guardando} style={{
-            background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)',
-            borderRadius: '18px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif',
-            textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px'
-          }}>
+          <button type="button" onClick={() => guardarNombreYRol('trabajador')} disabled={guardando} style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '18px', padding: '24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', flexShrink: 0, background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🔧</div>
             <div>
               <p style={{ fontSize: '17px', fontWeight: '700', color: '#378ADD', marginBottom: '4px' }}>Ofrecer mis servicios</p>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.4' }}>Quiero trabajar y ganar dinero con mi oficio</p>
             </div>
           </button>
-          <button type="button" onClick={() => guardarNombreYRol('ambos')} disabled={guardando} style={{
-            background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)',
-            borderRadius: '18px', padding: '20px', cursor: 'pointer', fontFamily: 'sans-serif',
-            textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px'
-          }}>
+          <button type="button" onClick={() => guardarNombreYRol('ambos')} disabled={guardando} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '18px', padding: '20px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', flexShrink: 0, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🔄</div>
             <div>
               <p style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Ambas cosas</p>
@@ -226,11 +256,12 @@ function AppContenido() {
   const [noLeidas, setNoLeidas] = useState(0)
   const [verNotificaciones, setVerNotificaciones] = useState(false)
   const [toastActivo, setToastActivo] = useState(null)
-  const [esNuevo, setEsNuevo] = useState(false) // onboarding
+  const [esNuevo, setEsNuevo] = useState(false)
   const [onboardingCompletado, setOnboardingCompletado] = useState(false)
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
+  const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
   const toastTimer = useRef(null)
 
   useEffect(() => {
@@ -245,12 +276,8 @@ function AppContenido() {
     if (session) {
       supabase.from('usuarios').select('nombre').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => {
-          if (data?.nombre) {
-            setNombreUsuario(data.nombre)
-            setEsNuevo(false)
-          } else {
-            setEsNuevo(true) // No tiene nombre → es nuevo
-          }
+          if (data?.nombre) { setNombreUsuario(data.nombre); setEsNuevo(false) }
+          else setEsNuevo(true)
         })
     }
   }, [session])
@@ -303,10 +330,7 @@ function AppContenido() {
   }
 
   function onboardingTerminado(rol, nombre) {
-    setNombreUsuario(nombre)
-    setEsNuevo(false)
-    setOnboardingCompletado(true)
-    // Llevar al modo correcto según su elección
+    setNombreUsuario(nombre); setEsNuevo(false); setOnboardingCompletado(true)
     if (rol === 'trabajador') setModo('trabajador')
     else setModo('cliente')
   }
@@ -335,11 +359,11 @@ function AppContenido() {
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
 
+  // ── Recuperar contraseña ──
+  if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
+
   if (session) {
-    // Onboarding para usuarios nuevos
-    if (esNuevo) {
-      return <Onboarding userId={session.user.id} userEmail={session.user.email} onCompletado={onboardingTerminado} />
-    }
+    if (esNuevo) return <Onboarding userId={session.user.id} userEmail={session.user.email} onCompletado={onboardingTerminado} />
 
     if (verNotificaciones) {
       return <Notificaciones
@@ -378,7 +402,6 @@ function AppContenido() {
             onNotificaciones={() => setVerNotificaciones(true)}
             irAActivos={navegarAActivos} trabajoIdInicial={trabajoIdInicial}
             onNavegacionCompletada={() => { setNavegarAActivos(false); setTrabajoIdInicial(null) }}
-            // Si viene del onboarding como trabajador → abrir perfil directo
             irAPerfil={onboardingCompletado && modo === 'trabajador'}
             onPerfilAbierto={() => setOnboardingCompletado(false)}
           />
@@ -411,7 +434,11 @@ function AppContenido() {
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>{loading ? 'Cargando...' : 'Entrar'}</button>
           <button type="button" onClick={handleRegister} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
-          <div style={{ textAlign: 'center', marginTop: '4px' }}>
+          {/* ← NUEVO: Link recuperar contraseña */}
+          <button type="button" onClick={() => setVerRecuperar(true)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'center', padding: '4px' }}>
+            ¿Olvidaste tu contraseña?
+          </button>
+          <div style={{ textAlign: 'center' }}>
             <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
           </div>
         </form>
