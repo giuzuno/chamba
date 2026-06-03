@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import ReglasChambaModal from './ReglasChambaModal'
 
 const CATEGORIAS = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -68,6 +69,8 @@ export default function PublicarTrabajo({ onVolver, userId }) {
   const [error, setError] = useState('')
   const [confirmando, setConfirmando] = useState(false)
   const [ubicacion, setUbicacion] = useState(null)
+  const [mostrarReglas, setMostrarReglas] = useState(false)
+  const [reglasAceptadas, setReglasAceptadas] = useState(false)
 
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
@@ -89,6 +92,8 @@ export default function PublicarTrabajo({ onVolver, userId }) {
     if (!esAhora && !fecha) { setError('Selecciona la fecha en que lo necesitas'); return }
     if (!esAhora && !hora) { setError('Selecciona la hora en que lo necesitas'); return }
     setError('')
+
+    if (!reglasAceptadas) { setMostrarReglas(true); return }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -153,6 +158,14 @@ export default function PublicarTrabajo({ onVolver, userId }) {
     setExito(true)
     setLoading(false)
   }
+
+  if (mostrarReglas) return (
+    <ReglasChambaModal
+      tipo="cliente"
+      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); verConfirmacion() }}
+      onCerrar={() => setMostrarReglas(false)}
+    />
+  )
 
   if (exito) {
     return (
@@ -227,6 +240,14 @@ export default function PublicarTrabajo({ onVolver, userId }) {
 
           <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
             ✓ Los trabajadores de <strong style={{ color: '#1D9E75' }}>{categoriaFinal}</strong> cerca de ti recibirán una notificación.
+          </div>
+
+          <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>🔐</span>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Tu dinero está protegido</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido en escrow y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien. Si hay un problema, lo recuperas.</p>
+            </div>
           </div>
 
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
