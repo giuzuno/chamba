@@ -133,10 +133,21 @@ serve(async (req) => {
 
       await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
-      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token')
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token, amonestaciones')
         .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
       const cliente = usuarios?.find((u: any) => u.id === trabajo.cliente_id)
       const trabajador = usuarios?.find((u: any) => u.id === trabajo.trabajador_id)
+
+      // Amonestar al trabajador por inasistencia
+      if (trabajo.trabajador_id && trabajador) {
+        const nuevas = (trabajador.amonestaciones || 0) + 1
+        const baneado = nuevas >= 3
+        await supabase.from('usuarios').update({
+          amonestaciones: nuevas,
+          ...(baneado ? { baneado: true } : {})
+        }).eq('id', trabajo.trabajador_id)
+        console.log(`Trabajador ${trabajo.trabajador_id} amonestado por inasistencia (${nuevas}/3)${baneado ? ' — BANEADO' : ''}`)
+      }
 
       if (trabajo.cliente_id) {
         await notificar(supabase, trabajo.cliente_id,
@@ -147,7 +158,7 @@ serve(async (req) => {
       if (trabajo.trabajador_id) {
         await notificar(supabase, trabajo.trabajador_id,
           'Trabajo cancelado por inasistencia',
-          `El trabajo de ${trabajo.categoria} fue cancelado automaticamente por no presentarte a tiempo.`,
+          `El trabajo de ${trabajo.categoria} fue cancelado por no presentarte. Amonestacion registrada.`,
           'general', trabajo.id, trabajador?.fcm_token || null, accessToken)
       }
       cancelados++

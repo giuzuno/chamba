@@ -55,6 +55,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [abrirDisputa, setAbrirDisputa] = useState(null)
   const [menuAbierto, setMenuAbierto] = useState(null)
   const [reportando, setReportando] = useState(null)
+  const [confirmarCancelar, setConfirmarCancelar] = useState(null) // trabajo a cancelar
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -175,6 +176,15 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   async function cancelarTrabajo(trabajo) {
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
+
+    // Si ya estaba aceptado → amonestar al cliente
+    if (trabajo.status === 'aceptado') {
+      const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
+      const nuevas = (usuario?.amonestaciones || 0) + 1
+      const baneado = nuevas >= 3
+      await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
+    }
+
     setTrabajoSeleccionado(null)
     await cargarMisTrabajos()
     setLoadingAccion(false)
@@ -219,6 +229,15 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setMenuAbierto(null)
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
+
+    // Si ya estaba aceptado → amonestar al cliente
+    if (trabajo.status === 'aceptado') {
+      const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
+      const nuevas = (usuario?.amonestaciones || 0) + 1
+      const baneado = nuevas >= 3
+      await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
+    }
+
     await cargarMisTrabajos()
     setLoadingAccion(false)
   }
@@ -254,6 +273,48 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
   const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
+
+  if (confirmarCancelar) {
+    const estaAceptado = confirmarCancelar.status === 'aceptado'
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '28px', maxWidth: '340px', width: '100%' }}>
+          <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>{estaAceptado ? '⚠️' : '❌'}</div>
+          <h3 style={{ fontSize: '18px', fontWeight: '700', textAlign: 'center', marginBottom: '10px' }}>
+            {estaAceptado ? '¿Seguro que quieres cancelar?' : 'Cancelar publicación'}
+          </h3>
+          {estaAceptado ? (
+            <>
+              <div style={{ background: 'rgba(240,149,149,0.08)', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+                <p style={{ fontSize: '13px', color: '#F09595', fontWeight: '700', marginBottom: '6px' }}>🚨 Recibirás una amonestación</p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+                  Este trabajo ya fue aceptado por un trabajador. Cancelarlo cuenta como una falta.
+                  <strong style={{ color: '#F09595', display: 'block', marginTop: '6px' }}>3 amonestaciones = cuenta suspendida automáticamente.</strong>
+                </p>
+              </div>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginBottom: '16px', lineHeight: '1.5' }}>
+                Si tienes un problema real, habla con el trabajador por chat antes de cancelar.
+              </p>
+            </>
+          ) : (
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '20px', lineHeight: '1.5' }}>
+              Esta publicación aún no fue aceptada. Puedes cancelarla sin consecuencias.
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button type="button" onClick={() => { const t = confirmarCancelar; setConfirmarCancelar(null); cancelarTrabajo(t) }}
+              style={{ width: '100%', padding: '14px', background: estaAceptado ? 'rgba(240,149,149,0.15)' : 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              {estaAceptado ? '⚠️ Sí, cancelar y aceptar amonestación' : '❌ Sí, cancelar publicación'}
+            </button>
+            <button type="button" onClick={() => setConfirmarCancelar(null)}
+              style={{ width: '100%', padding: '12px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Volver — no cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (reportando) {
     return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="cliente" onVolver={() => setReportando(null)} />
@@ -566,7 +627,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
           )}
 
           {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
-            <button type="button" onClick={() => cancelarTrabajo(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            <button type="button" onClick={() => setConfirmarCancelar(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               ❌ Cancelar publicación
             </button>
           )}
@@ -631,7 +692,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             )}
             {menuAbierto === trabajo.id && (
               <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '6px', zIndex: 200, minWidth: '180px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-                <button type="button" onClick={() => cancelarDesdeMenu(trabajo)} style={{ width: '100%', padding: '10px 14px', background: 'transparent', color: '#F09595', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button type="button" onClick={() => { setMenuAbierto(null); setConfirmarCancelar(trabajo) }} style={{ width: '100%', padding: '10px 14px', background: 'transparent', color: '#F09595', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   ❌ Cancelar trabajo
                 </button>
                 <button type="button" onClick={() => { setMenuAbierto(null); compartirWhatsApp(trabajo) }} style={{ width: '100%', padding: '10px 14px', background: 'transparent', color: '#25D366', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>

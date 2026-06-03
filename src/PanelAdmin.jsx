@@ -61,7 +61,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
 
   async function cargarUsuarios() {
     const { data } = await supabase.from('usuarios')
-      .select('id, nombre, email, es_trabajador, es_admin, rating_promedio, total_trabajos, creado_en, baneado')
+      .select('id, nombre, email, es_trabajador, es_admin, rating_promedio, total_trabajos, creado_en, baneado, amonestaciones')
       .order('creado_en', { ascending: false })
     if (data) setUsuarios(data)
   }
@@ -71,8 +71,31 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     const nuevoStatus = ganador === 'cliente' ? 'cancelado' : 'completado'
     await supabase.from('trabajos').update({ status: nuevoStatus, en_disputa: false }).eq('id', trabajoId)
     await supabase.from('disputas').update({ status: 'resuelta', resolucion: ganador }).eq('id', disputaId)
+
+    // Amonestar al perdedor y banear si llega a 3
+    const { data: trabajo } = await supabase.from('trabajos').select('cliente_id, trabajador_id').eq('id', trabajoId).maybeSingle()
+    if (trabajo) {
+      const perdedorId = ganador === 'cliente' ? trabajo.trabajador_id : trabajo.cliente_id
+      if (perdedorId) {
+        const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', perdedorId).maybeSingle()
+        const nuevas = (usuario?.amonestaciones || 0) + 1
+        const baneado = nuevas >= 3
+        await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', perdedorId)
+        if (baneado) console.log(`Usuario ${perdedorId} baneado por 3 amonestaciones`)
+      }
+    }
+
     await cargarDisputas()
     await cargarStats()
+    setLoadingAccion(null)
+  }
+
+  async function amonestacionManual(usuarioId, actuales) {
+    setLoadingAccion(usuarioId)
+    const nuevas = actuales + 1
+    const baneado = nuevas >= 3
+    await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', usuarioId)
+    await cargarUsuarios()
     setLoadingAccion(null)
   }
 
@@ -291,15 +314,26 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
                   <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                     {u.rating_promedio && <span style={{ fontSize: '10px', color: '#F5A623' }}>⭐ {u.rating_promedio}</span>}
                     {u.total_trabajos > 0 && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>{u.total_trabajos} trabajos</span>}
+                    {u.amonestaciones > 0 && <span style={{ fontSize: '10px', color: '#F09595', fontWeight: '700' }}>⚠️ {u.amonestaciones}/3 amonestaciones</span>}
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{tiempoTranscurrido(u.creado_en)}</span>
                   </div>
                 </div>
                 {!u.es_admin && (
-                  <button type="button" onClick={() => banearUsuario(u.id, u.baneado)} disabled={loadingAccion === u.id}
-                    style={{ marginLeft: '12px', padding: '6px 12px', background: u.baneado ? 'rgba(29,158,117,0.1)' : 'rgba(240,149,149,0.1)', color: u.baneado ? '#1D9E75' : '#F09595', border: `0.5px solid ${u.baneado ? 'rgba(29,158,117,0.3)' : 'rgba(240,149,149,0.3)'}`, borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0 }}>
-                    {u.baneado ? '✅ Desbanear' : '🚫 Banear'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginLeft: '12px', flexShrink: 0 }}>
+                    <button type="button" onClick={() => banearUsuario(u.id, u.baneado)} disabled={loadingAccion === u.id}
+                      style={{ padding: '5px 10px', background: u.baneado ? 'rgba(29,158,117,0.1)' : 'rgba(240,149,149,0.1)', color: u.baneado ? '#1D9E75' : '#F09595', border: `0.5px solid ${u.baneado ? 'rgba(29,158,117,0.3)' : 'rgba(240,149,149,0.3)'}`, borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                      {u.baneado ? '✅ Desbanear' : '🚫 Banear'}
+                    </button>
+                    {!u.baneado && (
+                      <button type="button" onClick={() => amonestacionManual(u.id, u.amonestaciones || 0)} disabled={loadingAccion === u.id}
+                        style={{ padding: '5px 10px', background: 'rgba(232,160,48,0.1)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        ⚠️ Amonestar
+                      </button>
+                    )}
+                  </div>
                 )}
+                {u.es_admin && (<div style={{ marginLeft: '12px', width: '80px' }} />
+    )}
               </div>
             ))}
           </>

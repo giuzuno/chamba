@@ -252,6 +252,17 @@ export default function PublicarTrabajo({ onVolver, userId }) {
 
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
+          {/* Advertencia de cancelación */}
+          <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: '700', color: '#E8A030', marginBottom: '3px' }}>Importante antes de publicar</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+                Si cancelas un trabajo que ya fue aceptado por un trabajador, recibirás una <strong style={{ color: '#E8A030' }}>amonestación</strong>. Con 3 amonestaciones tu cuenta será suspendida automáticamente.
+              </p>
+            </div>
+          </div>
+
           <button type="button" onClick={publicar} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {loading ? 'Publicando...' : '✅ Confirmar y publicar'}
           </button>
