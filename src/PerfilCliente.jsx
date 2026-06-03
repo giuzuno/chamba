@@ -65,16 +65,16 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
       setTotalCalificaciones(cals.length)
       setResenas(cals.filter(c => c.comentario))
     }
-    // Total trabajos completados + historial de pagos
+    // Todos los trabajos del cliente para estado de cuenta completo
     const { data: pagos } = await supabase.from('trabajos')
-      .select('id, categoria, descripcion, precio_acordado, presupuesto, creado_en, trabajador_id')
+      .select('id, categoria, descripcion, precio_acordado, presupuesto, creado_en, trabajador_id, status')
       .eq('cliente_id', userId)
-      .eq('status', 'completado')
       .order('creado_en', { ascending: false })
     if (pagos) {
-      setTotalTrabajos(pagos.length)
+      const completados = pagos.filter(t => t.status === 'completado')
+      setTotalTrabajos(completados.length)
       setHistorialPagos(pagos)
-      const total = pagos.reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
+      const total = completados.reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
       setGastoTotal(total)
     }
   }
@@ -246,43 +246,99 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
 
             {pestana === 'pagos' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Resumen total */}
-                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total gastado en Chamba</p>
-                    <p style={{ fontSize: '36px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>${gastoTotal.toLocaleString('es-MX')}</p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>en {totalTrabajos} trabajo{totalTrabajos !== 1 ? 's' : ''} completado{totalTrabajos !== 1 ? 's' : ''}</p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Promedio</p>
-                    <p style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75' }}>
-                      ${totalTrabajos > 0 ? Math.round(gastoTotal / totalTrabajos).toLocaleString('es-MX') : 0}
-                    </p>
-                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>por trabajo</p>
-                  </div>
-                </div>
 
-                {/* Lista de pagos */}
-                {historialPagos.length === 0 ? (
+                {/* Resumen 4 tarjetas */}
+                {(() => {
+                  const completados = historialPagos.filter(t => t.status === 'completado')
+                  const enProceso = historialPagos.filter(t => ['aceptado','en_revision','publicado'].includes(t.status))
+                  const cancelados = historialPagos.filter(t => t.status === 'cancelado')
+                  const enDisputa = historialPagos.filter(t => t.status === 'en_disputa')
+                  const totalCompletado = completados.reduce((a, t) => a + (t.precio_acordado || t.presupuesto || 0), 0)
+                  const totalProceso = enProceso.reduce((a, t) => a + (t.precio_acordado || t.presupuesto || 0), 0)
+                  const totalCancelado = cancelados.reduce((a, t) => a + (t.precio_acordado || t.presupuesto || 0), 0)
+                  const totalDisputa = enDisputa.reduce((a, t) => a + (t.precio_acordado || t.presupuesto || 0), 0)
+
+                  return (
+                    <>
+                      {/* Banner principal */}
+                      <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px' }}>
+                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Estado de cuenta</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <div>
+                            <p style={{ fontSize: '36px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>${totalCompletado.toLocaleString('es-MX')}</p>
+                            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>pagado y liberado</p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Promedio por trabajo</p>
+                            <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75' }}>${completados.length > 0 ? Math.round(totalCompletado / completados.length).toLocaleString('es-MX') : 0}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Grid de estados */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        {[
+                          { label: '✅ Completados', count: completados.length, total: totalCompletado, color: '#1D9E75', bg: 'rgba(29,158,117,0.08)', border: 'rgba(29,158,117,0.2)' },
+                          { label: '🔄 En escrow', count: enProceso.length, total: totalProceso, color: '#378ADD', bg: 'rgba(55,138,221,0.08)', border: 'rgba(55,138,221,0.2)' },
+                          { label: '❌ Cancelados', count: cancelados.length, total: totalCancelado, color: '#F09595', bg: 'rgba(240,149,149,0.06)', border: 'rgba(240,149,149,0.15)' },
+                          { label: '⚠️ En disputa', count: enDisputa.length, total: totalDisputa, color: '#E8A030', bg: 'rgba(232,160,48,0.06)', border: 'rgba(232,160,48,0.15)' },
+                        ].map(s => (
+                          <div key={s.label} style={{ background: s.bg, border: `0.5px solid ${s.border}`, borderRadius: '14px', padding: '14px' }}>
+                            <p style={{ fontSize: '12px', color: s.color, fontWeight: '600', marginBottom: '6px' }}>{s.label}</p>
+                            <p style={{ fontSize: '22px', fontWeight: '800', color: 'white', lineHeight: 1 }}>{s.count}</p>
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '3px' }}>${s.total.toLocaleString('es-MX')} MXN</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Nota cancelados */}
+                      {cancelados.length > 0 && (
+                        <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+                          🔐 Los trabajos cancelados antes de iniciar son devueltos automáticamente. Si ganaste una disputa, el reembolso puede tardar 3-5 días hábiles.
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+
+                {/* Lista detallada por estado */}
+                {[
+                  { status: 'completado', label: '✅ Pagados', color: '#1D9E75' },
+                  { status: 'en_revision', label: '🔧 Pendiente de confirmar', color: '#378ADD' },
+                  { status: 'aceptado', label: '🔄 En escrow', color: '#378ADD' },
+                  { status: 'en_disputa', label: '⚠️ En disputa', color: '#E8A030' },
+                  { status: 'cancelado', label: '❌ Cancelados / Devueltos', color: '#F09595' },
+                ].map(grupo => {
+                  const items = historialPagos.filter(t => t.status === grupo.status)
+                  if (items.length === 0) return null
+                  return (
+                    <div key={grupo.status}>
+                      <p style={{ fontSize: '12px', color: grupo.color, fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{grupo.label} ({items.length})</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {items.map(pago => (
+                          <div key={pago.id} style={{ background: 'rgba(255,255,255,0.03)', border: `0.5px solid ${grupo.color}20`, borderRadius: '12px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: '13px', fontWeight: '600', color: 'white', marginBottom: '2px' }}>{pago.categoria}</p>
+                              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>{pago.descripcion}</p>
+                              <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{new Date(pago.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '10px' }}>
+                              <p style={{ fontSize: '16px', fontWeight: '800', color: grupo.color }}>${(pago.precio_acordado || pago.presupuesto || 0).toLocaleString('es-MX')}</p>
+                              <p style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)' }}>MXN</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {historialPagos.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>
                     <div style={{ fontSize: '48px', marginBottom: '12px' }}>💳</div>
-                    <p>Aún no tienes pagos completados.</p>
+                    <p>Aún no tienes servicios contratados.</p>
                   </div>
-                ) : historialPagos.map(pago => (
-                  <div key={pago.id} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '3px' }}>{pago.categoria}</p>
-                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '3px' }}>{pago.descripcion}</p>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>
-                        {new Date(pago.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
-                      <p style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${(pago.precio_acordado || pago.presupuesto || 0).toLocaleString('es-MX')}</p>
-                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>MXN</p>
-                    </div>
-                  </div>
-                ))}
+                )}
               </div>
             )}
 
