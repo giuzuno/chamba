@@ -34,12 +34,6 @@ const CATEGORIAS = [
   { icon: '✳️', nombre: 'Otros' },
 ]
 
-const HORARIOS = [
-  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
-  '19:00', '20:00'
-]
-
 // Fix fecha domingo — usar fecha LOCAL no UTC
 function getHoyLocal() {
   const hoy = new Date()
@@ -365,24 +359,18 @@ export default function PublicarTrabajo({ onVolver, userId }) {
             </div>
 
             <div>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿A qué hora? *</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                {HORARIOS.map(h => (
-                  <button key={h} type="button"
-                    onClick={() => { setHora(h); setError('') }}
-                    style={{
-                      background: hora === h ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.05)',
-                      border: hora === h ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.1)',
-                      borderRadius: '10px', padding: '10px 6px',
-                      color: hora === h ? '#1D9E75' : 'rgba(255,255,255,0.6)',
-                      fontSize: '13px', fontWeight: hora === h ? '600' : '400',
-                      cursor: 'pointer', fontFamily: 'sans-serif'
-                    }}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿A qué hora? * (formato 24 hrs)</p>
+              <input
+                type="time"
+                value={hora}
+                onChange={e => { setHora(e.target.value); setError('') }}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: hora ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '18px', fontFamily: 'sans-serif', outline: 'none', colorScheme: 'dark' }}
+              />
+              {hora && (
+                <p style={{ fontSize: '13px', color: '#1D9E75', marginTop: '8px' }}>
+                  🕐 {hora} hrs
+                </p>
+              )}
             </div>
           </>
         )}
