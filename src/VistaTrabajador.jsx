@@ -62,6 +62,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [mensajeNoPuedoLlegar, setMensajeNoPuedoLlegar] = useState(null)
   const [modalOpciones, setModalOpciones] = useState(false)
   const [verPerfil, setVerPerfil] = useState(false)
+  const [perfilIncompleto, setPerfilIncompleto] = useState(false)
+  const [camposFaltantes, setCamposFaltantes] = useState([])
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -95,9 +97,27 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     }
   }, [trabajoIdInicial, misTrabajos])
 
+  function validarPerfilCompleto(perfil) {
+    const faltantes = []
+    if (!perfil?.nombre) faltantes.push('Nombre')
+    if (!perfil?.foto_url) faltantes.push('Foto de perfil')
+    if (!perfil?.categorias_servicio || perfil.categorias_servicio.length === 0) faltantes.push('Categorías de servicio')
+    return faltantes
+  }
+
+  function intentarVerTrabajo(trabajo) {
+    const faltantes = validarPerfilCompleto(perfilUsuario)
+    if (faltantes.length > 0) {
+      setCamposFaltantes(faltantes)
+      setPerfilIncompleto(true)
+      return
+    }
+    setTrabajoSeleccionado(trabajo)
+  }
+
   async function cargarPerfilUsuario() {
     const { data } = await supabase.from('usuarios')
-      .select('categorias_servicio, radio_alertas, lat, lng')
+      .select('categorias_servicio, radio_alertas, lat, lng, nombre, foto_url')
       .eq('id', userId).maybeSingle()
     if (data) setPerfilUsuario(data)
     cargarTrabajos(data)
@@ -225,6 +245,32 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       </div>
     </div>
   )
+
+  if (perfilIncompleto) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '28px', maxWidth: '340px', width: '100%' }}>
+          <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>⚠️</div>
+          <h3 style={{ fontSize: '18px', fontWeight: '700', textAlign: 'center', marginBottom: '8px' }}>Completa tu perfil primero</h3>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '20px', lineHeight: '1.5' }}>
+            Los clientes necesitan ver tu información antes de contratarte.
+          </p>
+          <div style={{ background: 'rgba(240,149,149,0.08)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
+            <p style={{ fontSize: '12px', color: '#F09595', fontWeight: '600', marginBottom: '8px' }}>Te falta:</p>
+            {camposFaltantes.map(c => (
+              <p key={c} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>• {c}</p>
+            ))}
+          </div>
+          <button type="button" onClick={() => { setPerfilIncompleto(false); setVerPerfil(true) }} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '10px' }}>
+            ✏️ Completar mi perfil
+          </button>
+          <button type="button" onClick={() => setPerfilIncompleto(false)} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} onVolver={() => { setVerPerfil(false); cargarPerfilUsuario() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
@@ -373,7 +419,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               </div>
             )}
             {trabajos.map(trabajo => (
-              <button key={trabajo.id} type="button" onClick={() => setTrabajoSeleccionado(trabajo)}
+              <button key={trabajo.id} type="button" onClick={() => intentarVerTrabajo(trabajo)}
                 style={{ background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${esViaje(trabajo) ? 'rgba(55,138,221,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <span style={{ fontSize: '36px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
