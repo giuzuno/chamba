@@ -8,6 +8,7 @@ import ChatTrabajo from './ChatTrabajo'
 import PerfilTrabajador from './PerfilTrabajador'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import LogoChamba from './LogoChamba'
+import ReportarCobro from './ReportarCobro'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -89,6 +90,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [modalOpciones, setModalOpciones] = useState(false)
   const [verPerfil, setVerPerfil] = useState(false)
   const [perfilIncompleto, setPerfilIncompleto] = useState(false)
+  const [reportando, setReportando] = useState(null)
   const [camposFaltantes, setCamposFaltantes] = useState([])
   const [infoViaje, setInfoViaje] = useState(null) // { zonaOrigen, zonaDestino, distancia, eta }
 
@@ -310,6 +312,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       </div>
     )
   }
+
+  if (reportando) return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="trabajador" onVolver={() => setReportando(null)} />
 
   if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} onVolver={() => { setVerPerfil(false); cargarPerfilUsuario() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
@@ -568,6 +572,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
                 <button type="button" onClick={() => setChatAbierto(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   💬 Chat con el cliente
+                </button>
+                <button type="button" onClick={() => setReportando(trabajo)} style={{ width: '100%', padding: '7px', marginBottom: '8px', background: 'transparent', color: 'rgba(240,149,149,0.5)', border: '0.5px solid rgba(240,149,149,0.15)', borderRadius: '8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  🚨 El cliente me pidió cobrar fuera de la app
                 </button>
 
                 {esViaje(trabajo) && trabajo.status === 'aceptado' && (

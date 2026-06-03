@@ -7,6 +7,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import ReportarCobro from './ReportarCobro'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -52,7 +53,8 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [pestana, setPestana] = useState('activos')
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState({})
   const [abrirDisputa, setAbrirDisputa] = useState(null)
-  const [menuAbierto, setMenuAbierto] = useState(null) // id del trabajo con menu abierto
+  const [menuAbierto, setMenuAbierto] = useState(null)
+  const [reportando, setReportando] = useState(null)
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -252,6 +254,10 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
   const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
+
+  if (reportando) {
+    return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="cliente" onVolver={() => setReportando(null)} />
+  }
 
   if (chatAbierto) {
     return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => {
@@ -562,6 +568,13 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
           {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
             <button type="button" onClick={() => cancelarTrabajo(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               ❌ Cancelar publicación
+            </button>
+          )}
+
+          {/* Reporte cobro fuera de app */}
+          {['aceptado', 'en_revision'].includes(trabajoSeleccionado.status) && (
+            <button type="button" onClick={() => setReportando(trabajoSeleccionado)} style={{ width: '100%', padding: '11px', background: 'transparent', color: 'rgba(240,149,149,0.5)', border: '0.5px solid rgba(240,149,149,0.15)', borderRadius: '12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              🚨 El trabajador me pidió pagar fuera de la app
             </button>
           )}
 

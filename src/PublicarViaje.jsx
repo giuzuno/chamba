@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from '
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import ReglasChambaModal from './ReglasChambaModal'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -68,6 +69,8 @@ export default function PublicarViaje({ onVolver, userId }) {
   const [horaCita, setHoraCita] = useState('')
   const [publicando, setPublicando] = useState(false)
   const [exito, setExito] = useState(false)
+  const [mostrarReglas, setMostrarReglas] = useState(false)
+  const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [errorFecha, setErrorFecha] = useState('')
 
   const { minFecha, maxFecha, horaMin } = obtenerFechaHoraMinMax()
@@ -117,6 +120,7 @@ export default function PublicarViaje({ onVolver, userId }) {
   async function publicarViaje() {
     if (!origen || !destino || !tipo) return
     if (!validarFecha()) return
+    if (!reglasAceptadas) { setMostrarReglas(true); return }
     setPublicando(true)
 
     const ahora = new Date()
@@ -159,6 +163,14 @@ export default function PublicarViaje({ onVolver, userId }) {
     setExito(true)
     setPublicando(false)
   }
+
+  if (mostrarReglas) return (
+    <ReglasChambaModal
+      tipo="cliente"
+      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); publicarViaje() }}
+      onCerrar={() => setMostrarReglas(false)}
+    />
+  )
 
   if (exito) {
     return (

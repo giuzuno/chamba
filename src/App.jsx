@@ -308,6 +308,7 @@ function AppContenido() {
   const [toastActivo, setToastActivo] = useState(null)
   const [esNuevo, setEsNuevo] = useState(false)
   const [esAdmin, setEsAdmin] = useState(false)
+  const [estaBaneado, setEstaBaneado] = useState(false)
   const [onboardingCompletado, setOnboardingCompletado] = useState(false)
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
@@ -334,8 +335,9 @@ function AppContenido() {
 
   useEffect(() => {
     if (session) {
-      supabase.from('usuarios').select('nombre, es_admin').eq('id', session.user.id).maybeSingle()
+      supabase.from('usuarios').select('nombre, es_admin, baneado').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => {
+          if (data?.baneado) { setEstaBaneado(true); return }
           if (data?.es_admin) { setEsAdmin(true); setEsNuevo(false) }
           else if (data?.nombre) { setNombreUsuario(data.nombre); setEsNuevo(false) }
           else setEsNuevo(true)
@@ -414,7 +416,7 @@ function AppContenido() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false)
+    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false); setEstaBaneado(false)
     setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
 
@@ -437,6 +439,25 @@ function AppContenido() {
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
 
   if (session) {
+    if (estaBaneado) return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>🚫</div>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px', color: '#F09595' }}>Cuenta suspendida</h2>
+        <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.7', marginBottom: '8px' }}>
+          Tu cuenta ha sido suspendida por violar los términos y condiciones de Chamba.
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '32px', maxWidth: '280px', lineHeight: '1.6' }}>
+          Si crees que esto es un error, contacta a nuestro equipo de soporte.
+        </p>
+        <a href="mailto:chambaapp.soporte@gmail.com" style={{ background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', textDecoration: 'none', marginBottom: '16px' }}>
+          📧 Contactar soporte
+        </a>
+        <button type="button" onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif', marginTop: '8px' }}>
+          Cerrar sesión
+        </button>
+      </div>
+    )
+
     if (esAdmin) return <PanelAdmin onLogout={handleLogout} nombreAdmin={nombreUsuario || 'Admin'} />
     if (esNuevo) return <Onboarding userId={session.user.id} userEmail={session.user.email} onCompletado={onboardingTerminado} />
 
