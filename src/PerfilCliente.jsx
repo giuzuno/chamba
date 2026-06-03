@@ -32,6 +32,8 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   const [totalCalificaciones, setTotalCalificaciones] = useState(0)
   const [resenas, setResenas] = useState([])
   const [totalTrabajos, setTotalTrabajos] = useState(0)
+  const [historialPagos, setHistorialPagos] = useState([])
+  const [gastoTotal, setGastoTotal] = useState(0)
 
   useEffect(() => {
     cargarPerfil()
@@ -63,12 +65,18 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
       setTotalCalificaciones(cals.length)
       setResenas(cals.filter(c => c.comentario))
     }
-    // Total trabajos publicados
-    const { count } = await supabase.from('trabajos')
-      .select('*', { count: 'exact', head: true })
+    // Total trabajos completados + historial de pagos
+    const { data: pagos } = await supabase.from('trabajos')
+      .select('id, categoria, descripcion, precio_acordado, presupuesto, creado_en, trabajador_id')
       .eq('cliente_id', userId)
       .eq('status', 'completado')
-    setTotalTrabajos(count || 0)
+      .order('creado_en', { ascending: false })
+    if (pagos) {
+      setTotalTrabajos(pagos.length)
+      setHistorialPagos(pagos)
+      const total = pagos.reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
+      setGastoTotal(total)
+    }
   }
 
   async function subirFoto(e) {
@@ -176,7 +184,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
 
           {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
-            {[['info', 'Mi info'], ['resenas', `Reseñas${totalCalificaciones > 0 ? ` (${totalCalificaciones})` : ''}`]].map(([key, label]) => (
+            {[['info', 'Mi info'], ['pagos', `💳 Pagos${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`], ['resenas', `Reseñas${totalCalificaciones > 0 ? ` (${totalCalificaciones})` : ''}`]].map(([key, label]) => (
               <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 {label}
               </button>
@@ -234,6 +242,48 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                   </div>
                 </div>
               </>
+            )}
+
+            {pestana === 'pagos' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Resumen total */}
+                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total gastado en Chamba</p>
+                    <p style={{ fontSize: '36px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>${gastoTotal.toLocaleString('es-MX')}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>en {totalTrabajos} trabajo{totalTrabajos !== 1 ? 's' : ''} completado{totalTrabajos !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Promedio</p>
+                    <p style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75' }}>
+                      ${totalTrabajos > 0 ? Math.round(gastoTotal / totalTrabajos).toLocaleString('es-MX') : 0}
+                    </p>
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>por trabajo</p>
+                  </div>
+                </div>
+
+                {/* Lista de pagos */}
+                {historialPagos.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>💳</div>
+                    <p>Aún no tienes pagos completados.</p>
+                  </div>
+                ) : historialPagos.map(pago => (
+                  <div key={pago.id} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '3px' }}>{pago.categoria}</p>
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '3px' }}>{pago.descripcion}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>
+                        {new Date(pago.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
+                      <p style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${(pago.precio_acordado || pago.presupuesto || 0).toLocaleString('es-MX')}</p>
+                      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>MXN</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
 
             {pestana === 'resenas' && (
