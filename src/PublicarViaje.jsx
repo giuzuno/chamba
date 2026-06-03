@@ -64,6 +64,12 @@ export default function PublicarViaje({ onVolver, userId }) {
   const [origenEsActual, setOrigenEsActual] = useState(true)
   const [seleccionandoPunto, setSeleccionandoPunto] = useState(null)
   const [descripcion, setDescripcion] = useState('')
+  const [busquedaDestino, setBusquedaDestino] = useState('')
+  const [resultadosBusqueda, setResultadosBusqueda] = useState([])
+  const [buscando, setBuscando] = useState(false)
+  const [busquedaOrigen, setBusquedaOrigen] = useState('')
+  const [resultadosOrigen, setResultadosOrigen] = useState([])
+  const [buscandoOrigen, setBuscandoOrigen] = useState(false)
   const [esAhora, setEsAhora] = useState(true)
   const [fechaCita, setFechaCita] = useState('')
   const [horaCita, setHoraCita] = useState('')
@@ -104,6 +110,27 @@ export default function PublicarViaje({ onVolver, userId }) {
   const eta = tipoSeleccionado ? calcularETA(distancia, tipo) : ''
   const centro = ubicacionActual || [16.1833, -95.2000]
   const rutaLinea = origen && destino ? [origen, destino] : []
+
+  async function buscarDireccion(texto, tipo) {
+    if (texto.trim().length < 3) {
+      if (tipo === 'destino') setResultadosBusqueda([])
+      else setResultadosOrigen([])
+      return
+    }
+    if (tipo === 'destino') setBuscando(true)
+    else setBuscandoOrigen(true)
+
+    try {
+      const query = `${texto}, Salina Cruz, Oaxaca, Mexico`
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=4&countrycodes=mx`, { headers: { 'Accept-Language': 'es' } })
+      const data = await res.json()
+      if (tipo === 'destino') setResultadosBusqueda(data)
+      else setResultadosOrigen(data)
+    } catch { }
+
+    if (tipo === 'destino') setBuscando(false)
+    else setBuscandoOrigen(false)
+  }
 
   function validarFecha() {
     if (esAhora) return true
@@ -248,6 +275,29 @@ export default function PublicarViaje({ onVolver, userId }) {
               </div>
               {!origenEsActual && origen && <span style={{ color: '#1D9E75', fontWeight: '700' }}>✓</span>}
             </button>
+          {/* Buscador de origen por texto */}
+          {!origenEsActual && (
+            <div style={{ padding: '0 16px 8px' }}>
+              <div style={{ position: 'relative' }}>
+                <input type="text" placeholder="🔍 Buscar dirección de origen..."
+                  value={busquedaOrigen}
+                  onChange={e => { setBusquedaOrigen(e.target.value); buscarDireccion(e.target.value, 'origen') }}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
+                />
+                {buscandoOrigen && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
+              </div>
+              {resultadosOrigen.length > 0 && (
+                <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden' }}>
+                  {resultadosOrigen.map((r, i) => (
+                    <button key={i} type="button" onClick={() => { setOrigen([parseFloat(r.lat), parseFloat(r.lon)]); setBusquedaOrigen(r.display_name.split(',')[0]); setResultadosOrigen([]) }}
+                      style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: i < resultadosOrigen.length-1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
+                      📍 {r.display_name.split(',').slice(0,2).join(',')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
             {ubicacionActual && (
@@ -285,6 +335,27 @@ export default function PublicarViaje({ onVolver, userId }) {
               </div>
             ) : (
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>👆 Toca el mapa para marcar el destino</p>
+            )}
+          </div>
+          {/* Buscador de destino por texto */}
+          <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
+            <div style={{ position: 'relative' }}>
+              <input type="text" placeholder="🔍 Buscar dirección de destino..."
+                value={busquedaDestino}
+                onChange={e => { setBusquedaDestino(e.target.value); buscarDireccion(e.target.value, 'destino') }}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
+              />
+              {buscando && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
+            </div>
+            {resultadosBusqueda.length > 0 && (
+              <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden', zIndex: 100, position: 'relative' }}>
+                {resultadosBusqueda.map((r, i) => (
+                  <button key={i} type="button" onClick={() => { setDestino([parseFloat(r.lat), parseFloat(r.lon)]); setBusquedaDestino(r.display_name.split(',')[0]); setResultadosBusqueda([]) }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: i < resultadosBusqueda.length-1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
+                    🏁 {r.display_name.split(',').slice(0,2).join(',')}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
