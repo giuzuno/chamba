@@ -38,10 +38,14 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
       supabase.from('trabajos').select('precio_acordado, presupuesto').eq('status', 'completado'),
     ])
 
-    const gananciaTotal = (completados || []).reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
-    const comision = Math.round(gananciaTotal * 0.12)
+    const volumenTotal = (completados || []).reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
+    const comisionBruta = Math.round(volumenTotal * 0.12)
+    // Conekta cobra aprox 2.9% + $3 MXN por transacción (cuando esté integrado)
+    const numCompletados = completados?.length || 0
+    const costoConekta = Math.round(volumenTotal * 0.029) + (numCompletados * 3)
+    const gananciaNetaChamba = comisionBruta - costoConekta
 
-    setStats({ totalUsuarios, totalTrabajos, trabajosActivos, disputasAbiertas, gananciaTotal, comision, completados: completados?.length || 0 })
+    setStats({ totalUsuarios, totalTrabajos, trabajosActivos, disputasAbiertas, volumenTotal, comisionBruta, costoConekta, gananciaNetaChamba, completados: numCompletados })
   }
 
   async function cargarTrabajos() {

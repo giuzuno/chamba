@@ -523,12 +523,22 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
             {pestana === 'stats' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Ganancias totales */}
-                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ganancias totales</p>
-                  <p style={{ fontSize: '40px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>
-                    ${gananciaTotal.toLocaleString('es-MX')}
-                  </p>
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>MXN acumulados en Chamba</p>
+                <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px' }}>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center' }}>Desglose de ganancias</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Ganancia bruta</span>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>${gananciaTotal.toLocaleString('es-MX')}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', color: '#F09595' }}>➖ Comisión Chamba (12%)</span>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#F09595' }}>-${Math.round(gananciaTotal * 0.12).toLocaleString('es-MX')}</span>
+                  </div>
+                  <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.1)', marginBottom: '10px' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>✅ Tu ganancia neta</span>
+                    <span style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(gananciaTotal * 0.88).toLocaleString('es-MX')}</span>
+                  </div>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '6px', textAlign: 'center' }}>MXN acumulados en Chamba</p>
                 </div>
 
                 {/* Grid de stats */}
@@ -549,9 +559,9 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
                     <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>
-                      {trabajosCompletados > 0 ? `$${Math.round(gananciaTotal / trabajosCompletados).toLocaleString('es-MX')}` : '—'}
+                      {trabajosCompletados > 0 ? `$${Math.round((gananciaTotal * 0.88) / trabajosCompletados).toLocaleString('es-MX')}` : '—'}
                     </p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Promedio por trabajo</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>Promedio neto/trabajo</p>
                   </div>
                 </div>
 
