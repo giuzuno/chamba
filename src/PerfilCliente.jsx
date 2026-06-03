@@ -81,6 +81,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
     if (!uploadError) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
       setFotoUrl(data.publicUrl)
+      setErrores(p => ({ ...p, foto: null }))
       await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
     }
     setSubiendoFoto(false)
@@ -89,6 +90,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   function validar() {
     const e = {}
     if (!nombre.trim()) e.nombre = 'El nombre es obligatorio'
+    if (!fotoUrl) e.foto = 'La foto de perfil es obligatoria'
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -147,19 +149,22 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '24px 20px 0' }}>
             <div style={{ position: 'relative' }}>
               {fotoUrl ? (
-                <img src={fotoUrl} alt="avatar" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(55,138,221,0.4)' }} />
+                <img src={fotoUrl} alt="avatar" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${errores.foto ? '#F09595' : 'rgba(55,138,221,0.4)'}` }} />
               ) : (
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #378ADD, #1a5fa8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: 'white', border: '3px solid rgba(55,138,221,0.4)' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: errores.foto ? 'linear-gradient(135deg,#F09595,#c06060)' : 'linear-gradient(135deg, #378ADD, #1a5fa8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700', color: 'white', border: `3px solid ${errores.foto ? '#F09595' : 'rgba(55,138,221,0.4)'}` }}>
                   {iniciales}
                 </div>
               )}
               {editando && (
-                <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#378ADD', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', border: '2px solid #0D0D0D' }}>
+                <label style={{ position: 'absolute', bottom: 0, right: 0, background: errores.foto ? '#F09595' : '#378ADD', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', border: '2px solid #0D0D0D' }}>
                   {subiendoFoto ? '⏳' : '📷'}
                   <input type="file" accept="image/*" onChange={subirFoto} style={{ display: 'none' }} />
                 </label>
               )}
             </div>
+            {errores.foto && editando && (
+              <p style={{ color: '#F09595', fontSize: '12px', textAlign: 'center' }}>📷 {errores.foto}</p>
+            )}
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '16px', fontWeight: '600' }}>{nombre || 'Sin nombre'}</p>
               <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{userEmail?.replace(/(.{2}).*(@.*)/, '$1***$2')}</p>
@@ -180,7 +185,20 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
 
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            {exito && (
+            {!fotoUrl && !editando && (
+            <div style={{ background: 'rgba(232,160,48,0.08)', border: '1px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>📷</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '13px', color: '#E8A030', fontWeight: '600', marginBottom: '2px' }}>Agrega una foto de perfil</p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Los trabajadores confían más en clientes con foto</p>
+              </div>
+              <button type="button" onClick={() => setEditando(true)} style={{ background: '#E8A030', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                Agregar
+              </button>
+            </div>
+          )}
+
+          {exito && (
               <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#5DCAA5', textAlign: 'center' }}>
                 ✅ Perfil guardado
               </div>
