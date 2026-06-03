@@ -93,6 +93,13 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [trabajosCompletados, setTrabajosCompletados] = useState(0)
   const [mejorMes, setMejorMes] = useState(null)
   const [rachaMeses, setRachaMeses] = useState(0)
+  // Vehículo
+  const [vehiculoMarca, setVehiculoMarca] = useState('')
+  const [vehiculoModelo, setVehiculoModelo] = useState('')
+  const [vehiculoColor, setVehiculoColor] = useState('')
+  const [vehiculoPlacas, setVehiculoPlacas] = useState('')
+  const [vehiculoFotoUrl, setVehiculoFotoUrl] = useState(null)
+  const [subiendoFotoVehiculo, setSubiendoFotoVehiculo] = useState(false)
 
   useEffect(() => {
     cargarPerfil()
@@ -117,6 +124,11 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       setRadioAlertas(data.radio_alertas || 5000)
       setFotoUrl(data.foto_url || null)
       if (data.lat && data.lng) setUbicacion([data.lat, data.lng])
+      setVehiculoMarca(data.vehiculo_marca || '')
+      setVehiculoModelo(data.vehiculo_modelo || '')
+      setVehiculoColor(data.vehiculo_color || '')
+      setVehiculoPlacas(data.vehiculo_placas || '')
+      setVehiculoFotoUrl(data.vehiculo_foto_url || null)
     } else {
       setEditando(true)
     }
@@ -195,6 +207,22 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
     setSubiendoFoto(false)
   }
 
+  async function subirFotoVehiculo(e) {
+    if (!editando) return
+    const file = e.target.files[0]
+    if (!file) return
+    setSubiendoFotoVehiculo(true)
+    const ext = file.name.split('.').pop()
+    const path = `vehiculo_${userId}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    if (!uploadError) {
+      const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+      setVehiculoFotoUrl(data.publicUrl)
+      await supabase.from('usuarios').upsert({ id: userId, vehiculo_foto_url: data.publicUrl })
+    }
+    setSubiendoFotoVehiculo(false)
+  }
+
   function toggleCategoria(cat) {
     if (!editando) return
     setCategoriasServicio(prev =>
@@ -220,6 +248,10 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       es_trabajador: true,
       categorias_servicio: categoriasServicio,
       radio_alertas: radioAlertas,
+      vehiculo_marca: vehiculoMarca,
+      vehiculo_modelo: vehiculoModelo,
+      vehiculo_color: vehiculoColor,
+      vehiculo_placas: vehiculoPlacas,
     }
     if (ubicacion) { datos.lat = ubicacion[0]; datos.lng = ubicacion[1] }
     await supabase.from('usuarios').upsert(datos)
@@ -308,7 +340,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
 
           {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
-            {[['info', 'Mi info'], ['servicios', 'Servicios'], ['stats', '📊 Stats'], ['resenas', `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`]].map(([key, label]) => (
+            {[['info', 'Mi info'], ['servicios', 'Servicios'], ...(necesitaVerificacion ? [['vehiculo', '🚗 Vehículo']] : []), ['stats', '📊 Stats'], ['resenas', `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`]].map(([key, label]) => (
               <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 {label}
               </button>
@@ -430,6 +462,62 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                   </strong>.
                 </div>
               </>
+            )}
+
+            {pestana === 'vehiculo' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+                  Los clientes verán esta información cuando aceptes un viaje. Mantén los datos actualizados.
+                </p>
+
+                {/* Foto del vehículo */}
+                <div>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Foto del vehículo</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    {vehiculoFotoUrl ? (
+                      <img src={vehiculoFotoUrl} alt="vehiculo" style={{ width: '80px', height: '60px', borderRadius: '10px', objectFit: 'cover', border: '2px solid rgba(29,158,117,0.4)' }} />
+                    ) : (
+                      <div style={{ width: '80px', height: '60px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🚗</div>
+                    )}
+                    {editando && (
+                      <label style={{ background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.4)', borderRadius: '10px', padding: '10px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        {subiendoFotoVehiculo ? '⏳ Subiendo...' : '📷 Subir foto'}
+                        <input type="file" accept="image/*" onChange={subirFotoVehiculo} style={{ display: 'none' }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Datos del vehículo */}
+                {[
+                  { label: 'Marca', value: vehiculoMarca, set: setVehiculoMarca, placeholder: 'Ej: Nissan, Toyota, Honda' },
+                  { label: 'Modelo', value: vehiculoModelo, set: setVehiculoModelo, placeholder: 'Ej: Sentra, Tsuru, Beat' },
+                  { label: 'Color', value: vehiculoColor, set: setVehiculoColor, placeholder: 'Ej: Blanco, Rojo, Gris' },
+                  { label: 'Placas', value: vehiculoPlacas, set: setVehiculoPlacas, placeholder: 'Ej: ABC-123-D' },
+                ].map(campo => (
+                  <div key={campo.label}>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{campo.label}</p>
+                    <input type="text" placeholder={campo.placeholder} value={campo.value}
+                      onChange={e => editando && campo.set(e.target.value)}
+                      disabled={!editando}
+                      style={{ width: '100%', background: editando ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${editando ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '12px', padding: '14px 16px', color: editando ? 'white' : 'rgba(255,255,255,0.7)', fontSize: '15px', fontFamily: 'sans-serif', outline: 'none' }}
+                    />
+                  </div>
+                ))}
+
+                {!editando && vehiculoMarca && (
+                  <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px' }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Vista del cliente</p>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                      {vehiculoFotoUrl && <img src={vehiculoFotoUrl} alt="vehiculo" style={{ width: '60px', height: '45px', borderRadius: '8px', objectFit: 'cover' }} />}
+                      <div>
+                        <p style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>{vehiculoMarca} {vehiculoModelo}</p>
+                        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Color: {vehiculoColor} · Placas: {vehiculoPlacas}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {pestana === 'stats' && (

@@ -124,6 +124,16 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setMensajesNoLeidos(prev => ({ ...prev, [trabajoId]: 0 }))
   }
 
+  const [datosChofer, setDatosChofer] = useState(null)
+
+  async function cargarDatosChofer(trabajadorId) {
+    if (!trabajadorId) return
+    const { data } = await supabase.from('usuarios')
+      .select('nombre, foto_url, vehiculo_marca, vehiculo_modelo, vehiculo_color, vehiculo_placas, vehiculo_foto_url, rating_promedio')
+      .eq('id', trabajadorId).maybeSingle()
+    if (data) setDatosChofer(data)
+  }
+
   async function cargarNegociaciones(trabajoId) {
     const { data } = await supabase.from('negociaciones').select('*')
       .eq('trabajo_id', trabajoId).order('creado_en', { ascending: true })
@@ -132,8 +142,10 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   async function seleccionarTrabajo(trabajo) {
     setExitoAccion('')
+    setDatosChofer(null)
     setTrabajoSeleccionado(trabajo)
     await cargarNegociaciones(trabajo.id)
+    if (trabajo.trabajador_id) await cargarDatosChofer(trabajo.trabajador_id)
   }
 
   async function aceptarContraoferta(trabajo) {
@@ -320,6 +332,37 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 <p style={{ fontSize: '15px', fontWeight: '600', color: '#1D9E75', textTransform: 'capitalize' }}>{formatearFecha(trabajoSeleccionado.fecha_cita)}</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>🕐 {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs</p>
               </div>
+            </div>
+          )}
+
+          {/* Info del conductor — solo en viajes aceptados */}
+          {trabajoSeleccionado.es_viaje && trabajoSeleccionado.trabajador_id && datosChofer && (
+            <div style={{ background: 'rgba(55,138,221,0.06)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '16px', padding: '16px' }}>
+              <p style={{ fontSize: '11px', color: '#378ADD', fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🚗 Tu conductor</p>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                {datosChofer.foto_url ? (
+                  <img src={datosChofer.foto_url} alt={datosChofer.nombre} style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(55,138,221,0.4)' }} />
+                ) : (
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👤</div>
+                )}
+                <div>
+                  <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>{datosChofer.nombre}</p>
+                  {datosChofer.rating_promedio && <p style={{ fontSize: '12px', color: '#F5A623' }}>⭐ {datosChofer.rating_promedio} · Conductor verificado</p>}
+                </div>
+              </div>
+              {datosChofer.vehiculo_marca && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  {datosChofer.vehiculo_foto_url && <img src={datosChofer.vehiculo_foto_url} alt="vehiculo" style={{ width: '60px', height: '44px', borderRadius: '8px', objectFit: 'cover' }} />}
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: 'white' }}>{datosChofer.vehiculo_marca} {datosChofer.vehiculo_modelo}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Color: {datosChofer.vehiculo_color}</p>
+                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#378ADD', marginTop: '2px' }}>Placas: {datosChofer.vehiculo_placas}</p>
+                  </div>
+                </div>
+              )}
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '10px', textAlign: 'center' }}>
+                ⚠️ Verifica que los datos coincidan con la persona que te recoge
+              </p>
             </div>
           )}
 
