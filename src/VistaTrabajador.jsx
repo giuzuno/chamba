@@ -25,6 +25,32 @@ const CATEGORIAS_ICONS = {
 
 const CATEGORIAS_VIAJE = ['Taxi', 'Moto taxi', 'Repartidor', 'Repartidor moto', 'Flete', 'Taxi / Chofer', 'Mandados']
 
+async function obtenerZona(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=14`, { headers: { 'Accept-Language': 'es' } })
+    const data = await res.json()
+    const colonia = data.address?.suburb || data.address?.neighbourhood || data.address?.quarter || ''
+    const ciudad = data.address?.city || data.address?.town || data.address?.village || ''
+    return colonia ? `${colonia}, ${ciudad}` : ciudad || 'Zona desconocida'
+  } catch { return 'Zona no disponible' }
+}
+
+function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function calcularETAViaje(distanciaKm, categoria) {
+  const vel = categoria?.includes('Flete') ? 18 : categoria?.includes('Moto') ? 30 : 25
+  const min = Math.round((distanciaKm / vel) * 60)
+  if (min < 5) return 'menos de 5 min'
+  if (min < 60) return `aprox. ${min} min`
+  return `aprox. ${Math.floor(min/60)}h ${min%60}min`
+}
+
 function puedeIrAlTrabajo(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return false
   const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
@@ -64,6 +90,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [verPerfil, setVerPerfil] = useState(false)
   const [perfilIncompleto, setPerfilIncompleto] = useState(false)
   const [camposFaltantes, setCamposFaltantes] = useState([])
+  const [infoViaje, setInfoViaje] = useState(null) // { zonaOrigen, zonaDestino, distancia, eta }
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -105,14 +132,26 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     return faltantes
   }
 
-  function intentarVerTrabajo(trabajo) {
+  async function intentarVerTrabajo(trabajo) {
     const faltantes = validarPerfilCompleto(perfilUsuario)
     if (faltantes.length > 0) {
       setCamposFaltantes(faltantes)
       setPerfilIncompleto(true)
       return
     }
+    setInfoViaje(null)
     setTrabajoSeleccionado(trabajo)
+
+    // Si es viaje, cargar zonas aproximadas
+    if (trabajo.es_viaje && trabajo.origen_lat && trabajo.destino_lat) {
+      const distancia = trabajo.distancia_km || calcularDistanciaKm(trabajo.origen_lat, trabajo.origen_lng, trabajo.destino_lat, trabajo.destino_lng)
+      const eta = calcularETAViaje(distancia, trabajo.categoria)
+      const [zonaOrigen, zonaDestino] = await Promise.all([
+        obtenerZona(trabajo.origen_lat, trabajo.origen_lng),
+        obtenerZona(trabajo.destino_lat, trabajo.destino_lng),
+      ])
+      setInfoViaje({ zonaOrigen, zonaDestino, distancia: distancia.toFixed(1), eta })
+    }
   }
 
   async function cargarPerfilUsuario() {
@@ -352,8 +391,51 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {tiempoTranscurrido(trabajoSeleccionado.creado_en)}</p>
                 </div>
               </div>
+              {/* Info del viaje — solo para viajes */}
+              {trabajoSeleccionado.es_viaje && (
+                <div style={{ background: 'rgba(55,138,221,0.06)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '16px', padding: '16px' }}>
+                  <p style={{ fontSize: '11px', color: '#378ADD', fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🗺️ Resumen del viaje</p>
+                  {infoViaje ? (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '16px', marginTop: '2px' }}>📍</span>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>ORIGEN (ZONA APROXIMADA)</p>
+                            <p style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{infoViaje.zonaOrigen}</p>
+                          </div>
+                        </div>
+                        <div style={{ marginLeft: '13px', width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)', marginTop: '-4px', marginBottom: '-4px' }} />
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '16px', marginTop: '2px' }}>🏁</span>
+                          <div>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>DESTINO (ZONA APROXIMADA)</p>
+                            <p style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{infoViaje.zonaDestino}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, padding: '12px', textAlign: 'center', borderRight: '0.5px solid rgba(255,255,255,0.08)' }}>
+                          <p style={{ fontSize: '18px', fontWeight: '800', color: '#378ADD' }}>{infoViaje.distancia} km</p>
+                          <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Distancia</p>
+                        </div>
+                        <div style={{ flex: 1, padding: '12px', textAlign: 'center' }}>
+                          <p style={{ fontSize: '16px', fontWeight: '800', color: '#378ADD' }}>{infoViaje.eta}</p>
+                          <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Duración est.</p>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: '10px' }}>
+                        La dirección exacta se revela al aceptar el viaje
+                      </p>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Cargando información del viaje...</p>
+                  )}
+                </div>
+              )}
+
               {trabajoSeleccionado.cliente_id && (
-                <button type="button" onClick={() => setVerPerfilCliente(trabajoSeleccionado.cliente_id)} style={{ width: '100%', padding: '13px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                style={{ width: '100%', padding: '13px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   👤 Ver perfil del cliente
                 </button>
               )}
