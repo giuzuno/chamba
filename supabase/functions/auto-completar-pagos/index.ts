@@ -131,6 +131,13 @@ serve(async (req) => {
 
       if (diffHoras < 2) continue // Aún no han pasado 2 hrs
 
+      // Para viajes "ahora mismo" o viajes en general — darles 4 hrs
+      // es_viaje = true significa que el chofer puede tardar más en llegar
+      if (trabajo.es_viaje && diffHoras < 4) continue
+
+      // Si el trabajador ya está en camino o llegó — no cancelar
+      if (trabajo.trabajador_en_camino || trabajo.trabajador_llego || trabajo.trabajo_iniciado) continue
+
       await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
       const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token, amonestaciones')
