@@ -53,19 +53,25 @@ function calcularETAViaje(distanciaKm, categoria) {
 }
 
 function puedeIrAlTrabajo(trabajo) {
-  if (!trabajo.fecha_cita || !trabajo.hora_cita) return false
-  // Comparar en hora local — agregar T y sin Z para evitar conversión UTC
-  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}:00`)
+  if (!trabajo.fecha_cita || !trabajo.hora_cita) return true // sin cita = puede ir siempre
+  // hora_cita puede venir como "19:05" o "19:05:00"
+  const horaStr = trabajo.hora_cita.slice(0, 5) // asegurar "HH:MM"
+  const [hh, mm] = horaStr.split(':').map(Number)
+  const cita = new Date(trabajo.fecha_cita + 'T00:00:00')
+  cita.setHours(hh, mm, 0, 0)
   const ahora = new Date()
-  const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
+  const diffHoras = (cita - ahora) / (1000 * 60 * 60)
   return diffHoras <= 2 && diffHoras > -4
 }
 
 function horasParaCita(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return null
-  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}:00`)
+  const horaStr = trabajo.hora_cita.slice(0, 5)
+  const [hh, mm] = horaStr.split(':').map(Number)
+  const cita = new Date(trabajo.fecha_cita + 'T00:00:00')
+  cita.setHours(hh, mm, 0, 0)
   const ahora = new Date()
-  const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
+  const diffHoras = (cita - ahora) / (1000 * 60 * 60)
   if (diffHoras <= 0) return null
   if (diffHoras < 1) return `${Math.round(diffHoras * 60)} min`
   return `${Math.round(diffHoras)} hrs`
