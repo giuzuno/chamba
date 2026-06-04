@@ -154,7 +154,31 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   async function aceptarContraoferta(trabajo) {
     setLoadingAccion(true)
     const precioFinal = trabajo.ultima_oferta || trabajo.presupuesto
-    await supabase.from('trabajos').update({ status: 'aceptado', precio_acordado: precioFinal }).eq('id', trabajo.id)
+
+    // Obtener el trabajador que hizo la contraoferta
+    const { data: negs } = await supabase.from('negociaciones')
+      .select('usuario_id')
+      .eq('trabajo_id', trabajo.id)
+      .eq('ofertado_por', 'trabajador')
+      .order('creado_en', { ascending: false })
+      .limit(1)
+
+    const trabajadorId = negs?.[0]?.usuario_id || trabajo.trabajador_id
+
+    await supabase.from('trabajos').update({
+      status: 'aceptado',
+      precio_acordado: precioFinal,
+      ...(trabajadorId ? { trabajador_id: trabajadorId } : {})
+    }).eq('id', trabajo.id)
+
+    await enviarNotificacionCompleta({
+      usuarioId: trabajadorId,
+      titulo: '✅ ¡Tu contraoferta fue aceptada!',
+      cuerpo: `El cliente aceptó tu precio de $${precioFinal} MXN para ${trabajo.categoria}`,
+      tipo: 'trabajo_aceptado',
+      trabajoId: trabajo.id,
+    })
+
     setExitoAccion(`¡Aceptaste la contraoferta de $${precioFinal} MXN!`)
     await cargarMisTrabajos()
     setLoadingAccion(false)

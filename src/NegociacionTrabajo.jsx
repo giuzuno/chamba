@@ -45,7 +45,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function hacerContraoferta() {
     if (nuevaOferta === precioActual || rondasRestantes <= 0) return
     setLoading(true)
-    await supabase.from('negociaciones').insert({ trabajo_id: trabajo.id, ofertado_por: 'trabajador', monto: nuevaOferta })
+    await supabase.from('negociaciones').insert({ trabajo_id: trabajo.id, ofertado_por: 'trabajador', monto: nuevaOferta, usuario_id: userId })
     await supabase.from('trabajos').update({ ultima_oferta: nuevaOferta, quien_oferto: 'trabajador', rondas_negociacion: rondasUsadas + 1 }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({ usuarioId: trabajo.cliente_id, titulo: '💬 Nueva contraoferta en Chamba', cuerpo: `Un trabajador ofrece $${nuevaOferta} MXN por tu ${trabajo.categoria}`, tipo: 'contraoferta', trabajoId: trabajo.id })
     await cargarOfertas()
