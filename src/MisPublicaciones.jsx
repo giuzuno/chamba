@@ -656,6 +656,33 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             </button>
           )}
 
+          {/* Botón "Ya subí" para viajes */}
+          {trabajoSeleccionado.es_viaje && trabajoSeleccionado.trabajador_llego && !trabajoSeleccionado.pasajero_subio && trabajoSeleccionado.status === 'aceptado' && (
+            <div style={{ background: 'rgba(55,138,221,0.1)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: '28px', marginBottom: '8px' }}>🚗</p>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: '#378ADD', marginBottom: '6px' }}>¡Tu conductor llegó!</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '14px', lineHeight: '1.5' }}>
+                Cuando subas al vehículo, toca el botón para que el chofer pueda iniciar el viaje.
+              </p>
+              <button type="button" onClick={async () => {
+                setLoadingAccion(true)
+                await supabase.from('trabajos').update({ pasajero_subio: true }).eq('id', trabajoSeleccionado.id)
+                await enviarNotificacionCompleta({
+                  usuarioId: trabajoSeleccionado.trabajador_id,
+                  titulo: '✅ ¡El pasajero subió!',
+                  cuerpo: 'Ya puedes iniciar el viaje.',
+                  tipo: 'general',
+                  trabajoId: trabajoSeleccionado.id,
+                })
+                await cargarMisTrabajos()
+                setLoadingAccion(false)
+              }} disabled={loadingAccion}
+                style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(55,138,221,0.5)' : '#378ADD', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                {loadingAccion ? 'Confirmando...' : '🙋 Ya subí — iniciar viaje'}
+              </button>
+            </div>
+          )}
+
           {/* Reporte cobro fuera de app */}
           {['aceptado', 'en_revision'].includes(trabajoSeleccionado.status) && (
             <button type="button" onClick={() => setReportando(trabajoSeleccionado)} style={{ width: '100%', padding: '11px', background: 'transparent', color: 'rgba(240,149,149,0.5)', border: '0.5px solid rgba(240,149,149,0.15)', borderRadius: '12px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
