@@ -77,6 +77,39 @@ function horasParaCita(trabajo) {
   return `${Math.round(diffHoras)} hrs`
 }
 
+function ClienteInfoViaje({ clienteId, notaCliente }) {
+  const [cliente, setCliente] = useState(null)
+  useEffect(() => {
+    supabase.from('usuarios').select('nombre, apellido, foto_url').eq('id', clienteId).maybeSingle()
+      .then(({ data }) => { if (data) setCliente(data) })
+  }, [clienteId])
+
+  if (!cliente) return null
+
+  return (
+    <div style={{ background: 'rgba(55,138,221,0.06)', border: '1px solid rgba(55,138,221,0.25)', borderRadius: '16px', padding: '16px' }}>
+      <p style={{ fontSize: '11px', color: '#378ADD', fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>👤 Tu pasajero</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: notaCliente ? '12px' : '0' }}>
+        {cliente.foto_url ? (
+          <img src={cliente.foto_url} alt="cliente" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(55,138,221,0.4)' }} />
+        ) : (
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(55,138,221,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👤</div>
+        )}
+        <div>
+          <p style={{ fontSize: '16px', fontWeight: '700', color: 'white' }}>{cliente.nombre} {cliente.apellido || ''}</p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Cliente verificado</p>
+        </div>
+      </div>
+      {notaCliente && (
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px 14px' }}>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>📝 NOTA DEL CLIENTE</p>
+          <p style={{ fontSize: '13px', color: 'white', lineHeight: '1.5' }}>{notaCliente}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, trabajoIdInicial, onNavegacionCompletada, irAPerfil, onPerfilAbierto }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
@@ -443,6 +476,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Cargando información del viaje...</p>
                   )}
                 </div>
+              )}
+
+              {/* Info del cliente para viajes */}
+              {trabajoSeleccionado.es_viaje && trabajoSeleccionado.cliente_id && (
+                <ClienteInfoViaje clienteId={trabajoSeleccionado.cliente_id} notaCliente={trabajoSeleccionado.nota_cliente} />
               )}
 
               {trabajoSeleccionado.cliente_id && (

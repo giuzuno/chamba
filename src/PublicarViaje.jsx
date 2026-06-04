@@ -74,6 +74,7 @@ export default function PublicarViaje({ onVolver, userId }) {
   const [origenEsActual, setOrigenEsActual] = useState(true)
   const [seleccionandoPunto, setSeleccionandoPunto] = useState(null)
   const [descripcion, setDescripcion] = useState('')
+  const [notaCliente, setNotaCliente] = useState('')
   const [busquedaDestino, setBusquedaDestino] = useState('')
   const [resultadosBusqueda, setResultadosBusqueda] = useState([])
   const [buscando, setBuscando] = useState(false)
@@ -180,6 +181,8 @@ export default function PublicarViaje({ onVolver, userId }) {
       cliente_id: userId,
       categoria: tipoSeleccionado.categoria,
       descripcion: descripcion || `${tipoSeleccionado.label} — ${distancia.toFixed(1)} km`,
+      nota_cliente: notaCliente || descripcion || null,
+      nota_cliente: notaCliente,
       presupuesto: precioBase,
       lat: origen[0], lng: origen[1],
       origen_lat: origen[0], origen_lng: origen[1],
@@ -492,20 +495,45 @@ export default function PublicarViaje({ onVolver, userId }) {
             {!esAhora && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>Máximo 48 horas de anticipación · Formato 24 hrs</p>}
           </div>
 
-          {/* Nota */}
-          <div>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nota al conductor (opcional)</p>
-            <textarea placeholder="Ej: Voy con niños, son 3 cajas medianas, necesito llegar antes de las 3pm..."
-              value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
-              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
-            />
+          {/* Nota para el conductor */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📝 ¿Cómo te identificas? (opcional)</p>
+              <input type="text"
+                placeholder='Ej: "Camisa roja en la entrada", "Portón azul", "Esperando afuera"...'
+                value={notaCliente}
+                onChange={e => setNotaCliente(e.target.value)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: notaCliente ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
+              />
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '4px' }}>El conductor verá esto para ubicarte más rápido</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💬 Nota adicional (opcional)</p>
+              <textarea placeholder="Ej: Voy con niños, son 3 cajas medianas, necesito llegar antes de las 3pm..."
+                value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
+              />
+            </div>
           </div>
 
           <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '12px', padding: '12px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
             ⚠️ Si el conductor no puede llegar exactamente al punto, te contactará por chat.
           </div>
 
-          <button type="button" onClick={publicarViaje} disabled={publicando} style={{ width: '100%', padding: '16px', background: publicando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          {/* Nota para el conductor */}
+        <div style={{ marginBottom: '8px' }}>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            📝 Nota para el conductor (opcional)
+          </p>
+          <input type="text"
+            placeholder='Ej: "Estaré en la entrada con camisa roja", "Busca el portón azul"...'
+            value={notaCliente}
+            onChange={e => setNotaCliente(e.target.value)}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: notaCliente ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '12px 14px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
+          />
+        </div>
+
+        <button type="button" onClick={publicarViaje} disabled={publicando} style={{ width: '100%', padding: '16px', background: publicando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {publicando ? 'Publicando...' : `${tipoSeleccionado?.icon} Solicitar ${tipoSeleccionado?.label} — $${precioBase} MXN`}
           </button>
         </div>
