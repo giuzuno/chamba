@@ -468,6 +468,20 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                           <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Duración est.</p>
                         </div>
                       </div>
+                      {trabajoSeleccionado.tipo_viaje === 'redondo' && (
+                        <div style={{ background: 'rgba(232,160,48,0.1)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', padding: '10px 14px', marginTop: '10px' }}>
+                          <p style={{ fontSize: '13px', color: '#E8A030', fontWeight: '600' }}>🔄 Viaje redondo</p>
+                          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '3px' }}>El cliente espera que lo regreses. Tiempo de espera: <strong style={{ color: '#E8A030' }}>{trabajoSeleccionado.tiempo_espera_min} min</strong></p>
+                        </div>
+                      )}
+                      {trabajoSeleccionado.tipo_viaje === 'paradas' && trabajoSeleccionado.paradas && JSON.parse(trabajoSeleccionado.paradas || '[]').length > 0 && (
+                        <div style={{ background: 'rgba(232,160,48,0.1)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', padding: '10px 14px', marginTop: '10px' }}>
+                          <p style={{ fontSize: '13px', color: '#E8A030', fontWeight: '600', marginBottom: '6px' }}>🔶 Paradas en la ruta</p>
+                          {JSON.parse(trabajoSeleccionado.paradas || '[]').map((p, i) => (
+                            <p key={i} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '3px' }}>#{i+1} {p.nombre}</p>
+                          ))}
+                        </div>
+                      )}
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: '10px' }}>
                         La dirección exacta se revela al aceptar el viaje
                       </p>
