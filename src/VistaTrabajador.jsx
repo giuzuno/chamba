@@ -54,7 +54,8 @@ function calcularETAViaje(distanciaKm, categoria) {
 
 function puedeIrAlTrabajo(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return false
-  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+  // Comparar en hora local — agregar T y sin Z para evitar conversión UTC
+  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}:00`)
   const ahora = new Date()
   const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
   return diffHoras <= 2 && diffHoras > -4
@@ -62,7 +63,7 @@ function puedeIrAlTrabajo(trabajo) {
 
 function horasParaCita(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return null
-  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+  const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}:00`)
   const ahora = new Date()
   const diffHoras = (citaDateTime - ahora) / (1000 * 60 * 60)
   if (diffHoras <= 0) return null
