@@ -55,6 +55,16 @@ function obtenerFechaHoraMinMax() {
   return { minFecha, maxFecha, horaMin }
 }
 
+function getAhoraHora() {
+  const hoy = new Date()
+  return `${String(hoy.getHours()).padStart(2,'0')}:${String(hoy.getMinutes()).padStart(2,'0')}`
+}
+
+function getHoyLocal() {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
+}
+
 export default function PublicarViaje({ onVolver, userId }) {
   const [tipo, setTipo] = useState(null)
   const [paso, setPaso] = useState(1)
@@ -121,9 +131,21 @@ export default function PublicarViaje({ onVolver, userId }) {
     else setBuscandoOrigen(true)
 
     try {
-      const query = `${texto}, Salina Cruz, Oaxaca, Mexico`
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=4&countrycodes=mx`, { headers: { 'Accept-Language': 'es' } })
-      const data = await res.json()
+      // Intentar primero con Salina Cruz, luego más amplio
+      const queries = [
+        `${texto}, Salina Cruz, Oaxaca, Mexico`,
+        `${texto}, Oaxaca, Mexico`,
+        `${texto}, Mexico`,
+      ]
+      let data = []
+      for (const query of queries) {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=mx&viewbox=-95.35,16.10,-95.10,16.25&bounded=0`,
+          { headers: { 'Accept-Language': 'es' } }
+        )
+        data = await res.json()
+        if (data.length > 0) break
+      }
       if (tipo === 'destino') setResultadosBusqueda(data)
       else setResultadosOrigen(data)
     } catch { }

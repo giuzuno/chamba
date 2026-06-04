@@ -45,9 +45,17 @@ function getHoyLocal() {
 
 function getAhoraHora() {
   const hoy = new Date()
-  const hrs = String(hoy.getHours()).padStart(2, '0')
-  const min = String(hoy.getMinutes()).padStart(2, '0')
-  return `${hrs}:${min}`
+  // Forzar formato 24hrs con hora local
+  const hrs = hoy.getHours() // 0-23, nunca 12hrs
+  const min = hoy.getMinutes()
+  return `${String(hrs).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+}
+
+function getMinHora(fechaSeleccionada) {
+  // Si la fecha seleccionada es hoy, la hora mínima es ahora
+  const hoy = getHoyLocal()
+  if (fechaSeleccionada === hoy) return getAhoraHora()
+  return '00:00'
 }
 
 export default function PublicarTrabajo({ onVolver, userId }) {
@@ -363,6 +371,7 @@ export default function PublicarTrabajo({ onVolver, userId }) {
               <input
                 type="time"
                 value={hora}
+                min={getMinHora(fecha)}
                 onChange={e => { setHora(e.target.value); setError('') }}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: hora ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '18px', fontFamily: 'sans-serif', outline: 'none', colorScheme: 'dark' }}
               />
