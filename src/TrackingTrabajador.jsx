@@ -26,6 +26,17 @@ const iconoCliente = L.divIcon({
 
 const CATEGORIAS_VIAJE = ['Taxi / Chofer', 'Moto taxi', 'Repartidor moto', 'Fletes', 'Taxi', 'Moto Raite', 'Raite', 'Flete', 'Moto Mandados']
 
+function abrirNavegacion(lat, lng, label = '') {
+  // Deep link que abre Google Maps o el navegador por defecto
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+  window.open(url, '_blank')
+}
+
+function abrirWaze(lat, lng) {
+  const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
+  window.open(url, '_blank')
+}
+
 export default function TrackingTrabajador({ trabajo, onVolver }) {
   const [enCamino, setEnCamino] = useState(trabajo.trabajador_en_camino || false)
   const [llego, setLlego] = useState(trabajo.trabajador_llego || false)
@@ -34,6 +45,7 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
   const [loading, setLoading] = useState(false)
   const [watchId, setWatchId] = useState(null)
   const [compartirUrl, setCompartirUrl] = useState(null)
+  const [modalNavegacion, setModalNavegacion] = useState(null) // { lat, lng, label }
 
   const esViaje = trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
 
@@ -74,6 +86,11 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
     setEnCamino(true)
     if (!watchId) iniciarTracking()
     setLoading(false)
+
+    // Abrir navegación al punto de recogida
+    const lat = trabajo.origen_lat || trabajo.lat
+    const lng = trabajo.origen_lng || trabajo.lng
+    if (lat && lng) setModalNavegacion({ lat, lng, label: 'punto de recogida' })
   }
 
   async function confirmarLlegadaOrigen() {
@@ -105,9 +122,13 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
       trabajoId: trabajo.id,
     })
     setViajeIniciado(true)
-    // Reiniciar tracking durante el viaje
     iniciarTracking()
     setLoading(false)
+
+    // Abrir navegación al destino
+    if (trabajo.destino_lat && trabajo.destino_lng) {
+      setModalNavegacion({ lat: trabajo.destino_lat, lng: trabajo.destino_lng, label: 'destino' })
+    }
   }
 
   async function confirmarLlegadaDestino() {
@@ -173,6 +194,33 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+
+      {/* Modal de navegación */}
+      {modalNavegacion && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+          <div style={{ background: '#1A1A1A', borderRadius: '24px 24px 0 0', width: '100%', maxWidth: '480px', padding: '24px', border: '0.5px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', margin: '0 auto 20px' }} />
+            <p style={{ fontSize: '18px', fontWeight: '700', color: 'white', textAlign: 'center', marginBottom: '6px' }}>🗺️ ¿Abrir navegación?</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: '20px' }}>
+              Navegar al {modalNavegacion.label}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button type="button" onClick={() => { abrirNavegacion(modalNavegacion.lat, modalNavegacion.lng); setModalNavegacion(null) }}
+                style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '22px' }}>🗺️</span> Abrir en Google Maps
+              </button>
+              <button type="button" onClick={() => { abrirWaze(modalNavegacion.lat, modalNavegacion.lng); setModalNavegacion(null) }}
+                style={{ width: '100%', padding: '14px', background: 'rgba(0,174,239,0.15)', color: '#00AEEF', border: '1px solid rgba(0,174,239,0.3)', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '22px' }}>🔵</span> Abrir en Waze
+              </button>
+              <button type="button" onClick={() => setModalNavegacion(null)}
+                style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                Continuar sin navegación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
