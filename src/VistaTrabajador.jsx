@@ -180,16 +180,29 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     }
   }, [trabajoIdInicial, misTrabajos])
 
-  function validarPerfilCompleto(perfil) {
+  function validarPerfilCompleto(perfil, trabajo) {
     const faltantes = []
-    if (!perfil?.nombre) faltantes.push('Nombre')
+    if (!perfil?.nombre) faltantes.push('Nombre completo')
     if (!perfil?.foto_url) faltantes.push('Foto de perfil')
     if (!perfil?.categorias_servicio || perfil.categorias_servicio.length === 0) faltantes.push('Categorías de servicio')
+
+    // Validaciones extra para choferes/viajes
+    const CATS_CHOFER = ['Taxi / Chofer', 'Moto taxi', 'Repartidor moto', 'Fletes', 'Mandados', 'Repartidor']
+    const esChofer = perfil?.categorias_servicio?.some(c => CATS_CHOFER.includes(c))
+    const esViajeTrabajo = trabajo?.es_viaje || CATS_CHOFER.includes(trabajo?.categoria)
+
+    if (esChofer || esViajeTrabajo) {
+      if (!perfil?.vehiculo_placas) faltantes.push('Placas del vehículo')
+      if (!perfil?.vehiculo_marca) faltantes.push('Marca del vehículo')
+      if (!perfil?.vehiculo_color) faltantes.push('Color del vehículo')
+      if (!perfil?.vehiculo_foto_url) faltantes.push('Foto del vehículo')
+    }
+
     return faltantes
   }
 
   async function intentarVerTrabajo(trabajo) {
-    const faltantes = validarPerfilCompleto(perfilUsuario)
+    const faltantes = validarPerfilCompleto(perfilUsuario, trabajo)
     if (faltantes.length > 0) {
       setCamposFaltantes(faltantes)
       setPerfilIncompleto(true)
@@ -212,7 +225,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function cargarPerfilUsuario() {
     const { data } = await supabase.from('usuarios')
-      .select('categorias_servicio, radio_alertas, lat, lng, nombre, foto_url')
+      .select('categorias_servicio, radio_alertas, lat, lng, nombre, foto_url, vehiculo_marca, vehiculo_color, vehiculo_placas, vehiculo_foto_url')
       .eq('id', userId).maybeSingle()
     if (data) setPerfilUsuario(data)
     cargarTrabajos(data)
@@ -359,11 +372,19 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
             Los clientes necesitan ver tu información antes de contratarte.
           </p>
           <div style={{ background: 'rgba(240,149,149,0.08)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '12px', color: '#F09595', fontWeight: '600', marginBottom: '8px' }}>Te falta:</p>
+            <p style={{ fontSize: '12px', color: '#F09595', fontWeight: '600', marginBottom: '8px' }}>Te falta completar:</p>
             {camposFaltantes.map(c => (
-              <p key={c} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>• {c}</p>
+              <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '14px' }}>❌</span>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>{c}</p>
+              </div>
             ))}
           </div>
+          {camposFaltantes.some(c => c.includes('vehículo') || c.includes('Placas')) && (
+            <div style={{ background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.2)', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+              🚗 Para aceptar viajes necesitas tener los datos de tu vehículo completos en la pestaña <strong style={{ color: '#378ADD' }}>Vehículo</strong> de tu perfil.
+            </div>
+          )}
           <button type="button" onClick={() => { setPerfilIncompleto(false); setVerPerfil(true) }} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '10px' }}>
             ✏️ Completar mi perfil
           </button>
