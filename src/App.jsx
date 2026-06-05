@@ -313,6 +313,7 @@ function AppContenido() {
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
+  const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
@@ -388,35 +389,23 @@ function AppContenido() {
 
     if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId)
 
-    // Notificaciones que van al modo CLIENTE (muestran MisPublicaciones)
-    const tiposCliente = [
-      'trabajo_aceptado',   // trabajador aceptó → cliente va a ver su publicación
-      'trabajo_completado', // trabajador terminó → cliente confirma
-      'llegada',            // trabajador llegó → cliente confirma
-      'en_camino',          // trabajador va en camino → cliente ve tracking
-      'recordatorio',       // recordatorio de cita → cliente
-      'contraoferta',       // trabajador hizo contraoferta → cliente responde
-      'disputa',            // disputa abierta → cliente
-    ]
+    const tiposCliente = ['trabajo_aceptado', 'trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa']
+    const tiposTrabajador = ['pago_liberado', 'nuevo_trabajo']
 
-    // Notificaciones que van al modo TRABAJADOR (muestran Activos)
-    const tiposTrabajador = [
-      'pago_liberado',      // cliente liberó pago → trabajador
-      'nuevo_trabajo',      // nuevo trabajo disponible → trabajador va a disponibles
-    ]
-
-    // Si estamos en modo trabajador y la notif es de cliente → cambiar a cliente
-    // Si estamos en modo cliente y la notif es de trabajador → cambiar a trabajador
-    if (tiposCliente.includes(toast.tipo)) {
-      setModo('cliente')
-      setNavegarAMisPublicaciones(true)
-    } else if (tiposTrabajador.includes(toast.tipo)) {
-      setModo('trabajador')
-      setNavegarAActivos(true)
-    } else {
-      // general → ir a notificaciones
-      setVerNotificaciones(true)
-    }
+    // Mostrar pantalla de carga brevemente
+    setNavegando(true)
+    setTimeout(() => {
+      setNavegando(false)
+      if (tiposCliente.includes(toast.tipo)) {
+        setModo('cliente')
+        setNavegarAMisPublicaciones(true)
+      } else if (tiposTrabajador.includes(toast.tipo)) {
+        setModo('trabajador')
+        setNavegarAActivos(true)
+      } else {
+        setVerNotificaciones(true)
+      }
+    }, 600)
   }
 
   function onboardingTerminado(rol, nombre) {
@@ -446,6 +435,13 @@ function AppContenido() {
     setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false); setEstaBaneado(false)
     setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
+
+  if (navegando) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+      <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '3px solid rgba(29,158,117,0.2)', borderTop: '3px solid #1D9E75', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
 
   if (sinInternet) return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: 'white', padding: '32px', textAlign: 'center' }}>
