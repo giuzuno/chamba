@@ -114,10 +114,13 @@ serve(async (req) => {
     const limite2hrs = new Date(ahora.getTime() - 2 * 60 * 60 * 1000).toISOString()
     const hoy = ahora.toISOString().split('T')[0]
 
+    // Solo cancelar trabajos PUBLICADOS (sin trabajador) que ya vencieron
+    // Los trabajos ACEPTADOS nunca se cancelan automáticamente
     const { data: vencidos } = await supabase
       .from('trabajos')
       .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id, fecha_cita, hora_cita, es_viaje, trabajador_en_camino, trabajador_llego, trabajo_iniciado, pasajero_subio')
-      .eq('status', 'aceptado')
+      .eq('status', 'publicado')
+      .is('trabajador_id', null)
       .not('fecha_cita', 'is', null)
       .not('hora_cita', 'is', null)
       .lte('fecha_cita', hoy)
