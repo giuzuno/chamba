@@ -175,6 +175,74 @@ serve(async (req) => {
       console.log(`Auto-cancelado trabajo ${trabajo.id} — cita vencida hace ${diffHoras.toFixed(1)} hrs`)
     }
 
+    // ── 3. ALERTAR trabajos donde el chofer lleva mucho tiempo "en camino" ──
+    // Si trabajador_en_camino = true por más de 2 hrs sin llegar → cancelar con amonestación
+    const hace2hrs = new Date(ahora.getTime() - 2 * 60 * 60 * 1000).toISOString()
+    const hace30min = new Date(ahora.getTime() - 30 * 60 * 1000).toISOString()
+
+    const { data: tardanzas } = await supabase
+      .from('trabajos')
+      .select('id, categoria, cliente_id, trabajador_id, trabajador_en_camino, trabajador_llego, trabajo_iniciado, trabajador_lat, trabajador_lng, updated_at')
+      .eq('status', 'aceptado')
+      .eq('trabajador_en_camino', true)
+      .eq('trabajador_llego', false)
+      .lt('updated_at', hace2hrs)
+
+    for (const trabajo of (tardanzas || [])) {
+      // Si lleva más de 2 hrs en camino sin llegar → cancelar y amonestar
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token, amonestaciones')
+        .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
+      const cliente = usuarios?.find((u: any) => u.id === trabajo.cliente_id)
+      const trabajador = usuarios?.find((u: any) => u.id === trabajo.trabajador_id)
+
+      await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
+
+      // Amonestar al trabajador
+      if (trabajo.trabajador_id && trabajador) {
+        const nuevas = (trabajador.amonestaciones || 0) + 1
+        const baneado = nuevas >= 3
+        await supabase.from('usuarios').update({
+          amonestaciones: nuevas,
+          ...(baneado ? { baneado: true } : {})
+        }).eq('id', trabajo.trabajador_id)
+      }
+
+      // Notificar al cliente
+      if (trabajo.cliente_id) {
+        await notificar(supabase, trabajo.cliente_id,
+          '⚠️ Tu conductor tardó demasiado',
+          `Tu ${trabajo.categoria} fue cancelado porque el conductor no llegó en 2 horas. No se te cobrará nada.`,
+          'general', trabajo.id, cliente?.fcm_token || null, accessToken)
+      }
+      // Notificar al trabajador
+      if (trabajo.trabajador_id) {
+        await notificar(supabase, trabajo.trabajador_id,
+          '❌ Trabajo cancelado por tardanza',
+          `El trabajo de ${trabajo.categoria} fue cancelado por no llegar a tiempo. Amonestación registrada.`,
+          'general', trabajo.id, trabajador?.fcm_token || null, accessToken)
+      }
+      cancelados++
+      console.log(`Auto-cancelado por tardanza excesiva: ${trabajo.id}`)
+    }
+
+    // ── 4. ALERTAR al cliente si el chofer no se ha movido en 30 min ──
+    const { data: sinMovimiento } = await supabase
+      .from('trabajos')
+      .select('id, categoria, cliente_id, trabajador_id')
+      .eq('status', 'aceptado')
+      .eq('trabajador_en_camino', true)
+      .eq('trabajador_llego', false)
+      .lt('updated_at', hace30min)
+
+    for (const trabajo of (sinMovimiento || [])) {
+      const { data: clienteData } = await supabase.from('usuarios')
+        .select('fcm_token').eq('id', trabajo.cliente_id).maybeSingle()
+      await notificar(supabase, trabajo.cliente_id,
+        '⚠️ Tu conductor no se ha movido',
+        `Tu ${trabajo.categoria} lleva 30 min sin actualizar ubicación. Si hay un problema, puedes cancelar o abrir un chat.`,
+        'general', trabajo.id, clienteData?.fcm_token || null, accessToken)
+    }
+
     return new Response(JSON.stringify({ ok: true, completados, cancelados }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
