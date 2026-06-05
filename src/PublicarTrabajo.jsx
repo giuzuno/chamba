@@ -58,7 +58,7 @@ function getMinHora(fechaSeleccionada) {
   return '00:00'
 }
 
-export default function PublicarTrabajo({ onVolver, userId }) {
+export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [categoria, setCategoria] = useState('')
   const [otroServicio, setOtroServicio] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -160,6 +160,24 @@ export default function PublicarTrabajo({ onVolver, userId }) {
     setExito(true)
     setLoading(false)
   }
+
+  if (!fotoUrl) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '64px', marginBottom: '20px' }}>📷</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>Foto de perfil requerida</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.6', marginBottom: '24px' }}>
+        Los trabajadores necesitan ver tu foto para confiar en ti antes de aceptar un trabajo.
+      </p>
+      <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px', marginBottom: '24px', maxWidth: '300px' }}>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+          🔐 Tu foto ayuda a crear un ambiente de confianza y seguridad en Chamba.
+        </p>
+      </div>
+      <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        ← Ir a mi perfil a subir foto
+      </button>
+    </div>
+  )
 
   if (mostrarReglas) return (
     <ReglasChambaModal

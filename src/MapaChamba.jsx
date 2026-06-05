@@ -92,6 +92,7 @@ function MapaDragListener({ onDragStart, onDragEnd }) {
 }
 
 export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAMisPublicaciones, trabajoIdInicial, onNavegacionCompletada }) {
+  const [fotoUrlCliente, setFotoUrlCliente] = useState(null)
   const [trabajosPublicados, setTrabajosPublicados] = useState([])
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
@@ -150,8 +151,8 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
     : trabajosPublicados.filter(t => t.categoria === categoriaFiltro)
 
   if (pantalla === 'seleccionar') return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
-  if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} />
-  if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} />
+  if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} fotoUrl={fotoUrlCliente} />
+  if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} fotoUrl={fotoUrlCliente} />
   if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} trabajoIdInicial={trabajoIdInicial} onTrabajoAbierto={() => {}} />
   if (pantalla === 'perfil') return <PerfilCliente onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
   if (pantalla === 'buscar') return <BuscarTrabajadores userId={userId} onVolver={() => setPantalla('mapa')} />

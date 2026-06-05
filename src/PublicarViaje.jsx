@@ -63,7 +63,7 @@ function getHoyLocal() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
 }
 
-export default function PublicarViaje({ onVolver, userId }) {
+export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   const [tipo, setTipo] = useState(null)
   const [paso, setPaso] = useState(1)
   const [ubicacionActual, setUbicacionActual] = useState(null)
@@ -271,6 +271,19 @@ export default function PublicarViaje({ onVolver, userId }) {
     setExito(true)
     setPublicando(false)
   }
+
+  if (!fotoUrl) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '64px', marginBottom: '20px' }}>📷</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>Foto de perfil requerida</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.6', marginBottom: '24px' }}>
+        Los conductores necesitan ver tu foto antes de aceptar un viaje.
+      </p>
+      <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        ← Ir a mi perfil a subir foto
+      </button>
+    </div>
+  )
 
   if (mostrarReglas) return (
     <ReglasChambaModal
