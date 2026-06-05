@@ -215,10 +215,14 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function cargarMisTrabajos() {
     const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision', 'en_camino', 'publicado'])
+      .in('status', ['aceptado', 'en_revision', 'en_camino', 'publicado', 'en_disputa'])
       .eq('trabajador_id', userId)
       .order('creado_en', { ascending: false })
-    if (data) setMisTrabajos(data)
+    if (data) {
+      setMisTrabajos(data)
+      console.log('Mis trabajos cargados:', data.length, data.map(t => t.status))
+    }
+    return data
   }
 
   async function cargarHistorial() {
@@ -362,7 +366,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   if (tracking) return <TrackingTrabajador trabajo={tracking} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
   if (negociando) return (
     <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
-      onAceptado={() => { setNegociando(null); setTrabajoSeleccionado(null); cargarTrabajos(perfilUsuario); cargarMisTrabajos(); setPestana('mis') }}
+      onAceptado={async () => { 
+              setNegociando(null)
+              setTrabajoSeleccionado(null)
+              await cargarMisTrabajos()
+              await cargarTrabajos(perfilUsuario)
+              setPestana('mis')
+            }}
     />
   )
 
