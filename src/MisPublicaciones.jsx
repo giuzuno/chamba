@@ -61,9 +61,15 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   // Abrir trabajo específico desde toast
   useEffect(() => {
-    if (trabajoIdInicial && trabajos.length > 0) {
-      const t = trabajos.find(t => t.id === trabajoIdInicial)
-      if (t) seleccionarTrabajo(t)
+    if (!trabajoIdInicial) return
+    // Buscar primero en los trabajos cargados
+    const t = trabajos.find(t => t.id === trabajoIdInicial)
+    if (t) {
+      seleccionarTrabajo(t)
+    } else {
+      // Si no está en la lista, buscar directo en BD
+      supabase.from('trabajos').select('*').eq('id', trabajoIdInicial).maybeSingle()
+        .then(({ data }) => { if (data) seleccionarTrabajo(data) })
     }
   }, [trabajoIdInicial, trabajos])
 

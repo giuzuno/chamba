@@ -385,11 +385,38 @@ function AppContenido() {
     setToastActivo(null)
     if (toastTimer.current) clearTimeout(toastTimer.current)
     if (!toast) return
-    const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa', 'general']
-    const tiposTrabajador = ['pago_liberado', 'trabajo_aceptado']
-    if (tiposCliente.includes(toast.tipo)) { setModo('cliente'); setNavegarAMisPublicaciones(true); if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId) }
-    else if (tiposTrabajador.includes(toast.tipo)) { setModo('trabajador'); setNavegarAActivos(true); if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId) }
-    else setVerNotificaciones(true)
+
+    if (toast.trabajoId) setTrabajoIdInicial(toast.trabajoId)
+
+    // Notificaciones que van al modo CLIENTE (muestran MisPublicaciones)
+    const tiposCliente = [
+      'trabajo_aceptado',   // trabajador aceptó → cliente va a ver su publicación
+      'trabajo_completado', // trabajador terminó → cliente confirma
+      'llegada',            // trabajador llegó → cliente confirma
+      'en_camino',          // trabajador va en camino → cliente ve tracking
+      'recordatorio',       // recordatorio de cita → cliente
+      'contraoferta',       // trabajador hizo contraoferta → cliente responde
+      'disputa',            // disputa abierta → cliente
+    ]
+
+    // Notificaciones que van al modo TRABAJADOR (muestran Activos)
+    const tiposTrabajador = [
+      'pago_liberado',      // cliente liberó pago → trabajador
+      'nuevo_trabajo',      // nuevo trabajo disponible → trabajador va a disponibles
+    ]
+
+    // Si estamos en modo trabajador y la notif es de cliente → cambiar a cliente
+    // Si estamos en modo cliente y la notif es de trabajador → cambiar a trabajador
+    if (tiposCliente.includes(toast.tipo)) {
+      setModo('cliente')
+      setNavegarAMisPublicaciones(true)
+    } else if (tiposTrabajador.includes(toast.tipo)) {
+      setModo('trabajador')
+      setNavegarAActivos(true)
+    } else {
+      // general → ir a notificaciones
+      setVerNotificaciones(true)
+    }
   }
 
   function onboardingTerminado(rol, nombre) {
@@ -467,11 +494,12 @@ function AppContenido() {
         onVolver={() => { setVerNotificaciones(false); cargarNoLeidas() }}
         onIrATrabajo={(trabajoId, tipo) => {
           setVerNotificaciones(false); cargarNoLeidas()
-          const tiposCliente = ['trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa', 'general']
-          const tiposTrabajador = ['pago_liberado', 'trabajo_aceptado']
           setTrabajoIdInicial(trabajoId)
+          const tiposCliente = ['trabajo_aceptado', 'trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa']
+          const tiposTrabajador = ['pago_liberado', 'nuevo_trabajo']
           if (tiposCliente.includes(tipo)) { setModo('cliente'); setNavegarAMisPublicaciones(true) }
           else if (tiposTrabajador.includes(tipo)) { setModo('trabajador'); setNavegarAActivos(true) }
+          else setVerNotificaciones(false)
         }}
       />
     }

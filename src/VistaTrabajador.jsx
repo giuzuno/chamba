@@ -158,12 +158,25 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   // Abrir trabajo específico desde toast
   useEffect(() => {
-    if (trabajoIdInicial && misTrabajos.length > 0) {
-      const t = misTrabajos.find(t => t.id === trabajoIdInicial)
-      if (t) {
-        setPestana('mis')
-        setTrabajoSeleccionado(t)
-      }
+    if (!trabajoIdInicial) return
+    const t = misTrabajos.find(t => t.id === trabajoIdInicial)
+    if (t) {
+      setPestana('mis')
+      setTrabajoSeleccionado(t)
+    } else {
+      // Si no está en activos, buscar en BD (puede estar en disponibles)
+      supabase.from('trabajos').select('*').eq('id', trabajoIdInicial).maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            if (data.status === 'publicado') {
+              setPestana('disponibles')
+              setTrabajoSeleccionado(data)
+            } else {
+              setPestana('mis')
+              setTrabajoSeleccionado(data)
+            }
+          }
+        })
     }
   }, [trabajoIdInicial, misTrabajos])
 
