@@ -93,6 +93,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [trabajosCompletados, setTrabajosCompletados] = useState(0)
   const [mejorMes, setMejorMes] = useState(null)
   const [rachaMeses, setRachaMeses] = useState(0)
+  const [amonestaciones, setAmonestaciones] = useState(0)
   // Vehículo
   const [vehiculoMarca, setVehiculoMarca] = useState('')
   const [vehiculoModelo, setVehiculoModelo] = useState('')
@@ -129,6 +130,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       setVehiculoColor(data.vehiculo_color || '')
       setVehiculoPlacas(data.vehiculo_placas || '')
       setVehiculoFotoUrl(data.vehiculo_foto_url || null)
+      setAmonestaciones(data.amonestaciones || 0)
     } else {
       setEditando(true)
     }
@@ -540,6 +542,34 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                   </div>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '6px', textAlign: 'center' }}>MXN acumulados en Chamba</p>
                 </div>
+
+                {/* Amonestaciones */}
+                {amonestaciones > 0 && (
+                  <div style={{ background: amonestaciones >= 2 ? 'rgba(240,149,149,0.1)' : 'rgba(232,160,48,0.08)', border: `1px solid ${amonestaciones >= 2 ? 'rgba(240,149,149,0.4)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <span style={{ fontSize: '32px' }}>⚠️</span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '14px', fontWeight: '700', color: amonestaciones >= 2 ? '#F09595' : '#E8A030', marginBottom: '4px' }}>
+                        {amonestaciones}/3 Amonestaciones
+                      </p>
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+                        {amonestaciones === 1 && 'Una más y estás en riesgo. Sé puntual y cumple tus trabajos.'}
+                        {amonestaciones === 2 && '⚠️ Última advertencia — otra amonestación suspende tu cuenta.'}
+                        {amonestaciones >= 3 && '🚫 Cuenta suspendida por acumular 3 amonestaciones.'}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[1,2,3].map(i => (
+                        <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: i <= amonestaciones ? (amonestaciones >= 2 ? '#F09595' : '#E8A030') : 'rgba(255,255,255,0.15)' }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {amonestaciones === 0 && (
+                  <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>✅</span>
+                    <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '500' }}>Sin amonestaciones — ¡sigue así!</p>
+                  </div>
+                )}
 
                 {/* Grid de stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
