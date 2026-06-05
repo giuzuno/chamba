@@ -53,23 +53,22 @@ function calcularETAViaje(distanciaKm, categoria) {
 }
 
 function puedeIrAlTrabajo(trabajo) {
-  if (!trabajo.fecha_cita || !trabajo.hora_cita) return true // sin cita = puede ir siempre
-  // hora_cita puede venir como "19:05" o "19:05:00"
-  const horaStr = trabajo.hora_cita.slice(0, 5) // asegurar "HH:MM"
-  const [hh, mm] = horaStr.split(':').map(Number)
-  const cita = new Date(trabajo.fecha_cita + 'T00:00:00')
-  cita.setHours(hh, mm, 0, 0)
+  if (!trabajo.fecha_cita || !trabajo.hora_cita) return true
+  // Construir fecha/hora local sin conversión UTC
+  const horaStr = trabajo.hora_cita.slice(0, 5)
+  const fechaHoraStr = `${trabajo.fecha_cita}T${horaStr}:00`
+  const cita = new Date(fechaHoraStr) // Sin Z — interpreta como local
   const ahora = new Date()
   const diffHoras = (cita - ahora) / (1000 * 60 * 60)
+  // Puede ir si faltan 2hrs o menos, o si ya pasó (hasta 4hrs después)
   return diffHoras <= 2 && diffHoras > -4
 }
 
 function horasParaCita(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return null
   const horaStr = trabajo.hora_cita.slice(0, 5)
-  const [hh, mm] = horaStr.split(':').map(Number)
-  const cita = new Date(trabajo.fecha_cita + 'T00:00:00')
-  cita.setHours(hh, mm, 0, 0)
+  const fechaHoraStr = `${trabajo.fecha_cita}T${horaStr}:00`
+  const cita = new Date(fechaHoraStr)
   const ahora = new Date()
   const diffHoras = (cita - ahora) / (1000 * 60 * 60)
   if (diffHoras <= 0) return null
@@ -216,7 +215,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function cargarMisTrabajos() {
     const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision']).eq('trabajador_id', userId)
+      .in('status', ['aceptado', 'en_revision', 'en_camino', 'publicado'])
+      .eq('trabajador_id', userId)
       .order('creado_en', { ascending: false })
     if (data) setMisTrabajos(data)
   }
