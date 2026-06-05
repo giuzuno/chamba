@@ -413,6 +413,14 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
                   style={{ width: '100%', padding: '12px', background: 'transparent', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   📍 El pasajero quiere bajarse antes
                 </button>
+
+                {/* Override manual si GPS no detecta llegada */}
+                {!cercaDestino && (
+                  <button type="button" onClick={() => setCercaDestino(true)}
+                    style={{ width: '100%', padding: '10px', background: 'transparent', color: 'rgba(255,255,255,0.2)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', fontSize: '11px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    ¿Ya llegaste pero el GPS no lo detecta? Toca aquí
+                  </button>
+                )}
               </>
             )}
           </>
