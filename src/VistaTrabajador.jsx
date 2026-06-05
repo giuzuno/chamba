@@ -214,10 +214,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   async function cargarMisTrabajos() {
-    const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision', 'en_disputa'])
+    const { data, error } = await supabase.from('trabajos').select('*')
       .eq('trabajador_id', userId)
+      .neq('status', 'completado')
+      .neq('status', 'cancelado')
+      .neq('status', 'publicado')
       .order('creado_en', { ascending: false })
+    if (error) console.log('Error cargarMisTrabajos:', error)
     if (data) {
       setMisTrabajos(data)
       console.log('Mis trabajos cargados:', data.length, data.map(t => t.status))
