@@ -116,27 +116,27 @@ serve(async (req) => {
 
     const { data: vencidos } = await supabase
       .from('trabajos')
-      .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id, fecha_cita, hora_cita')
+      .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id, fecha_cita, hora_cita, es_viaje, trabajador_en_camino, trabajador_llego, trabajo_iniciado, pasajero_subio')
       .eq('status', 'aceptado')
-      .eq('trabajador_en_camino', false)
       .not('fecha_cita', 'is', null)
       .not('hora_cita', 'is', null)
       .lte('fecha_cita', hoy)
 
     for (const trabajo of (vencidos || [])) {
-      // Calcular si la cita pasó hace más de 2 horas
-      const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}`)
+      // NUNCA cancelar si el trabajador ya tomó acción
+      if (trabajo.trabajador_en_camino) continue
+      if (trabajo.trabajador_llego) continue
+      if (trabajo.trabajo_iniciado) continue
+      if (trabajo.pasajero_subio) continue
+
+      // Calcular si la cita pasó hace más de X horas
+      const citaDateTime = new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita}:00`)
       const diffMs = ahora.getTime() - citaDateTime.getTime()
       const diffHoras = diffMs / (1000 * 60 * 60)
 
-      if (diffHoras < 2) continue // Aún no han pasado 2 hrs
-
-      // Para viajes "ahora mismo" o viajes en general — darles 4 hrs
-      // es_viaje = true significa que el chofer puede tardar más en llegar
-      if (trabajo.es_viaje && diffHoras < 4) continue
-
-      // Si el trabajador ya está en camino o llegó — no cancelar
-      if (trabajo.trabajador_en_camino || trabajo.trabajador_llego || trabajo.trabajo_iniciado) continue
+      // Viajes tienen 4 hrs de margen, trabajos normales 2 hrs
+      const margen = trabajo.es_viaje ? 4 : 2
+      if (diffHoras < margen) continue
 
       await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
