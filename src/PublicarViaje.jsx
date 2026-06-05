@@ -218,7 +218,13 @@ export default function PublicarViaje({ onVolver, userId }) {
     setPublicando(true)
 
     const fCita = esAhora ? getHoyLocal() : fechaCita
-    const hCita = esAhora ? getAhoraHora() : horaCita
+    // Para "ahora mismo" — dar 2hrs de margen para que el cron no cancele
+    function getHoraConMargen() {
+      const ahora = new Date()
+      ahora.setHours(ahora.getHours() + 2)
+      return `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`
+    }
+    const hCita = esAhora ? getHoraConMargen() : horaCita
     const precioEspera = tipoViaje === 'redondo' ? tiempoEspera * COSTO_ESPERA_POR_MIN : 0
 
     const { data: trabajo } = await supabase.from('trabajos').insert({
