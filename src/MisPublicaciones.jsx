@@ -208,12 +208,23 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
-    // Si ya estaba aceptado → amonestar al cliente
+    // Si ya estaba aceptado → amonestar al cliente y notificar al trabajador
     if (trabajo.status === 'aceptado') {
       const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
       const nuevas = (usuario?.amonestaciones || 0) + 1
       const baneado = nuevas >= 3
       await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
+
+      // Notificar al trabajador
+      if (trabajo.trabajador_id) {
+        await enviarNotificacionCompleta({
+          usuarioId: trabajo.trabajador_id,
+          titulo: '❌ El cliente canceló el trabajo',
+          cuerpo: `El cliente canceló el ${trabajo.categoria}. El trabajo ya no está disponible.`,
+          tipo: 'general',
+          trabajoId: trabajo.id,
+        })
+      }
     }
 
     setTrabajoSeleccionado(null)
@@ -261,12 +272,23 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
-    // Si ya estaba aceptado → amonestar al cliente
+    // Si ya estaba aceptado → amonestar al cliente y notificar al trabajador
     if (trabajo.status === 'aceptado') {
       const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
       const nuevas = (usuario?.amonestaciones || 0) + 1
       const baneado = nuevas >= 3
       await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
+
+      // Notificar al trabajador
+      if (trabajo.trabajador_id) {
+        await enviarNotificacionCompleta({
+          usuarioId: trabajo.trabajador_id,
+          titulo: '❌ El cliente canceló el trabajo',
+          cuerpo: `El cliente canceló el ${trabajo.categoria}. El trabajo ya no está disponible.`,
+          tipo: 'general',
+          trabajoId: trabajo.id,
+        })
+      }
     }
 
     await cargarMisTrabajos()
