@@ -75,6 +75,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
         setTrabajos(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t))
         if (trabajoSeleccionado?.id === payload.new.id) {
           setTrabajoSeleccionado(prev => ({ ...prev, ...payload.new }))
+          // No cerrar el detalle aunque cambie el status
         }
       })
       .subscribe()
@@ -295,7 +296,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     return { texto: s, bg: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: 'rgba(255,255,255,0.1)' }
   }
 
-  const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado'].includes(t.status))
+  const trabajosActivos   = trabajos.filter(t => !['completado', 'cancelado', 'en_disputa'].includes(t.status))
   const trabajosHistorial = trabajos.filter(t =>  ['completado', 'cancelado'].includes(t.status))
 
   if (confirmarCancelar) {
