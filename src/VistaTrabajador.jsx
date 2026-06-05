@@ -215,7 +215,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function cargarMisTrabajos() {
     const { data } = await supabase.from('trabajos').select('*')
-      .in('status', ['aceptado', 'en_revision', 'en_camino', 'publicado', 'en_disputa'])
+      .in('status', ['aceptado', 'en_revision', 'en_disputa'])
       .eq('trabajador_id', userId)
       .order('creado_en', { ascending: false })
     if (data) {
