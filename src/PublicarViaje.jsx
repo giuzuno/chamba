@@ -72,6 +72,7 @@ export default function PublicarViaje({ onVolver, userId }) {
   const [origenEsActual, setOrigenEsActual] = useState(true)
   const [descripcion, setDescripcion] = useState('')
   const [notaCliente, setNotaCliente] = useState('')
+  const [personas, setPersonas] = useState(1)
   const [busquedaDestino, setBusquedaDestino] = useState('')
   const [resultadosBusqueda, setResultadosBusqueda] = useState([])
   const [buscando, setBuscando] = useState(false)
@@ -242,6 +243,7 @@ export default function PublicarViaje({ onVolver, userId }) {
       precio_espera: precioEspera,
       paradas: paradas.length > 0 ? JSON.stringify(paradas) : '[]',
       nota_cliente: notaCliente || null,
+      personas: personas,
       fecha_cita: fCita,
       hora_cita: hCita,
       status: 'publicado',
@@ -257,7 +259,7 @@ export default function PublicarViaje({ onVolver, userId }) {
             await enviarNotificacionCompleta({
               usuarioId: chofer.id,
               titulo: `${tipoSeleccionado.icon} ${tipoSeleccionado.label} — ${distanciaTotal.toFixed(1)} km`,
-              cuerpo: `$${precioTotal} MXN · ${tipoLabel} · ${esAhora ? 'Ahora mismo' : `${fCita} ${hCita}`}`,
+              cuerpo: `$${precioTotal} MXN · ${personas} persona(s) · ${tipoLabel} · ${esAhora ? 'Ahora mismo' : `${fCita} ${hCita}`}`,
               tipo: 'trabajo_aceptado',
               trabajoId: trabajo.id,
             })
@@ -649,6 +651,22 @@ export default function PublicarViaje({ onVolver, userId }) {
               </div>
             )}
             {errorFecha && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>{errorFecha}</p>}
+          </div>
+
+          {/* Cuántas personas van */}
+          <div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>👥 ¿Cuántas personas van?</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[1,2,3,4,5,6].map(n => (
+                <button key={n} type="button" onClick={() => setPersonas(n)}
+                  style={{ flex: 1, padding: '12px 6px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', background: personas === n ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: personas === n ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: personas === n ? '700' : '400', fontSize: '15px' }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            {personas >= 4 && (
+              <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '6px' }}>⚠️ {personas} personas — verifica que el vehículo tenga capacidad suficiente.</p>
+            )}
           </div>
 
           {/* Nota al conductor */}

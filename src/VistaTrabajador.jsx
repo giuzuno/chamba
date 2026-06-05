@@ -131,7 +131,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [perfilIncompleto, setPerfilIncompleto] = useState(false)
   const [reportando, setReportando] = useState(null)
   const [camposFaltantes, setCamposFaltantes] = useState([])
-  const [infoViaje, setInfoViaje] = useState(null) // { zonaOrigen, zonaDestino, distancia, eta }
+  const [infoViaje, setInfoViaje] = useState(null)
+  const [modalRechazo, setModalRechazo] = useState(false)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -402,6 +404,47 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     )
   }
 
+  if (modalRechazo) {
+    const MOTIVOS_RECHAZO = [
+      { id: 'peso', icon: '⚖️', label: 'Capacidad de peso del vehículo' },
+      { id: 'no_disponible', icon: '🛵', label: 'Mi vehículo no está disponible' },
+      { id: 'lejos', icon: '📍', label: 'Estoy muy lejos del punto' },
+      { id: 'clima', icon: '🌧️', label: 'Condiciones del clima' },
+      { id: 'falla', icon: '🔧', label: 'Falla mecánica' },
+      { id: 'otro', icon: '📝', label: 'Otro motivo' },
+    ]
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+          <button type="button" onClick={() => setModalRechazo(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>¿Por qué no puedes aceptar?</h2>
+        </div>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+            ✅ No habrá penalización. El trabajo quedará disponible para otro conductor.
+          </div>
+          {MOTIVOS_RECHAZO.map(m => (
+            <button key={m.id} type="button" onClick={() => setMotivoRechazo(m.id)}
+              style={{ padding: '16px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', background: motivoRechazo === m.id ? 'rgba(29,158,117,0.15)' : 'rgba(255,255,255,0.04)', outline: motivoRechazo === m.id ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '24px' }}>{m.icon}</span>
+              <span style={{ fontSize: '14px', color: motivoRechazo === m.id ? '#1D9E75' : 'rgba(255,255,255,0.8)', fontWeight: motivoRechazo === m.id ? '600' : '400' }}>{m.label}</span>
+              {motivoRechazo === m.id && <span style={{ marginLeft: 'auto', color: '#1D9E75' }}>✓</span>}
+            </button>
+          ))}
+          <button type="button" onClick={() => { setModalRechazo(false); setMotivoRechazo(''); setTrabajoSeleccionado(null) }}
+            disabled={!motivoRechazo}
+            style={{ width: '100%', padding: '16px', background: motivoRechazo ? 'rgba(240,149,149,0.15)' : 'rgba(255,255,255,0.06)', color: motivoRechazo ? '#F09595' : 'rgba(255,255,255,0.3)', border: `1px solid ${motivoRechazo ? 'rgba(240,149,149,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: motivoRechazo ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
+            {motivoRechazo ? '✅ Confirmar — no aceptar este viaje' : 'Selecciona un motivo'}
+          </button>
+          <button type="button" onClick={() => setModalRechazo(false)}
+            style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            Cancelar — volver al trabajo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (trabajoSeleccionado) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -495,6 +538,18 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                           ))}
                         </div>
                       )}
+                      {trabajoSeleccionado.personas > 0 && (
+                        <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 14px', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '20px' }}>👥</span>
+                          <div>
+                            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '2px' }}>PERSONAS</p>
+                            <p style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>{trabajoSeleccionado.personas} persona{trabajoSeleccionado.personas > 1 ? 's' : ''}</p>
+                          </div>
+                          {trabajoSeleccionado.personas >= 4 && (
+                            <p style={{ fontSize: '11px', color: '#E8A030', marginLeft: 'auto' }}>⚠️ Verifica capacidad</p>
+                          )}
+                        </div>
+                      )}
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', marginTop: '10px' }}>
                         La dirección exacta se revela al aceptar el viaje
                       </p>
@@ -524,7 +579,10 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{ width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 💰 Ver y negociar precio
               </button>
-              <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              <button type="button" onClick={() => setModalRechazo(true)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                ❌ No puedo aceptar este viaje
+              </button>
+              <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 Ver otros trabajos
               </button>
             </>
