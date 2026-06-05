@@ -736,11 +736,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 {trabajo.status === 'aceptado' && !trabajo.trabajador_en_camino && !trabajo.trabajador_llego && (
                   puedeIrAlTrabajo(trabajo) ? (
                     <button type="button" onClick={() => setTracking(trabajo)} style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
-                      🚗 Ir al trabajo — compartir ubicación
+                      🚗 Ir al trabajo — iniciar tracking
                     </button>
                   ) : (
                     <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: '8px' }}>
-                      ⏰ Podrás salir cuando falten 2 hrs · cita a las {trabajo.hora_cita?.slice(0, 5)}
+                      ⏰ El tracking se activa 2 hrs antes · cita a las {trabajo.hora_cita?.slice(0, 5)}
                       {horasParaCita(trabajo) && <span style={{ display: 'block', marginTop: '2px', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>Faltan aprox. {horasParaCita(trabajo)}</span>}
                     </div>
                   )

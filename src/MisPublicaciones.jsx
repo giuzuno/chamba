@@ -368,9 +368,15 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   if (calificando) {
     return (
-      <Calificacion trabajo={calificando} userId={userId} rolCalificador="cliente"
-        onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
-      />
+      <div>
+        <div style={{ background: 'rgba(29,158,117,0.1)', border: '0.5px solid rgba(29,158,117,0.3)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: 'sans-serif' }}>
+          <span style={{ fontSize: '16px' }}>⭐</span>
+          <p style={{ fontSize: '13px', color: '#1D9E75', fontWeight: '600' }}>Califica el servicio para liberar el pago al trabajador</p>
+        </div>
+        <Calificacion trabajo={calificando} userId={userId} rolCalificador="cliente"
+          onCompletado={() => { setCalificando(null); setTrabajoSeleccionado(null); cargarMisTrabajos() }}
+        />
+      </div>
     )
   }
 
