@@ -54,34 +54,43 @@ export default function BuscarTrabajadores({ userId, onVolver }) {
   const [trabajadores, setTrabajadores] = useState([])
   const [cargando, setCargando] = useState(false)
   const [verPerfil, setVerPerfil] = useState(null)
+  const [ordenar, setOrdenar] = useState('rating') // rating, trabajos
 
   useEffect(() => { buscar() }, [categoriaFiltro])
 
   async function buscar() {
     setCargando(true)
     let query = supabase.from('usuarios')
-      .select('id, nombre, foto_url, categorias_servicio, rating_promedio, total_trabajos, bio')
+      .select('id, nombre, apellido, foto_url, categorias_servicio, rating_promedio, total_trabajos, bio, vehiculo_marca, vehiculo_modelo, amonestaciones')
       .eq('es_trabajador', true)
+      .eq('baneado', false)
       .not('categorias_servicio', 'is', null)
       .neq('id', userId)
-      .order('rating_promedio', { ascending: false })
 
     if (categoriaFiltro) {
       query = query.contains('categorias_servicio', [categoriaFiltro])
     }
 
-    const { data } = await query.limit(50)
+    const { data } = await query.limit(100)
     if (data) setTrabajadores(data)
     setCargando(false)
   }
 
-  const trabajadoresFiltrados = busqueda.trim()
-    ? trabajadores.filter(t =>
-        t.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        t.categorias_servicio?.some(c => c.toLowerCase().includes(busqueda.toLowerCase())) ||
-        t.bio?.toLowerCase().includes(busqueda.toLowerCase())
+  const trabajadoresFiltrados = trabajadores
+    .filter(t => {
+      if (!busqueda.trim()) return true
+      const b = busqueda.toLowerCase()
+      return (
+        t.nombre?.toLowerCase().includes(b) ||
+        t.apellido?.toLowerCase().includes(b) ||
+        t.categorias_servicio?.some(c => c.toLowerCase().includes(b)) ||
+        t.bio?.toLowerCase().includes(b)
       )
-    : trabajadores
+    })
+    .sort((a, b) => {
+      if (ordenar === 'rating') return (b.rating_promedio || 0) - (a.rating_promedio || 0)
+      return (b.total_trabajos || 0) - (a.total_trabajos || 0)
+    })
 
   if (verPerfil) {
     return <PerfilPublico usuarioId={verPerfil} rolVisto="trabajador" onVolver={() => setVerPerfil(null)} />
@@ -95,20 +104,19 @@ export default function BuscarTrabajadores({ userId, onVolver }) {
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700', flex: 1 }}>Buscar trabajadores</h2>
         {categoriaFiltro && (
-          <button type="button" onClick={() => setCategoriaFiltro(null)} style={{ background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          <button type="button" onClick={() => setCategoriaFiltro(null)} style={{ background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '8px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             ✕ Limpiar
           </button>
         )}
       </div>
 
-      {/* Búsqueda */}
+      {/* Buscador de texto */}
       <div style={{ padding: '12px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
         <div style={{ position: 'relative' }}>
           <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px' }}>🔍</span>
-          <input
-            type="text" placeholder="Buscar por nombre, oficio o descripción..."
+          <input type="text" placeholder="Buscar por nombre, servicio o descripción..."
             value={busqueda} onChange={e => setBusqueda(e.target.value)}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: '12px 14px 12px 42px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: busqueda ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 14px 12px 40px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
           />
           {busqueda && (
             <button type="button" onClick={() => setBusqueda('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '16px', cursor: 'pointer' }}>✕</button>
@@ -116,101 +124,116 @@ export default function BuscarTrabajadores({ userId, onVolver }) {
         </div>
       </div>
 
-      {/* Filtros por categoría */}
-      <div style={{ display: 'flex', gap: '8px', padding: '10px 16px', overflowX: 'auto', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-        {CATEGORIAS.map(cat => (
-          <button key={cat.nombre} type="button" onClick={() => setCategoriaFiltro(categoriaFiltro === cat.nombre ? null : cat.nombre)}
-            style={{
-              background: categoriaFiltro === cat.nombre ? '#1D9E75' : 'rgba(255,255,255,0.05)',
-              border: categoriaFiltro === cat.nombre ? 'none' : '0.5px solid rgba(255,255,255,0.1)',
-              borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'sans-serif',
-              display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
-              color: categoriaFiltro === cat.nombre ? 'white' : 'rgba(255,255,255,0.6)',
-              fontSize: '12px', fontWeight: categoriaFiltro === cat.nombre ? '600' : '400',
-            }}>
-            <span>{cat.icon}</span>
-            <span>{cat.nombre}</span>
+      {/* Filtros de categoría */}
+      <div style={{ padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '8px', minWidth: 'max-content' }}>
+          <button type="button" onClick={() => setCategoriaFiltro(null)}
+            style={{ padding: '7px 14px', borderRadius: '20px', border: 'none', background: !categoriaFiltro ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: !categoriaFiltro ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: !categoriaFiltro ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif', whiteSpace: 'nowrap' }}>
+            Todos
           </button>
-        ))}
+          {CATEGORIAS.map(cat => (
+            <button key={cat.nombre} type="button" onClick={() => setCategoriaFiltro(cat.nombre)}
+              style={{ padding: '7px 14px', borderRadius: '20px', border: 'none', background: categoriaFiltro === cat.nombre ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: categoriaFiltro === cat.nombre ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: categoriaFiltro === cat.nombre ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif', whiteSpace: 'nowrap' }}>
+              {cat.icon} {cat.nombre}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Resultados */}
-      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-        {/* Contador */}
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '4px' }}>
-          {cargando ? 'Buscando...' : `${trabajadoresFiltrados.length} trabajador${trabajadoresFiltrados.length !== 1 ? 'es' : ''} encontrado${trabajadoresFiltrados.length !== 1 ? 's' : ''}${categoriaFiltro ? ` · ${categoriaFiltro}` : ''}`}
+      {/* Ordenar y conteo */}
+      <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
+          {cargando ? 'Buscando...' : `${trabajadoresFiltrados.length} trabajador${trabajadoresFiltrados.length !== 1 ? 'es' : ''}`}
+          {categoriaFiltro && <span style={{ color: '#1D9E75' }}> de {categoriaFiltro}</span>}
         </p>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[['rating', '⭐ Rating'], ['trabajos', '🔧 Trabajos']].map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setOrdenar(key)}
+              style={{ padding: '5px 10px', borderRadius: '8px', border: 'none', background: ordenar === key ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', color: ordenar === key ? '#1D9E75' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: ordenar === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {!cargando && trabajadoresFiltrados.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-            <p style={{ fontSize: '15px', marginBottom: '8px' }}>Sin resultados</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.2)' }}>
-              Prueba con otra categoría o término de búsqueda
-            </p>
+      {/* Lista de trabajadores */}
+      <div style={{ padding: '0 16px 80px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {cargando && (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>
+            Buscando trabajadores...
           </div>
         )}
 
-        {trabajadoresFiltrados.map(t => {
-          const iniciales = t.nombre?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
-          const cats = t.categorias_servicio?.slice(0, 3) || []
-          const masCategs = (t.categorias_servicio?.length || 0) - 3
+        {!cargando && trabajadoresFiltrados.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</div>
+            <p>No encontramos trabajadores{categoriaFiltro ? ` de ${categoriaFiltro}` : ''}.</p>
+            {categoriaFiltro && (
+              <button type="button" onClick={() => setCategoriaFiltro(null)} style={{ marginTop: '12px', background: 'transparent', color: '#1D9E75', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                Ver todos los trabajadores →
+              </button>
+            )}
+          </div>
+        )}
 
-          return (
-            <button key={t.id} type="button" onClick={() => setVerPerfil(t.id)}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', width: '100%', display: 'flex', gap: '14px', alignItems: 'center' }}>
+        {trabajadoresFiltrados.map(t => (
+          <button key={t.id} type="button" onClick={() => setVerPerfil(t.id)}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
 
-              {/* Avatar */}
-              {t.foto_url ? (
-                <img src={t.foto_url} alt={t.nombre} style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(29,158,117,0.4)', flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'linear-gradient(135deg,#1D9E75,#0d6b50)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: 'white', flexShrink: 0, border: '2px solid rgba(29,158,117,0.4)' }}>
-                  {iniciales}
-                </div>
-              )}
+            {/* Foto */}
+            {t.foto_url ? (
+              <img src={t.foto_url} alt={t.nombre} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(29,158,117,0.3)', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg,#1D9E75,#0d6b50)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '700', color: 'white', flexShrink: 0 }}>
+                {t.nombre?.[0]?.toUpperCase() || '?'}
+              </div>
+            )}
 
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                  <p style={{ fontSize: '15px', fontWeight: '600', color: 'white' }}>{t.nombre}</p>
-                  {t.total_trabajos > 0 && (
-                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
-                      {t.total_trabajos} trabajo{t.total_trabajos > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-
-                <Estrellas rating={t.rating_promedio} />
-
-                {t.bio && (
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {t.bio}
-                  </p>
-                )}
-
-                {/* Categorías */}
-                <div style={{ display: 'flex', gap: '5px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {cats.map(c => {
-                    const cat = CATEGORIAS.find(x => x.nombre === c)
-                    return (
-                      <span key={c} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: categoriaFiltro === c ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', color: categoriaFiltro === c ? '#1D9E75' : 'rgba(255,255,255,0.5)', border: `0.5px solid ${categoriaFiltro === c ? 'rgba(29,158,117,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
-                        {cat?.icon} {c}
-                      </span>
-                    )
-                  })}
-                  {masCategs > 0 && (
-                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}>
-                      +{masCategs} más
-                    </span>
-                  )}
-                </div>
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                <p style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>
+                  {t.nombre} {t.apellido || ''}
+                </p>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', flexShrink: 0, marginLeft: '8px' }}>
+                  {t.total_trabajos || 0} trabajos
+                </span>
               </div>
 
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '18px', flexShrink: 0 }}>›</span>
-            </button>
-          )
-        })}
+              <Estrellas rating={t.rating_promedio} />
+
+              {t.bio && (
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.bio}
+                </p>
+              )}
+
+              {/* Categorías */}
+              <div style={{ display: 'flex', gap: '5px', marginTop: '8px', flexWrap: 'wrap' }}>
+                {t.categorias_servicio?.slice(0, 4).map(cat => {
+                  const c = CATEGORIAS.find(x => x.nombre === cat)
+                  return (
+                    <span key={cat} style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: categoriaFiltro === cat ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', color: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.5)', border: categoriaFiltro === cat ? '0.5px solid rgba(29,158,117,0.3)' : 'none' }}>
+                      {c?.icon} {cat}
+                    </span>
+                  )
+                })}
+                {t.categorias_servicio?.length > 4 && (
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>+{t.categorias_servicio.length - 4} más</span>
+                )}
+              </div>
+
+              {/* Vehículo si es chofer */}
+              {t.vehiculo_marca && (
+                <p style={{ fontSize: '11px', color: 'rgba(55,138,221,0.7)', marginTop: '5px' }}>
+                  🚗 {t.vehiculo_marca} {t.vehiculo_modelo}
+                </p>
+              )}
+            </div>
+
+            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '16px', flexShrink: 0, alignSelf: 'center' }}>›</span>
+          </button>
+        ))}
       </div>
     </div>
   )
