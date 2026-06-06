@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
+import { sanitizarDescripcion, sanitizarCampo, tieneInyeccionSQL } from './sanitize'
 
 const CATEGORIAS = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -111,10 +112,20 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
   async function publicar() {
     setLoading(true)
+    // Sanitizar inputs antes de guardar
+    const descripcionSanitizada = sanitizarDescripcion(descripcion)
+    const categoriaFinalSanitizada = sanitizarCampo(categoriaFinal)
+    if (tieneInyeccionSQL(descripcion) || tieneInyeccionSQL(categoriaFinal)) {
+      setError('Contenido no válido detectado')
+      setConfirmando(false)
+      setLoading(false)
+      return
+    }
+
     const { data: trabajo, error: insertError } = await supabase.from('trabajos').insert({
       cliente_id: userId,
-      categoria: categoriaFinal,
-      descripcion,
+      categoria: categoriaFinalSanitizada,
+      descripcion: descripcionSanitizada,
       presupuesto,
       fecha_cita: fechaFinal,
       hora_cita: horaFinal,
