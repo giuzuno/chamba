@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 
-const ADMIN_ID = '72dd9af7-1597-4175-b5ec-febde2306fd3'
+// Admin ID se obtiene dinámicamente de la BD
+async function obtenerAdminId() {
+  const { data } = await supabase.from('usuarios').select('id').eq('es_admin', true).limit(1).maybeSingle()
+  return data?.id || null
+}
 
 const MOTIVOS = [
   { id: 'no_llego', icon: '🚫', label: 'El trabajador no llegó' },
@@ -66,7 +70,7 @@ export default function Disputa({ trabajo, userId, onVolver, onDisputaAbierta })
 
     // Notificar al admin — NUEVO
     await enviarNotificacionCompleta({
-      usuarioId: ADMIN_ID,
+      usuarioId: await obtenerAdminId(),
       titulo: '🚨 Nueva disputa abierta',
       cuerpo: `${trabajo.categoria} — ${motivoLabel}: ${descripcion.slice(0, 60)}`,
       tipo: 'disputa',

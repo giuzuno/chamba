@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 
-const ADMIN_ID = '72dd9af7-1597-4175-b5ec-febde2306fd3' // chambaapp.soporte@gmail.com
+// Admin ID se obtiene dinámicamente de la BD
+async function obtenerAdminId() {
+  const { data } = await supabase.from('usuarios').select('id').eq('es_admin', true).limit(1).maybeSingle()
+  return data?.id || null
+}
 
 export default function ReportarCobro({ trabajo, userId, rolReportador, onVolver }) {
   const [descripcion, setDescripcion] = useState('')
@@ -24,7 +28,7 @@ export default function ReportarCobro({ trabajo, userId, rolReportador, onVolver
 
     // Notificar al admin
     await enviarNotificacionCompleta({
-      usuarioId: ADMIN_ID,
+      usuarioId: await obtenerAdminId(),
       titulo: '🚨 Reporte: cobro fuera de app',
       cuerpo: `Trabajo ${trabajo.categoria} — ${descripcion.slice(0, 60)}`,
       tipo: 'disputa',
