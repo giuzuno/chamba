@@ -10,6 +10,7 @@ import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
 import { solicitarPermiso, escucharNotificaciones } from './useNotificaciones'
 import LogoChamba from './LogoChamba'
+import { verificarDispositivoBaneado, guardarFingerprint } from './useFingerprint'
 import PanelAdmin from './PanelAdmin'
 import Terminos from './Terminos'
 
@@ -309,6 +310,7 @@ function AppContenido() {
   const [esNuevo, setEsNuevo] = useState(false)
   const [esAdmin, setEsAdmin] = useState(false)
   const [estaBaneado, setEstaBaneado] = useState(false)
+  const [dispositivoBaneado, setDispositivoBaneado] = useState(false)
   const [onboardingCompletado, setOnboardingCompletado] = useState(false)
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
@@ -336,6 +338,14 @@ function AppContenido() {
 
   useEffect(() => {
     if (session) {
+      // Verificar fingerprint del dispositivo primero
+      verificarDispositivoBaneado().then(({ baneado }) => {
+        if (baneado) { setDispositivoBaneado(true); return }
+      })
+
+      // Guardar fingerprint y cargar perfil
+      guardarFingerprint(session.user.id)
+
       supabase.from('usuarios').select('nombre, es_admin, baneado').eq('id', session.user.id).maybeSingle()
         .then(({ data }) => {
           if (data?.baneado) { setEstaBaneado(true); return }
@@ -432,9 +442,22 @@ function AppContenido() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false); setEstaBaneado(false)
+    setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false); setEstaBaneado(false); setDispositivoBaneado(false)
     setNavegarAMisPublicaciones(false); setNavegarAActivos(false); setTrabajoIdInicial(null)
   }
+
+  if (dispositivoBaneado) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '64px', marginBottom: '20px' }}>🚫</div>
+      <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px', color: '#F09595' }}>Dispositivo bloqueado</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.7', marginBottom: '24px' }}>
+        Este dispositivo ha sido bloqueado por violar los términos y condiciones de Chamba.
+      </p>
+      <a href="mailto:chambaapp.soporte@gmail.com" style={{ background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
+        📧 Contactar soporte
+      </a>
+    </div>
+  )
 
   if (navegando) return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>

@@ -104,6 +104,10 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
   }
 
   async function banearUsuario(usuarioId, baneado) {
+    // Si se está baneando (no desbaneando) → banear también el dispositivo
+    if (!baneado) {
+      await banearDispositivo(usuarioId, 'Baneado por administrador')
+    }
     setLoadingAccion(usuarioId)
     await supabase.from('usuarios').update({ baneado: !baneado }).eq('id', usuarioId)
     await cargarUsuarios()
