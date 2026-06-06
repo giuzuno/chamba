@@ -655,10 +655,18 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
               <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: '32px', marginBottom: '10px' }}>🔧</p>
                 <p style={{ fontSize: '15px', color: '#378ADD', fontWeight: '700', marginBottom: '6px' }}>¡El trabajador dice que terminó!</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px' }}>
                   ¿Quedó bien? Confirma para liberar{' '}
                   <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
                 </p>
+                {/* Foto del trabajo terminado */}
+                {trabajoSeleccionado.foto_trabajo_url && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📸 Foto del trabajo</p>
+                    <img src={trabajoSeleccionado.foto_trabajo_url} alt="trabajo terminado"
+                      style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '14px', border: '1px solid rgba(29,158,117,0.3)' }} />
+                  </div>
+                )}
                 <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)} disabled={loadingAccion}
                   style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}

@@ -134,6 +134,9 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [infoViaje, setInfoViaje] = useState(null)
   const [modalRechazo, setModalRechazo] = useState(false)
   const [motivoRechazo, setMotivoRechazo] = useState('')
+  const [modalFotoTrabajo, setModalFotoTrabajo] = useState(null) // trabajo pendiente de foto
+  const [fotoTrabajoUrl, setFotoTrabajoUrl] = useState(null)
+  const [subiendoFotoTrabajo, setSubiendoFotoTrabajo] = useState(false)
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -278,10 +281,17 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   async function marcarCompletado(trabajo) {
+    // Primero pedir foto del trabajo terminado
+    setFotoTrabajoUrl(null)
+    setModalFotoTrabajo(trabajo)
+  }
+
+  async function confirmarCompletadoConFoto(trabajo) {
     setLoadingCompletar(trabajo.id)
     await supabase.from('trabajos').update({
       status: 'en_revision',
       en_revision_desde: new Date().toISOString(),
+      foto_trabajo_url: fotoTrabajoUrl,
     }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({
       usuarioId: trabajo.cliente_id,
@@ -293,7 +303,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     await cargarMisTrabajos()
     await cargarHistorial()
     setLoadingCompletar(null)
+    setModalFotoTrabajo(null)
+    setFotoTrabajoUrl(null)
     setCalificando(trabajo)
+  }
+
+  async function subirFotoTrabajo(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setSubiendoFotoTrabajo(true)
+    const ext = file.name.split('.').pop()
+    const path = `trabajos/${modalFotoTrabajo.id}/terminado.${ext}`
+    const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+      setFotoTrabajoUrl(data.publicUrl)
+    }
+    setSubiendoFotoTrabajo(false)
   }
 
   async function noPuedoLlegar(trabajo) {
@@ -433,6 +459,55 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               Cancelar
             </button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (modalFotoTrabajo) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+          <button type="button" onClick={() => { setModalFotoTrabajo(null); setFotoTrabajoUrl(null) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>📸 Foto del trabajo terminado</h2>
+        </div>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px' }}>
+            <p style={{ fontSize: '14px', fontWeight: '600', color: '#1D9E75', marginBottom: '6px' }}>¿Por qué pedimos una foto?</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>
+              La foto protege a ambas partes. Si el cliente abre una disputa, esta imagen es la prueba de que el trabajo quedó bien. Sin foto no puedes marcar como terminado.
+            </p>
+          </div>
+
+          {/* Upload foto */}
+          {fotoTrabajoUrl ? (
+            <div style={{ position: 'relative' }}>
+              <img src={fotoTrabajoUrl} alt="trabajo" style={{ width: '100%', maxHeight: '280px', objectFit: 'cover', borderRadius: '16px', border: '2px solid rgba(29,158,117,0.4)' }} />
+              <button type="button" onClick={() => setFotoTrabajoUrl(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', fontFamily: 'sans-serif' }}>✕</button>
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(29,158,117,0.9)', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>✅ Foto lista</div>
+            </div>
+          ) : (
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '40px 20px', background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '16px', cursor: 'pointer', textAlign: 'center' }}>
+              <span style={{ fontSize: '48px' }}>{subiendoFotoTrabajo ? '⏳' : '📷'}</span>
+              <div>
+                <p style={{ fontSize: '15px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>
+                  {subiendoFotoTrabajo ? 'Subiendo foto...' : 'Toca para subir foto'}
+                </p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Toma una foto del trabajo terminado</p>
+              </div>
+              <input type="file" accept="image/*" capture="environment" onChange={subirFotoTrabajo} style={{ display: 'none' }} disabled={subiendoFotoTrabajo} />
+            </label>
+          )}
+
+          <button type="button" onClick={() => confirmarCompletadoConFoto(modalFotoTrabajo)}
+            disabled={!fotoTrabajoUrl || loadingCompletar === modalFotoTrabajo.id}
+            style={{ width: '100%', padding: '16px', background: fotoTrabajoUrl ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: fotoTrabajoUrl ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: fotoTrabajoUrl ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
+            {loadingCompletar === modalFotoTrabajo.id ? 'Enviando...' : fotoTrabajoUrl ? '✅ Confirmar trabajo terminado' : 'Sube una foto primero'}
+          </button>
+
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', lineHeight: '1.6' }}>
+            La foto será visible para el cliente y el equipo de Chamba en caso de disputa.
+          </p>
         </div>
       </div>
     )
