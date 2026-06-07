@@ -12,7 +12,6 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [trabajosEnVivo, setTrabajosEnVivo] = useState([])
   const [cargando, setCargando] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
-  const [busquedaUsuario, setBusquedaUsuario] = useState('')
   const [trabajoDetalle, setTrabajoDetalle] = useState(null)
   const [loadingAccion, setLoadingAccion] = useState(null)
 

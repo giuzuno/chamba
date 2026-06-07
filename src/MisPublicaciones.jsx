@@ -535,7 +535,8 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 <span style={{ fontSize: '13px', color: '#1D9E75' }}>Precio acordado final</span>
                 <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
               </div>
-              {trabajoSeleccionado.precio_acordado && (
+            )}
+            {trabajoSeleccionado.precio_acordado && (
                 <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '10px', padding: '10px 16px', marginTop: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio del servicio</span>
