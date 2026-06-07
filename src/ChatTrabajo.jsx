@@ -23,6 +23,10 @@ export default function ChatTrabajo({ trabajo, userId, onVolver }) {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+  const [modalCostoExtra, setModalCostoExtra] = useState(false)
+  const [costoExtra, setCostoExtra] = useState('')
+  const [motivoCostoExtra, setMotivoCostoExtra] = useState('')
+  const [enviandoCostoExtra, setEnviandoCostoExtra] = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -67,6 +71,39 @@ export default function ChatTrabajo({ trabajo, userId, onVolver }) {
         return nuevo
       })
     }
+  }
+
+  async function solicitarCostoExtra() {
+    if (!costoExtra || !motivoCostoExtra) return
+    setEnviandoCostoExtra(true)
+
+    const monto = Number(costoExtra)
+    const mensaje = `💰 *Solicitud de costo adicional*\n\nMotivo: ${motivoCostoExtra}\nMonto extra: $${monto} MXN\n\n¿Aceptas este costo adicional?`
+
+    await supabase.from('mensajes').insert({
+      trabajo_id: trabajo.id,
+      emisor_id: userId,
+      contenido: mensaje,
+      tipo: 'costo_extra',
+      monto_extra: monto,
+    })
+
+    // Notificar al cliente
+    const destinatarioId = trabajo.cliente_id
+    if (destinatarioId) {
+      const { data: destinatario } = await supabase.from('usuarios')
+        .select('fcm_token').eq('id', destinatarioId).maybeSingle()
+      if (destinatario?.fcm_token) {
+        await supabase.functions.invoke('enviar-notificacion', {
+          body: { token: destinatario.fcm_token, titulo: '💰 Solicitud de costo extra', cuerpo: `Tu ${trabajo.categoria}: ${motivoCostoExtra} — $${monto} MXN adicionales` }
+        })
+      }
+    }
+
+    setModalCostoExtra(false)
+    setCostoExtra('')
+    setMotivoCostoExtra('')
+    setEnviandoCostoExtra(false)
   }
 
   async function enviarMensaje() {
@@ -161,9 +198,81 @@ export default function ChatTrabajo({ trabajo, userId, onVolver }) {
 
   const esMio = (emisorId) => emisorId === userId
   const esPrevio = trabajo.status === 'publicado'
+  const esActivo = trabajo.status === 'aceptado' && trabajo.trabajo_iniciado
+  const esTrabajador = userId === trabajo.trabajador_id
+  const [mostrarExtra, setMostrarExtra] = useState(false)
+  const [montoExtra, setMontoExtra] = useState('')
+  const [motivoExtra, setMotivoExtra] = useState('')
+  const [enviandoExtra, setEnviandoExtra] = useState(false)
+
+  async function solicitarExtra() {
+    if (!montoExtra || !motivoExtra) return
+    setEnviandoExtra(true)
+    const monto = parseInt(montoExtra)
+    const nuevoTotal = (trabajo.precio_acordado || trabajo.presupuesto) + monto
+    const mensaje = `⚠️ SOLICITUD DE PAGO EXTRA\n\nMotivo: ${motivoExtra}\nCosto adicional: $${monto} MXN\nNuevo total: $${nuevoTotal} MXN\n\nPor favor confirma si estás de acuerdo.`
+    
+    await supabase.from('mensajes').insert({
+      trabajo_id: trabajo.id,
+      emisor_id: userId,
+      contenido: mensaje,
+    })
+
+    // Notificar al cliente
+    const { data: clienteData } = await supabase.from('usuarios')
+      .select('fcm_token').eq('id', trabajo.cliente_id).maybeSingle()
+    if (clienteData?.fcm_token) {
+      await supabase.functions.invoke('enviar-notificacion', {
+        body: { token: clienteData.fcm_token, titulo: '⚠️ El trabajador solicita un pago extra', cuerpo: `${motivoExtra} · $${monto} MXN adicionales` }
+      })
+    }
+    setMostrarExtra(false)
+    setMontoExtra('')
+    setMotivoExtra('')
+    setEnviandoExtra(false)
+  }
   const getNombre = (emisorId) => { const p = perfiles[emisorId]; if (!p?.nombre) return '...'; return p.nombre.split(' ')[0] }
   const getFoto = (emisorId) => perfiles[emisorId]?.foto_url || null
   const getIniciales = (emisorId) => { const n = perfiles[emisorId]?.nombre; if (!n) return '?'; return n.split(' ').map(x => x[0]).join('').toUpperCase().slice(0, 2) }
+
+  if (modalCostoExtra) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
+          <button type="button" onClick={() => setModalCostoExtra(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>💰 Solicitar costo adicional</h2>
+        </div>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '14px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>
+            ⚠️ Usa esto solo si apareció algo inesperado durante el trabajo. El cliente debe aceptar antes de que procedas.
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Por qué necesitas más? *</p>
+            <textarea placeholder="Ej: El tubo estaba más dañado de lo esperado, necesito material extra..."
+              value={motivoCostoExtra} onChange={e => setMotivoCostoExtra(e.target.value)} rows={3}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
+            />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Monto adicional (MXN) *</p>
+            <input type="number" min="1" placeholder="Ej: 150"
+              value={costoExtra} onChange={e => setCostoExtra(e.target.value)}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '18px', fontFamily: 'sans-serif', outline: 'none' }}
+            />
+          </div>
+          {costoExtra && motivoCostoExtra && (
+            <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.6' }}>
+              📨 Se enviará al cliente: <strong style={{ color: 'white' }}>"Solicitud de $${costoExtra} MXN adicionales — {motivoCostoExtra}"</strong>
+            </div>
+          )}
+          <button type="button" onClick={solicitarCostoExtra} disabled={!costoExtra || !motivoCostoExtra || enviandoCostoExtra}
+            style={{ width: '100%', padding: '16px', background: costoExtra && motivoCostoExtra ? '#E8A030' : 'rgba(255,255,255,0.08)', color: costoExtra && motivoCostoExtra ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: costoExtra && motivoCostoExtra ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
+            {enviandoCostoExtra ? 'Enviando...' : '💰 Enviar solicitud al cliente'}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ height: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column' }}>
@@ -186,7 +295,36 @@ export default function ChatTrabajo({ trabajo, userId, onVolver }) {
       )}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {mensajes.length === 0 && (
+        {mostrarExtra && esTrabajador && (
+        <div style={{ margin: '12px', background: 'rgba(232,160,48,0.08)', border: '1px solid rgba(232,160,48,0.3)', borderRadius: '14px', padding: '16px', flexShrink: 0 }}>
+          <p style={{ fontSize: '13px', fontWeight: '700', color: '#E8A030', marginBottom: '12px' }}>⚠️ Solicitar pago extra</p>
+          <input type="text" placeholder="¿Por qué necesitas más? Ej: breaker dañado"
+            value={motivoExtra} onChange={e => setMotivoExtra(e.target.value)}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '8px' }}
+          />
+          <input type="number" placeholder="Monto extra en MXN"
+            value={montoExtra} onChange={e => setMontoExtra(e.target.value)}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '10px' }}
+          />
+          {montoExtra && motivoExtra && (
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>
+              Nuevo total: <strong style={{ color: '#E8A030' }}>${(trabajo.precio_acordado || trabajo.presupuesto) + parseInt(montoExtra || 0)} MXN</strong>
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" onClick={solicitarExtra} disabled={!montoExtra || !motivoExtra || enviandoExtra}
+              style={{ flex: 1, padding: '10px', background: montoExtra && motivoExtra ? '#E8A030' : 'rgba(255,255,255,0.08)', color: montoExtra && motivoExtra ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              {enviandoExtra ? 'Enviando...' : '✅ Enviar solicitud'}
+            </button>
+            <button type="button" onClick={() => setMostrarExtra(false)}
+              style={{ padding: '10px 16px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mensajes.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: 'rgba(255,255,255,0.2)', textAlign: 'center', padding: '40px' }}>
             <div style={{ fontSize: '48px' }}>{esPrevio ? '❓' : '💬'}</div>
             <p style={{ fontSize: '14px' }}>{esPrevio ? 'Pregunta al cliente sobre el trabajo.' : 'Aún no hay mensajes.'}</p>
