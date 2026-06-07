@@ -55,7 +55,29 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function aceptarPrecio() {
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     setLoading(true)
-    await supabase.from('trabajos').update({ status: 'aceptado', precio_acordado: precioActual, trabajador_id: userId }).eq('id', trabajo.id)
+
+    // Verificar que el trabajo siga disponible antes de aceptar
+    const { data: trabajoActual } = await supabase
+      .from('trabajos').select('status, trabajador_id').eq('id', trabajo.id).maybeSingle()
+
+    if (!trabajoActual || trabajoActual.status !== 'publicado') {
+      setLoading(false)
+      setError('Lo sentimos — este trabajo ya fue aceptado por otro trabajador. Busca otros disponibles.')
+      return
+    }
+
+    // Aceptar el trabajo — solo si sigue publicado
+    const { error: updateError } = await supabase.from('trabajos')
+      .update({ status: 'aceptado', precio_acordado: precioActual, trabajador_id: userId })
+      .eq('id', trabajo.id)
+      .eq('status', 'publicado') // Condición extra para evitar race condition
+
+    if (updateError) {
+      setLoading(false)
+      setError('Lo sentimos — este trabajo ya fue aceptado por otro trabajador.')
+      return
+    }
+
     await enviarNotificacionCompleta({ usuarioId: trabajo.cliente_id, titulo: '✅ ¡Trabajo aceptado!', cuerpo: `Un trabajador aceptó tu ${trabajo.categoria} por $${precioActual} MXN`, tipo: 'trabajo_aceptado', trabajoId: trabajo.id })
     setExito(true)
     setLoading(false)

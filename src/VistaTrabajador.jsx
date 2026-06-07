@@ -142,6 +142,22 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     cargarPerfilUsuario()
     cargarMisTrabajos()
     cargarHistorial()
+
+    // Escuchar cambios en trabajos para remover de disponibles cuando se aceptan
+    const channel = supabase.channel('trabajos-disponibles')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
+        if (payload.new.status !== 'publicado') {
+          // Remover de disponibles si ya no está publicado
+          setTrabajos(prev => prev.filter(t => t.id !== payload.new.id))
+        }
+        if (payload.new.trabajador_id === userId) {
+          // Si me asignaron un trabajo → recargar activos
+          cargarMisTrabajos()
+        }
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
   }, [])
 
   useEffect(() => {
