@@ -314,6 +314,7 @@ function AppContenido() {
   const [onboardingCompletado, setOnboardingCompletado] = useState(false)
   const [navegarAMisPublicaciones, setNavegarAMisPublicaciones] = useState(false)
   const [navegarAActivos, setNavegarAActivos] = useState(false)
+  const [navegarAHistorial, setNavegarAHistorial] = useState(false)
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
@@ -543,8 +544,8 @@ function AppContenido() {
             onLogout={handleLogout} userId={session.user.id} userEmail={session.user.email}
             onCambiarModo={() => setModo(null)} noLeidas={noLeidas}
             onNotificaciones={() => setVerNotificaciones(true)}
-            irAActivos={navegarAActivos} trabajoIdInicial={trabajoIdInicial}
-            onNavegacionCompletada={() => { setNavegarAActivos(false); setTrabajoIdInicial(null) }}
+            irAActivos={navegarAActivos} irAHistorial={navegarAHistorial} trabajoIdInicial={trabajoIdInicial}
+            onNavegacionCompletada={() => { setNavegarAActivos(false); setNavegarAHistorial(false); setTrabajoIdInicial(null) }}
             irAPerfil={onboardingCompletado && modo === 'trabajador'}
             onPerfilAbierto={() => setOnboardingCompletado(false)}
           />

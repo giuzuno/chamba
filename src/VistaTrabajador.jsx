@@ -109,7 +109,7 @@ function ClienteInfoViaje({ clienteId, notaCliente }) {
   )
 }
 
-export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, trabajoIdInicial, onNavegacionCompletada, irAPerfil, onPerfilAbierto }) {
+export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAActivos, irAHistorial, trabajoIdInicial, onNavegacionCompletada, irAPerfil, onPerfilAbierto }) {
   const [trabajos, setTrabajos] = useState([])
   const [misTrabajos, setMisTrabajos] = useState([])
   const [historial, setHistorial] = useState([])
@@ -166,6 +166,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       onNavegacionCompletada?.()
     }
   }, [irAActivos])
+
+  useEffect(() => {
+    if (irAHistorial) {
+      setPestana('historial')
+      onNavegacionCompletada?.()
+    }
+  }, [irAHistorial])
 
   // Si viene del onboarding como trabajador → abrir perfil directo
   useEffect(() => {
@@ -704,7 +711,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 💰 Ver y negociar precio
               </button>
               <button type="button" onClick={() => setModalRechazo(true)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ❌ No puedo aceptar este viaje
+                ❌ No puedo aceptar este {esViaje(trabajoSeleccionado) ? 'viaje' : 'trabajo'}
               </button>
               <button type="button" onClick={() => setTrabajoSeleccionado(null)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 Ver otros trabajos

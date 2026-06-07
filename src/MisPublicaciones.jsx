@@ -535,6 +535,23 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 <span style={{ fontSize: '13px', color: '#1D9E75' }}>Precio acordado final</span>
                 <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
               </div>
+              {trabajoSeleccionado.precio_acordado && (
+                <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '10px', padding: '10px 16px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio del servicio</span>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Comisión Chamba (12%)</span>
+                    <span style={{ fontSize: '12px', color: '#F09595' }}>+${Math.round(trabajoSeleccionado.precio_acordado * 0.12)} MXN</span>
+                  </div>
+                  <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '6px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Total a pagar</span>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(trabajoSeleccionado.precio_acordado * 1.12)} MXN</span>
+                  </div>
+                </div>
+              )}
             )}
           </div>
 
