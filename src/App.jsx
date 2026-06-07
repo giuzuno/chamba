@@ -13,6 +13,7 @@ import LogoChamba from './LogoChamba'
 import { verificarDispositivoBaneado, guardarFingerprint } from './useFingerprint'
 import PanelAdmin from './PanelAdmin'
 import Terminos from './Terminos'
+import NotFound from './NotFound'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -604,7 +605,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/privacidad" element={<Privacidad />} />
+        <Route path="/terminos" element={<Terminos />} />
         <Route path="/*" element={<AppContenido />} />
+        <Route path="/404" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )
