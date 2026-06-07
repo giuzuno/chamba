@@ -7,6 +7,9 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [trabajos, setTrabajos] = useState([])
   const [disputas, setDisputas] = useState([])
   const [usuarios, setUsuarios] = useState([])
+  const [busquedaUsuario, setBusquedaUsuario] = useState('')
+  const [dispositivosBaneados, setDispositivosBaneados] = useState([])
+  const [trabajosEnVivo, setTrabajosEnVivo] = useState([])
   const [cargando, setCargando] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [busquedaUsuario, setBusquedaUsuario] = useState('')
@@ -19,8 +22,20 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
 
   async function cargarDatos() {
     setCargando(true)
-    await Promise.all([cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios()])
+    await Promise.all([cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios(), cargarDispositivosBaneados(), cargarTrabajosEnVivo()])
     setCargando(false)
+  }
+
+  async function cargarDispositivosBaneados() {
+    const { data } = await supabase.from('dispositivos_baneados').select('*').order('creado_en', { ascending: false }).limit(50)
+    if (data) setDispositivosBaneados(data)
+  }
+
+  async function cargarTrabajosEnVivo() {
+    const { data } = await supabase.from('trabajos').select('id, categoria, status, cliente_id, trabajador_id, precio_acordado, presupuesto, creado_en')
+      .in('status', ['publicado', 'aceptado', 'en_revision', 'en_disputa'])
+      .order('creado_en', { ascending: false })
+    if (data) setTrabajosEnVivo(data)
   }
 
   async function cargarStats() {
@@ -160,6 +175,8 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
           ['trabajos', `🏁 Trabajos${trabajos.length > 0 ? ` (${trabajos.length})` : ''}`],
           ['disputas', `⚠️ Disputas${stats.disputasAbiertas > 0 ? ` (${stats.disputasAbiertas})` : ''}`],
           ['usuarios', `👥 Usuarios${usuarios.length > 0 ? ` (${usuarios.length})` : ''}`],
+          ['en_vivo', `🔴 En vivo${trabajosEnVivo.length > 0 ? ` (${trabajosEnVivo.length})` : ''}`],
+          ['baneados', `🚫 Baneados${dispositivosBaneados.length > 0 ? ` (${dispositivosBaneados.length})` : ''}`],
         ].map(([key, label]) => (
           <button key={key} type="button" onClick={() => setPestana(key)} style={{
             flex: 1, padding: '12px 4px', border: 'none', background: 'transparent',
