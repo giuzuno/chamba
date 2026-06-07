@@ -66,15 +66,15 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       return
     }
 
-    // Aceptar el trabajo — solo si sigue publicado
+    // Aceptar el trabajo
     const { error: updateError } = await supabase.from('trabajos')
       .update({ status: 'aceptado', precio_acordado: precioActual, trabajador_id: userId })
       .eq('id', trabajo.id)
-      .eq('status', 'publicado') // Condición extra para evitar race condition
 
     if (updateError) {
+      console.log('Error aceptando:', updateError)
       setLoading(false)
-      setError('Lo sentimos — este trabajo ya fue aceptado por otro trabajador.')
+      setError('Error al aceptar el trabajo. Intenta de nuevo.')
       return
     }
 
