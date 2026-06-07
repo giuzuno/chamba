@@ -172,7 +172,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     setLoading(false)
   }
 
-  if (!fotoUrl) return (
+  if (fotoUrl !== 'cargando' && !fotoUrl) return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
       <div style={{ fontSize: '64px', marginBottom: '20px' }}>📷</div>
       <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>Foto de perfil requerida</h2>
