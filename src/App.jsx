@@ -113,8 +113,24 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [pendienteRol, setPendienteRol] = useState(null)
-
   const [apellido, setApellido] = useState('')
+  const [fotoOnboarding, setFotoOnboarding] = useState(null)
+  const [subiendoFotoOnb, setSubiendoFotoOnb] = useState(false)
+
+  async function subirFotoOnboarding(e, userId) {
+    const file = e.target.files[0]
+    if (!file) return
+    setSubiendoFotoOnb(true)
+    const ext = file.name.split('.').pop()
+    const path = `${userId}.${ext}`
+    const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+      setFotoOnboarding(data.publicUrl)
+      await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
+    }
+    setSubiendoFotoOnb(false)
+  }
 
   function generarUsername(nombre, apellido) {
     const base = `${nombre.trim().split(' ')[0]}_${apellido.trim().split(' ')[0]}`
@@ -231,9 +247,48 @@ function Onboarding({ userId, userEmail, onCompletado }) {
             </p>
           )}
           {error && <p style={{ color: '#F09595', fontSize: '13px', marginBottom: '8px' }}>{error}</p>}
-          <button type="button" onClick={() => { if (!nombre.trim()) { setError('Escribe tu nombre'); return } if (!apellido.trim()) { setError('Escribe tu apellido'); return } setPaso(3) }}
+          <button type="button" onClick={() => { if (!nombre.trim()) { setError('Escribe tu nombre'); return } if (!apellido.trim()) { setError('Escribe tu apellido'); return } setPaso('foto') }}
             style={{ width: '100%', padding: '16px', background: nombre.trim() && apellido.trim() ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: nombre.trim() && apellido.trim() ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: nombre.trim() && apellido.trim() ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif', marginTop: '8px' }}>
             Continuar →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (paso === 'foto') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
+          {[1,2,3].map(n => <div key={n} style={{ width: n<=2?'24px':'8px', height:'8px', borderRadius:'4px', background: n<=2?'#1D9E75':'rgba(255,255,255,0.15)', transition:'all 0.3s' }} />)}
+        </div>
+        <div style={{ width: '100%', maxWidth: '340px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '8px' }}>📷 Tu foto de perfil</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '28px', lineHeight: '1.5' }}>
+            Los trabajadores y clientes necesitan ver tu foto para confiar en ti.
+          </p>
+
+          {/* Foto */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '28px' }}>
+            {fotoOnboarding ? (
+              <img src={fotoOnboarding} alt="foto" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #1D9E75' }} />
+            ) : (
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>
+                👤
+              </div>
+            )}
+            <label style={{ background: fotoOnboarding ? 'rgba(29,158,117,0.15)' : '#1D9E75', color: fotoOnboarding ? '#1D9E75' : 'white', border: fotoOnboarding ? '1px solid rgba(29,158,117,0.4)' : 'none', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              {subiendoFotoOnb ? '⏳ Subiendo...' : fotoOnboarding ? '✅ Cambiar foto' : '📷 Subir foto'}
+              <input type="file" accept="image/*" onChange={e => subirFotoOnboarding(e, userId)} style={{ display: 'none' }} disabled={subiendoFotoOnb} />
+            </label>
+          </div>
+
+          <button type="button" onClick={() => setPaso(3)} disabled={!fotoOnboarding}
+            style={{ width: '100%', padding: '16px', background: fotoOnboarding ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: fotoOnboarding ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: fotoOnboarding ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
+            {fotoOnboarding ? 'Continuar →' : 'Sube tu foto primero'}
+          </button>
+          <button type="button" onClick={() => setPaso(3)} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.25)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif', marginTop: '8px' }}>
+            Saltar por ahora
           </button>
         </div>
       </div>
