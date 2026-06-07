@@ -696,7 +696,18 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 </button>
               </div>
 
-              <button type="button" onClick={() => setAbrirDisputa(trabajoSeleccionado)} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              <button type="button" onClick={async () => {
+                // Verificar si ya hubo chat con el trabajador
+                const { data: msgs } = await supabase.from('mensajes')
+                  .select('id').eq('trabajo_id', trabajoSeleccionado.id)
+                  .eq('emisor_id', userId).limit(1)
+                if (!msgs || msgs.length === 0) {
+                  setChatAbierto(trabajoSeleccionado)
+                  setError('⚠️ Primero intenta resolver con el trabajador por chat antes de abrir una disputa.')
+                  return
+                }
+                setAbrirDisputa(trabajoSeleccionado)
+              }} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 ⚠️ Hay un problema grave — abrir disputa
               </button>
             </div>

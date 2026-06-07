@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import VerificacionChofer from './VerificacionChofer'
+import { sanitizarCampo, sanitizarDescripcion, tieneInyeccionSQL } from './sanitize'
 
 const CATEGORIAS_DISPONIBLES = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -245,8 +246,17 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   async function guardarPerfil() {
     if (!validar()) return
     setGuardando(true)
+    // Sanitizar inputs
+    const nombreSanitizado = sanitizarCampo(nombre)
+    const bioSanitizada = sanitizarDescripcion(bio)
+    if (tieneInyeccionSQL(nombre) || tieneInyeccionSQL(bio)) {
+      setErrores({ nombre: 'Contenido no válido detectado' })
+      setGuardando(false)
+      return
+    }
+
     const datos = {
-      id: userId, email: userEmail, nombre, bio,
+      id: userId, email: userEmail, nombre: nombreSanitizado, bio: bioSanitizada,
       es_trabajador: true,
       categorias_servicio: categoriasServicio,
       radio_alertas: radioAlertas,
@@ -337,6 +347,29 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
             </div>
             <div style={{ background: 'rgba(55,138,221,0.1)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '100px', padding: '4px 14px', fontSize: '12px', color: '#378ADD', fontWeight: '600' }}>
               🔧 Modo trabajador
+            </div>
+            {/* Insignias de confianza */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
+              {amonestaciones === 0 && totalTrabajos >= 1 && (
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', fontWeight: '600' }}>
+                  ✅ Sin amonestaciones
+                </span>
+              )}
+              {totalTrabajos >= 5 && (
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>
+                  ⭐ {totalTrabajos}+ trabajos
+                </span>
+              )}
+              {ratingReal >= 4.5 && (
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>
+                  🏆 Top rated
+                </span>
+              )}
+              {rachaMeses >= 3 && (
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', fontWeight: '600' }}>
+                  🔥 {rachaMeses} meses activo
+                </span>
+              )}
             </div>
           </div>
 

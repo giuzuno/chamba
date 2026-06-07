@@ -267,6 +267,55 @@ serve(async (req) => {
         'general', trabajo.id, clienteData?.fcm_token || null, accessToken)
     }
 
+    // ── 5. RECORDATORIOS de cita — 24hrs y 1hr antes ──
+    const en24hrs = new Date(ahora.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const en1hr = new Date(ahora.getTime() + 60 * 60 * 1000)
+    const en1hrFecha = en1hr.toISOString().split('T')[0]
+    const en1hrHora = `${String(en1hr.getHours()).padStart(2,'0')}:${String(en1hr.getMinutes()).padStart(2,'0')}`
+
+    // Recordatorio 24hrs antes
+    const { data: citas24hrs } = await supabase
+      .from('trabajos')
+      .select('id, categoria, cliente_id, trabajador_id, fecha_cita, hora_cita, recordatorio_24h_enviado')
+      .eq('status', 'aceptado')
+      .eq('fecha_cita', en24hrs)
+      .eq('recordatorio_24h_enviado', false)
+
+    for (const trabajo of (citas24hrs || [])) {
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token')
+        .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
+      
+      for (const u of (usuarios || [])) {
+        await notificar(supabase, u.id,
+          '📅 Recordatorio — cita mañana',
+          `Tu ${trabajo.categoria} está agendado para mañana a las ${trabajo.hora_cita?.slice(0,5)} hrs`,
+          'recordatorio', trabajo.id, u.fcm_token, accessToken)
+      }
+      await supabase.from('trabajos').update({ recordatorio_24h_enviado: true }).eq('id', trabajo.id)
+    }
+
+    // Recordatorio 1hr antes
+    const { data: citas1hr } = await supabase
+      .from('trabajos')
+      .select('id, categoria, cliente_id, trabajador_id, fecha_cita, hora_cita, recordatorio_1h_enviado')
+      .eq('status', 'aceptado')
+      .eq('fecha_cita', en1hrFecha)
+      .eq('recordatorio_1h_enviado', false)
+
+    for (const trabajo of (citas1hr || [])) {
+      if (trabajo.hora_cita?.slice(0,5) !== en1hrHora) continue
+      const { data: usuarios } = await supabase.from('usuarios').select('id, fcm_token')
+        .in('id', [trabajo.cliente_id, trabajo.trabajador_id].filter(Boolean))
+      
+      for (const u of (usuarios || [])) {
+        await notificar(supabase, u.id,
+          '⏰ Tu cita es en 1 hora',
+          `${trabajo.categoria} a las ${trabajo.hora_cita?.slice(0,5)} hrs — ¡prepárate!`,
+          'recordatorio', trabajo.id, u.fcm_token, accessToken)
+      }
+      await supabase.from('trabajos').update({ recordatorio_1h_enviado: true }).eq('id', trabajo.id)
+    }
+
     return new Response(JSON.stringify({ ok: true, completados, cancelados }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

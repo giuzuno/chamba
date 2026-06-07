@@ -247,7 +247,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   )
 }
 
-function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, onNotificaciones }) {
+function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, onNotificaciones, horaActual }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', position: 'relative' }}>
       <div style={{ position: 'absolute', top: '16px', right: '20px' }}>
@@ -258,9 +258,18 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
       </div>
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <LogoChamba size='lg' />
-        {nombre && <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>Hola, {nombre.split(' ')[0]} 👋</p>}
+        {nombre && (
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '16px', marginTop: '12px', fontWeight: '500' }}>
+            {horaActual < 12 ? '🌅 Buenos días' : horaActual < 19 ? '☀️ Buenas tardes' : '🌙 Buenas noches'}, {nombre.split(' ')[0]}
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', marginTop: '4px' }}>
+            ¿Qué quieres hacer hoy?
+          </p>
+        </div>
+      )}
       </div>
-      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '24px', textAlign: 'center' }}>¿Qué deseas hacer hoy?</p>
+      <div style={{ height: '8px' }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '360px' }}>
         <button type="button" onClick={onCliente} style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '20px', padding: '28px 24px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '18px', flexShrink: 0, background: 'rgba(29,158,117,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🛍️</div>
@@ -528,7 +537,7 @@ function AppContenido() {
       return (
         <>
           <Toast toast={toastActivo} onClick={alTocarToast} />
-          <SeleccionModo nombre={nombreUsuario} noLeidas={noLeidas}
+          <SeleccionModo nombre={nombreUsuario} noLeidas={noLeidas} horaActual={new Date().getHours()}
             onCliente={() => setModo('cliente')} onTrabajador={() => setModo('trabajador')}
             onLogout={handleLogout} onNotificaciones={() => setVerNotificaciones(true)}
           />
