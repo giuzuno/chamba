@@ -700,6 +700,43 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             </div>
           </div>
 
+          {/* Desglose detallado del precio por km */}
+<div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
+  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📊 ¿Cómo se calculó?</p>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+      <span>{distanciaTotal.toFixed(1)} km × ${tipoSeleccionado?.precioPorKm}/km</span>
+      <span>${Math.round(distanciaTotal * (tipoSeleccionado?.precioPorKm || 0))} MXN</span>
+    </div>
+    {Math.round(distanciaTotal * (tipoSeleccionado?.precioPorKm || 0)) < (tipoSeleccionado?.minimo || 0) && (
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
+        <span>⬆️ Precio mínimo aplicado</span>
+        <span>${tipoSeleccionado?.minimo} MXN</span>
+      </div>
+    )}
+    {tipoViaje === 'redondo' && (
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
+        <span>🔄 Espera ({tiempoEspera} min × $3)</span>
+        <span>+${tiempoEspera * 3} MXN</span>
+      </div>
+    )}
+    {paradas.length > 0 && (
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
+        <span>🔶 {paradas.length} parada(s) × $20</span>
+        <span>+${paradas.length * 20} MXN</span>
+      </div>
+    )}
+    <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>
+      <span>Total estimado</span>
+      <span>${precioTotal} MXN</span>
+    </div>
+    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '4px' }}>
+      El conductor puede hacer una contraoferta antes de aceptar.
+    </p>
+  </div>
+</div>
+
           <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '12px', padding: '12px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
             ⚠️ El conductor puede negociar el precio antes de aceptar.
           </div>
