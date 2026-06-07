@@ -189,12 +189,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (!perfil?.foto_url) faltantes.push('Foto de perfil')
     if (!perfil?.categorias_servicio || perfil.categorias_servicio.length === 0) faltantes.push('Categorías de servicio')
 
-    // Validaciones extra para choferes/viajes
+    // Validaciones extra SOLO para trabajos de viaje
     const CATS_CHOFER = ['Taxi / Chofer', 'Moto taxi', 'Repartidor moto', 'Fletes', 'Mandados', 'Repartidor']
-    const esChofer = perfil?.categorias_servicio?.some(c => CATS_CHOFER.includes(c))
     const esViajeTrabajo = trabajo?.es_viaje || CATS_CHOFER.includes(trabajo?.categoria)
 
-    if (esChofer || esViajeTrabajo) {
+    if (esViajeTrabajo) {
       if (!perfil?.vehiculo_placas) faltantes.push('Placas del vehículo')
       if (!perfil?.vehiculo_marca) faltantes.push('Marca del vehículo')
       if (!perfil?.vehiculo_color) faltantes.push('Color del vehículo')
