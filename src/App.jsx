@@ -157,20 +157,53 @@ function Onboarding({ userId, userEmail, onCompletado }) {
 
   if (paso === 1) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
-        <div style={{ fontSize: '72px', marginBottom: '24px' }}>👋</div>
-        <LogoChamba size='lg' />
-        <h1 style={{ color: 'white', fontSize: '28px', fontWeight: '800', marginBottom: '8px' }}>Bienvenido a Chamba</h1>
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', marginBottom: '8px', maxWidth: '300px', lineHeight: '1.6' }}>La plataforma de servicios locales de Salina Cruz, Oaxaca.</p>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginBottom: '48px' }}>En 2 pasos estarás listo para empezar</p>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {['⚡ Electricistas', '🔧 Plomeros', '🚕 Taxis', '🍳 Cocineras'].map(s => (
-            <span key={s} style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '100px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)' }}>{s}</span>
-          ))}
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', padding: '0' }}>
+        {/* Hero visual */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px 24px', textAlign: 'center' }}>
+          <LogoChamba size='lg' />
+          <h1 style={{ color: 'white', fontSize: '30px', fontWeight: '900', marginBottom: '10px', marginTop: '20px', lineHeight: '1.2' }}>
+            El trabajo que necesitas,<br/>
+            <span style={{ color: '#1D9E75' }}>cuando lo necesitas</span>
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', marginBottom: '32px', maxWidth: '280px', lineHeight: '1.6' }}>
+            Conectamos a clientes con trabajadores locales en Salina Cruz, Oaxaca.
+          </p>
+
+          {/* Features */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '32px' }}>
+            {[
+              { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero protegido en escrow hasta confirmar' },
+              { icon: '⭐', titulo: 'Trabajadores verificados', desc: 'Con calificaciones reales de tus vecinos' },
+              { icon: '⚡', titulo: 'Respuesta inmediata', desc: 'Publica y recibe respuestas en minutos' },
+            ].map(f => (
+              <div key={f.titulo} style={{ display: 'flex', alignItems: 'center', gap: '14px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px', textAlign: 'left' }}>
+                <span style={{ fontSize: '28px', flexShrink: 0 }}>{f.icon}</span>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>{f.titulo}</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.4' }}>{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Servicios disponibles */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '8px' }}>
+            {['⚡ Electricistas', '🔧 Plomeros', '🚕 Taxis', '🍳 Cocineras', '🌿 Jardineros', '🛵 Repartidores'].map(s => (
+              <span key={s} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.08)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.2)' }}>{s}</span>
+            ))}
+            <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', color: 'rgba(255,255,255,0.3)' }}>+22 más</span>
+          </div>
         </div>
-        <button type="button" onClick={() => setPaso(2)} style={{ width: '100%', maxWidth: '320px', padding: '16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-          Comenzar →
-        </button>
+
+        {/* CTA fijo abajo */}
+        <div style={{ padding: '20px 32px 32px', background: 'linear-gradient(to top, #0D0D0D 80%, transparent)' }}>
+          <button type="button" onClick={() => setPaso(2)} style={{ width: '100%', padding: '18px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '16px', fontSize: '17px', fontWeight: '800', cursor: 'pointer', fontFamily: 'sans-serif', letterSpacing: '0.02em' }}>
+            Comenzar gratis →
+          </button>
+          <p style={{ textAlign: 'center', fontSize: '11px', color: 'rgba(255,255,255,0.2)', marginTop: '10px' }}>
+            Sin comisiones ocultas · Cancela cuando quieras
+          </p>
+        </div>
       </div>
     )
   }
