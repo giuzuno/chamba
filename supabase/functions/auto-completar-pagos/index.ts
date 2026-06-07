@@ -76,14 +76,36 @@ serve(async (req) => {
     let completados = 0
     let cancelados = 0
 
-    // ── 1. AUTO-COMPLETAR pagos en revision > 30 min ──
-    const limite30min = new Date(ahora.getTime() - 30 * 60 * 1000).toISOString()
+    // ── 1. AUTO-COMPLETAR pagos en revision > 24 hrs ──
+    // Si el cliente no confirma ni disputa en 24hrs → pago se libera automáticamente
+    const limite24hrs = new Date(ahora.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const limite20hrs = new Date(ahora.getTime() - 20 * 60 * 60 * 1000).toISOString()
+
+    // Avisar al cliente a las 20hrs que le quedan 4hrs para disputar
+    const { data: porVencer } = await supabase
+      .from('trabajos')
+      .select('id, categoria, cliente_id, trabajador_id, aviso_24hrs_enviado')
+      .eq('status', 'en_revision')
+      .not('en_revision_desde', 'is', null)
+      .lt('en_revision_desde', limite20hrs)
+      .gt('en_revision_desde', limite24hrs)
+
+    for (const trabajo of (porVencer || [])) {
+      if (!trabajo.aviso_24hrs_enviado) {
+        await notificar(supabase, trabajo.cliente_id,
+          '⏰ Tienes 4 horas para revisar el trabajo',
+          `Si no confirmas ni disputas tu ${trabajo.categoria} en 4 hrs, el pago se liberará automáticamente.`,
+          'general', trabajo.id, null, accessToken)
+        await supabase.from('trabajos').update({ aviso_24hrs_enviado: true }).eq('id', trabajo.id)
+      }
+    }
+
     const { data: enRevision } = await supabase
       .from('trabajos')
       .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id')
       .eq('status', 'en_revision')
       .not('en_revision_desde', 'is', null)
-      .lt('en_revision_desde', limite30min)
+      .lt('en_revision_desde', limite24hrs)
 
     for (const trabajo of (enRevision || [])) {
       await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
