@@ -116,14 +116,16 @@ serve(async (req) => {
 
     // Solo cancelar trabajos PUBLICADOS (sin trabajador) que ya vencieron
     // Los trabajos ACEPTADOS nunca se cancelan automáticamente
+    // Cancelar trabajos publicados hace más de 4 horas sin ser aceptados
+    // Usamos creado_en en UTC para evitar problemas de zona horaria
+    const hace4hrs = new Date(ahora.getTime() - 4 * 60 * 60 * 1000).toISOString()
+
     const { data: vencidos } = await supabase
       .from('trabajos')
       .select('id, categoria, precio_acordado, presupuesto, cliente_id, trabajador_id, fecha_cita, hora_cita, es_viaje, trabajador_en_camino, trabajador_llego, trabajo_iniciado, pasajero_subio')
       .eq('status', 'publicado')
       .is('trabajador_id', null)
-      .not('fecha_cita', 'is', null)
-      .not('hora_cita', 'is', null)
-      .lte('fecha_cita', hoy)
+      .lte('creado_en', hace4hrs)
 
     for (const trabajo of (vencidos || [])) {
       // NUNCA cancelar si el trabajador ya tomó acción
