@@ -21,6 +21,8 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [ofertas, setOfertas] = useState([])
   const [nuevaOferta, setNuevaOferta] = useState(trabajo.presupuesto)
   const [loading, setLoading] = useState(false)
+  const [costoMateriales, setCostoMateriales] = useState(0)
+  const [notaMateriales, setNotaMateriales] = useState('')
   const [cargando, setCargando] = useState(true)
   const [exito, setExito] = useState(false)
   const [verPerfilTrabajador, setVerPerfilTrabajador] = useState(false)
@@ -45,7 +47,14 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function hacerContraoferta() {
     if (nuevaOferta === precioActual || rondasRestantes <= 0) return
     setLoading(true)
-    await supabase.from('negociaciones').insert({ trabajo_id: trabajo.id, ofertado_por: 'trabajador', monto: nuevaOferta, usuario_id: userId })
+    await supabase.from('negociaciones').insert({ 
+      trabajo_id: trabajo.id, 
+      ofertado_por: 'trabajador', 
+      monto: nuevaOferta, 
+      usuario_id: userId,
+      costo_materiales: costoMateriales || 0,
+      nota_materiales: notaMateriales || null,
+    })
     await supabase.from('trabajos').update({ ultima_oferta: nuevaOferta, quien_oferto: 'trabajador', rondas_negociacion: rondasUsadas + 1 }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({ usuarioId: trabajo.cliente_id, titulo: '💬 Nueva contraoferta en Chamba', cuerpo: `Un trabajador ofrece $${nuevaOferta} MXN por tu ${trabajo.categoria}`, tipo: 'contraoferta', trabajoId: trabajo.id })
     await cargarOfertas()
@@ -224,6 +233,52 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             <span style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(precioActual * 0.88)} MXN</span>
           </div>
         </div>
+
+        {/* Desglose de materiales — solo si el trabajo requiere que el trabajador los consiga */}
+        {trabajo.materiales === 'trabajador' && (
+          <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '16px' }}>
+            <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '10px' }}>🛒 Desglose de materiales</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>Costo estimado de materiales (MXN)</p>
+                <input type="number" min="0" placeholder="Ej: 150"
+                  value={costoMateriales || ''}
+                  onChange={e => {
+                    const mat = Number(e.target.value) || 0
+                    setCostoMateriales(mat)
+                    setNuevaOferta(Math.round((nuevaOferta - costoMateriales) + mat))
+                  }}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '15px', fontFamily: 'sans-serif', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>Nota para el cliente (opcional)</p>
+                <input type="text" placeholder="Ej: Cable especial + clavos + sellador"
+                  value={notaMateriales}
+                  onChange={e => setNotaMateriales(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
+                />
+              </div>
+              {costoMateriales > 0 && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Mano de obra</span>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>${nuevaOferta - costoMateriales} MXN</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Materiales</span>
+                    <span style={{ fontSize: '12px', color: '#E8A030' }}>${costoMateriales} MXN</span>
+                  </div>
+                  <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', marginBottom: '6px' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Total</span>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${nuevaOferta} MXN</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {rondasRestantes > 0 && nuevaOferta !== precioActual && (
           <button type="button" onClick={hacerContraoferta} disabled={loading} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#1D9E75', border: '1.5px solid #1D9E75', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
