@@ -206,6 +206,24 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         <button type="button" onClick={aceptarPrecio} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           {loading ? 'Procesando...' : `✅ Aceptar $${precioActual} MXN`}
         </button>
+        
+        {/* Desglose de comisión para el trabajador */}
+        <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '12px', padding: '12px 16px' }}>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💰 Tu ganancia</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio acordado</span>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>${precioActual} MXN</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Comisión Chamba (12%)</span>
+            <span style={{ fontSize: '12px', color: '#F09595' }}>-${Math.round(precioActual * 0.12)} MXN</span>
+          </div>
+          <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '6px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75' }}>Tu ganancia neta</span>
+            <span style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(precioActual * 0.88)} MXN</span>
+          </div>
+        </div>
 
         {rondasRestantes > 0 && nuevaOferta !== precioActual && (
           <button type="button" onClick={hacerContraoferta} disabled={loading} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#1D9E75', border: '1.5px solid #1D9E75', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
