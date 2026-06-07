@@ -613,6 +613,16 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>🕐 {trabajoSeleccionado.hora_cita?.slice(0, 5)} hrs</p>
                   </div>
                 )}
+                {trabajoSeleccionado.materiales && (
+                  <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', background: trabajoSeleccionado.materiales === 'trabajador' ? 'rgba(232,160,48,0.06)' : 'transparent' }}>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>🔩 MATERIALES</p>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: trabajoSeleccionado.materiales === 'trabajador' ? '#E8A030' : 'rgba(255,255,255,0.8)' }}>
+                      {trabajoSeleccionado.materiales === 'cliente' ? '✅ El cliente los pone — solo llegas a trabajar' :
+                       trabajoSeleccionado.materiales === 'trabajador' ? '🛒 Tú consigues los materiales — agrega el costo al precio' :
+                       '🤝 A acordar en el chat antes de empezar'}
+                    </p>
+                  </div>
+                )}
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>UBICACIÓN</p>
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>📍 {trabajoSeleccionado.lat?.toFixed(4)}, {trabajoSeleccionado.lng?.toFixed(4)}</p>

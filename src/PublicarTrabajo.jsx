@@ -74,6 +74,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [ubicacion, setUbicacion] = useState(null)
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
+  const [materiales, setMateriales] = useState('cliente') // 'cliente' | 'trabajador' | 'acordar'
 
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
@@ -131,6 +132,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       hora_cita: horaFinal,
       lat: ubicacion.lat,
       lng: ubicacion.lng,
+      materiales,
       status: 'publicado'
     }).select().single()
 
@@ -258,6 +260,15 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
                     <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {hora} hrs</p>
                   </>
                 }
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '32px' }}>🔩</span>
+              <div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>MATERIALES</p>
+                <p style={{ fontSize: '15px', fontWeight: '600' }}>
+                  {materiales === 'cliente' ? '✅ Yo los pongo' : materiales === 'trabajador' ? '🛒 El trabajador los consigue' : '🤝 Lo acordamos en el chat'}
+                </p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px' }}>
@@ -412,6 +423,28 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             </div>
           </>
         )}
+
+        {/* Materiales */}
+        <div>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🔩 ¿Quién pone los materiales?</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { id: 'cliente', icon: '✅', label: 'Yo pongo los materiales', desc: 'Tengo todo listo para el trabajo' },
+              { id: 'trabajador', icon: '🛒', label: 'El trabajador los consigue', desc: 'El costo se agrega al precio final' },
+              { id: 'acordar', icon: '🤝', label: 'Lo acordamos en el chat', desc: 'Primero hablamos y luego decidimos' },
+            ].map(op => (
+              <button key={op.id} type="button" onClick={() => setMateriales(op.id)}
+                style={{ padding: '14px 16px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px', background: materiales === op.id ? 'rgba(29,158,117,0.15)' : 'rgba(255,255,255,0.04)', outline: materiales === op.id ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.08)' }}>
+                <span style={{ fontSize: '24px' }}>{op.icon}</span>
+                <div>
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: materiales === op.id ? '#1D9E75' : 'white', marginBottom: '2px' }}>{op.label}</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{op.desc}</p>
+                </div>
+                {materiales === op.id && <span style={{ marginLeft: 'auto', color: '#1D9E75', fontSize: '18px' }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {esAhora && (
           <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: '#E8A030', display: 'flex', alignItems: 'center', gap: '10px' }}>

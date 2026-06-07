@@ -710,6 +710,24 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             </div>
           )}
 
+          {/* Comentario tardío — garantía 72hrs */}
+          {trabajoSeleccionado.status === 'completado' && (() => {
+            const completadoHace = (Date.now() - new Date(trabajoSeleccionado.updated_at).getTime()) / (1000 * 60 * 60)
+            if (completadoHace > 72) return null
+            return (
+              <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '14px 16px' }}>
+                <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '6px' }}>⚠️ ¿Algo falló después del trabajo?</p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', lineHeight: '1.5' }}>
+                  Tienes {Math.round(72 - completadoHace)} horas para dejar un comentario adicional. Esto ayuda a futuros clientes.
+                </p>
+                <button type="button" onClick={() => setCalificando(trabajoSeleccionado)}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', border: '1px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  📝 Dejar comentario adicional
+                </button>
+              </div>
+            )
+          })()}
+
           {trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
             <button type="button" onClick={() => setConfirmarCancelar(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               ❌ Cancelar publicación
