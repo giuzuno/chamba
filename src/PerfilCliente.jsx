@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import { sanitizarCampo, sanitizarDescripcion, tieneInyeccionSQL } from './sanitize'
 
 function EstrellaRating({ rating }) {
   if (!rating) return <span style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificaciones</span>
@@ -105,9 +106,15 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
 
   async function guardarPerfil() {
     if (!validar()) return
+    if (tieneInyeccionSQL(nombre) || tieneInyeccionSQL(bio)) {
+      setError('Contenido no válido detectado')
+      return
+    }
     setGuardando(true)
     await supabase.from('usuarios').upsert({
-      id: userId, email: userEmail, nombre, bio,
+      id: userId, email: userEmail, 
+      nombre: sanitizarCampo(nombre), 
+      bio: sanitizarDescripcion(bio),
     })
     setExito(true)
     setTimeout(() => setExito(false), 3000)
