@@ -151,6 +151,14 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     ? [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
     : []
 
+  function limpiarResultados(tipoBusqueda) {
+    setTimeout(() => {
+      if (tipoBusqueda === 'destino') setResultadosBusqueda([])
+      else if (tipoBusqueda === 'origen') setResultadosOrigen([])
+      else setResultadosParada([])
+    }, 200)
+  }
+
   async function buscarDireccion(texto, tipoBusqueda) {
     if (texto.trim().length < 3) {
       if (tipoBusqueda === 'destino') setResultadosBusqueda([])
@@ -374,6 +382,8 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <div style={{ position: 'relative' }}>
                   <input type="text" placeholder="🔍 Buscar dirección de origen..." value={busquedaOrigen}
                     onChange={e => { setBusquedaOrigen(e.target.value); buscarDireccion(e.target.value, 'origen') }}
+                    onBlur={() => limpiarResultados('origen')}
+    
                     style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
                   />
                   {buscandoOrigen && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
@@ -425,6 +435,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             <div style={{ position: 'relative' }}>
               <input type="text" placeholder="🔍 Buscar dirección de destino..." value={busquedaDestino}
                 onChange={e => { setBusquedaDestino(e.target.value); buscarDireccion(e.target.value, 'destino') }}
+                onBlur={() => limpiarResultados('destino')}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
               />
               {buscando && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
@@ -539,6 +550,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <input type="text" placeholder="🔍 Buscar dirección de parada..."
                   value={busquedaParada}
                   onChange={e => { setBusquedaParada(e.target.value); buscarDireccion(e.target.value, 'parada') }}
+                  onBlur={() => limpiarResultados('parada')}
                   style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
                 />
                 {buscandoParada && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
