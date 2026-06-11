@@ -353,6 +353,44 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     setChatAbierto(trabajo)
   }
 
+  function BotonNavegacion({ lat, lng, label = 'Cómo llegar' }) {
+    const [mostrarOpciones, setMostrarOpciones] = useState(false)
+    const wazeUrl = `waze://?ll=${lat},${lng}&navigate=yes`
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+    return (
+      <div style={{ position: 'relative', marginBottom: '8px' }}>
+        <button type="button" onClick={() => setMostrarOpciones(!mostrarOpciones)}
+          style={{ width: '100%', padding: '10px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          🗺️ {label}
+        </button>
+        {mostrarOpciones && (
+          <div onClick={() => setMostrarOpciones(false)} style={{ position: 'fixed', inset: 0, zIndex: 999 }}>
+            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 'auto', left: '16px', right: '16px', background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '16px', overflow: 'hidden', zIndex: 1000, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+              <p style={{ padding: '12px 16px 8px', fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Abrir con</p>
+              <a href={wazeUrl} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', color: 'white', textDecoration: 'none', borderBottom: '0.5px solid rgba(255,255,255,0.08)', fontSize: '15px', fontWeight: '600' }}>
+                <span style={{ fontSize: '24px' }}>🟣</span>
+                <div>
+                  <p style={{ fontSize: '15px', fontWeight: '600' }}>Waze</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Navegación con tráfico en tiempo real</p>
+                </div>
+              </a>
+              <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', color: 'white', textDecoration: 'none', fontSize: '15px', fontWeight: '600' }}>
+                <span style={{ fontSize: '24px' }}>🗺️</span>
+                <div>
+                  <p style={{ fontSize: '15px', fontWeight: '600' }}>Google Maps</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Ruta detallada y alternativas</p>
+                </div>
+              </a>
+              <button type="button" onClick={() => setMostrarOpciones(false)} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
@@ -844,6 +882,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 <button type="button" onClick={() => setChatAbierto(trabajo)} style={{ width: '100%', padding: '8px', marginBottom: '8px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   💬 Chat con el cliente
                 </button>
+
+                {/* Botón permanente de navegación */}
+                {(trabajo.origen_lat || trabajo.lat) && (
+                  <BotonNavegacion
+                    lat={trabajo.origen_lat || trabajo.lat}
+                    lng={trabajo.origen_lng || trabajo.lng}
+                    label={esViaje(trabajo) ? '🚗 Ir al punto de origen' : '📍 Cómo llegar al trabajo'}
+                  />
+                )}
+                {esViaje(trabajo) && trabajo.destino_lat && trabajo.status !== 'en_revision' && (
+                  <BotonNavegacion
+                    lat={trabajo.destino_lat}
+                    lng={trabajo.destino_lng}
+                    label="🏁 Ver destino del viaje"
+                  />
+                )}
+
                 <button type="button" onClick={() => setReportando(trabajo)} style={{ width: '100%', padding: '7px', marginBottom: '8px', background: 'transparent', color: 'rgba(240,149,149,0.5)', border: '0.5px solid rgba(240,149,149,0.15)', borderRadius: '8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   🚨 El cliente me pidió cobrar fuera de la app
                 </button>

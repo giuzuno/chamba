@@ -185,14 +185,23 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         data = await res.json()
         if (data.length > 0) break
       }
+      if (data.length > 0 && origen) {
+        data.sort((a, b) => {
+          const dA = calcularDistancia(origen[0], origen[1], parseFloat(a.lat), parseFloat(a.lon))
+          const dB = calcularDistancia(origen[0], origen[1], parseFloat(b.lat), parseFloat(b.lon))
+          return dA - dB
+        })
+      }
       if (tipoBusqueda === 'destino') setResultadosBusqueda(data)
       else if (tipoBusqueda === 'origen') setResultadosOrigen(data)
       else setResultadosParada(data)
-    } catch { }
-
-    if (tipoBusqueda === 'destino') setBuscando(false)
-    else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
-    else setBuscandoParada(false)
+    } catch (e) {
+      console.log('Error búsqueda:', e)
+    } finally {
+      if (tipoBusqueda === 'destino') setBuscando(false)
+      else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
+      else setBuscandoParada(false)
+    }
   }
 
   function agregarParadaEnMapa(pos) {
