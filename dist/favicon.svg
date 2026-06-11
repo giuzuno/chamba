@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240">
-  <!-- Pin body -->
-  <path d="M100 0 C44.8 0 0 44.8 0 100 C0 175 100 240 100 240 C100 240 200 175 200 100 C200 44.8 155.2 0 100 0Z" fill="#1D9E75"/>
-  <!-- Círculo interior -->
-  <circle cx="100" cy="92" r="52" fill="#0A2E20"/>
-  <!-- Letra C -->
-  <text x="100" y="113" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="900" font-size="68">C</text>
-</svg>
