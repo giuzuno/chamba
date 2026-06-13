@@ -264,7 +264,10 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       vehiculo_modelo: vehiculoModelo,
       vehiculo_color: vehiculoColor,
       vehiculo_placas: vehiculoPlacas,
+      contacto_emergencia_nombre: sanitizarCampo(contactoEmergenciaNombre),
+      contacto_emergencia_telefono: contactoEmergenciaTelefono,
     }
+
     if (ubicacion) { datos.lat = ubicacion[0]; datos.lng = ubicacion[1] }
     await supabase.from('usuarios').upsert(datos)
     setExito(true)
@@ -407,6 +410,21 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                     rows={3} disabled={!editando} style={{ ...inputStyle(false), resize: 'none' }}
                   />
                 </div>
+
+                {/* NUEVO — Contacto de emergencia */}
+                <div>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🆘 Contacto de emergencia</p>
+                  <input type="text" placeholder="Nombre del contacto" value={contactoEmergenciaNombre}
+                    onChange={e => setContactoEmergenciaNombre(e.target.value)}
+                    disabled={!editando} style={{ ...inputStyle(false), marginBottom: '8px' }}
+                  />
+                  <input type="tel" placeholder="Teléfono (10 dígitos)" value={contactoEmergenciaTelefono}
+                    onChange={e => setContactoEmergenciaTelefono(e.target.value)}
+                    disabled={!editando} style={inputStyle(false)}
+                  />
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>Se usará solo si activas el botón de pánico durante un viaje.</p>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                     {ratingReal ? <EstrellaRating rating={ratingReal} /> : <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificar</p>}

@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import BotonPanico from './BotonPanico'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -42,7 +43,7 @@ function abrirWaze(lat, lng) {
   window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank')
 }
 
-export default function TrackingTrabajador({ trabajo, onVolver }) {
+export default function TrackingTrabajador({ trabajo, onVolver, userId, perfilUsuario }) {
   const [enCamino, setEnCamino] = useState(trabajo.trabajador_en_camino || false)
   const [llego, setLlego] = useState(trabajo.trabajador_llego || false)
   const [pasajeroSubio, setPasajeroSubio] = useState(trabajo.pasajero_subio || false)
@@ -460,6 +461,15 @@ export default function TrackingTrabajador({ trabajo, onVolver }) {
             )}
           </>
         )}
+
+        {/* Botón de pánico — siempre visible para el trabajador durante tracking activo */}
+        <BotonPanico
+          trabajo={trabajo}
+          userId={userId}
+          rol="trabajador"
+          contactoEmergenciaNombre={perfilUsuario?.contacto_emergencia_nombre}
+          contactoEmergenciaTelefono={perfilUsuario?.contacto_emergencia_telefono}
+        />
       </div>
     </div>
   )

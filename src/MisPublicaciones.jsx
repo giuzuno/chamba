@@ -8,6 +8,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReportarCobro from './ReportarCobro'
+import BotonPanico from './BotonPanico'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -55,7 +56,8 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [abrirDisputa, setAbrirDisputa] = useState(null)
   const [menuAbierto, setMenuAbierto] = useState(null)
   const [reportando, setReportando] = useState(null)
-  const [confirmarCancelar, setConfirmarCancelar] = useState(null) // trabajo a cancelar
+  const [confirmarCancelar, setConfirmarCancelar] = useState(null) 
+  const [contactoEmergencia, setContactoEmergencia] = useState({ nombre: '', telefono: '' })// trabajo a cancelar
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
@@ -72,6 +74,18 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
         .then(({ data }) => { if (data) seleccionarTrabajo(data) })
     }
   }, [trabajoIdInicial, trabajos])
+
+  useEffect(() => {
+  supabase.from('usuarios')
+    .select('contacto_emergencia_nombre, contacto_emergencia_telefono')
+    .eq('id', userId).maybeSingle()
+    .then(({ data }) => {
+      if (data) setContactoEmergencia({
+        nombre: data.contacto_emergencia_nombre,
+        telefono: data.contacto_emergencia_telefono,
+      })
+    })
+}, [userId])
 
   useEffect(() => {
     const channel = supabase
@@ -651,6 +665,17 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                   </p>
                 </div>
               )}
+
+              {/* Botón de pánico — solo en viajes activos */}
+              {trabajoSeleccionado.es_viaje && (
+                <BotonPanico
+                  trabajo={trabajoSeleccionado}
+                  userId={userId}
+                  rol="cliente"
+                  contactoEmergenciaNombre={contactoEmergencia.nombre}
+                  contactoEmergenciaTelefono={contactoEmergencia.telefono}
+                />
+              )}
             </div>
           )}
 
@@ -695,6 +720,17 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                   ❌ No ha terminado — devolver al trabajador
                 </button>
               </div>
+
+              {/* Botón de pánico — viajes recién terminados, aún en_revision */}
+              {trabajoSeleccionado.es_viaje && (
+                <BotonPanico
+                  trabajo={trabajoSeleccionado}
+                  userId={userId}
+                  rol="cliente"
+                  contactoEmergenciaNombre={contactoEmergencia.nombre}
+                  contactoEmergenciaTelefono={contactoEmergencia.telefono}
+                />
+              )}
 
               <button type="button" onClick={async () => {
                 // Verificar si ya hubo chat con el trabajador

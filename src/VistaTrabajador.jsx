@@ -488,7 +488,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
   if (calificando) return <Calificacion trabajo={calificando} userId={userId} rolCalificador="trabajador" onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }} />
-  if (tracking) return <TrackingTrabajador trabajo={tracking} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
+  if (tracking) return <TrackingTrabajador trabajo={tracking} userId={userId} perfilUsuario={perfilUsuario} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
   if (negociando) return (
     <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
       onAceptado={async () => { 
