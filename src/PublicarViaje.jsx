@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -96,6 +96,12 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   const [busquedaParada, setBusquedaParada] = useState('')
   const [resultadosParada, setResultadosParada] = useState([])
   const [buscandoParada, setBuscandoParada] = useState(false)
+  const [mapaListo, setMapaListo] = useState(false)
+
+  // Refs para debounce — evita llamadas excesivas a Nominatim
+  const debounceDestino = useRef(null)
+  const debounceOrigen = useRef(null)
+  const debounceParada = useRef(null)
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -117,6 +123,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   useEffect(() => {
     if (origenEsActual && ubicacionActual) setOrigen(ubicacionActual)
   }, [origenEsActual, ubicacionActual])
+
+  // El mapa de Leaflet necesita un pequeño delay para renderizar bien en Capacitor
+  useEffect(() => {
+    setMapaListo(false)
+    const t = setTimeout(() => setMapaListo(true), 250)
+    return () => clearTimeout(t)
+  }, [paso])
 
   const tipoSeleccionado = TIPOS_VIAJE.find(t => t.id === tipo)
 
@@ -159,36 +172,31 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     }, 200)
   }
 
-  async function buscarDireccion(texto, tipoBusqueda) {
-    if (texto.trim().length < 3) {
-      if (tipoBusqueda === 'destino') setResultadosBusqueda([])
-      else if (tipoBusqueda === 'origen') setResultadosOrigen([])
-      else setResultadosParada([])
-      return
-    }
-    if (tipoBusqueda === 'destino') setBuscando(true)
-    else if (tipoBusqueda === 'origen') setBuscandoOrigen(true)
-    else setBuscandoParada(true)
-
+  async function ejecutarBusqueda(texto, tipoBusqueda) {
     try {
+      // Viewbox dinámico alrededor del origen del usuario (~25km) — funciona en cualquier ciudad del Istmo
+      const base = origen || ubicacionActual || [16.1833, -95.2000]
+      const delta = 0.25
+      const viewbox = `${base[1]-delta},${base[0]-delta},${base[1]+delta},${base[0]+delta}`
+
       const queries = [
-        `${texto}, Salina Cruz, Oaxaca, Mexico`,
         `${texto}, Oaxaca, Mexico`,
         `${texto}, Mexico`,
+        texto,
       ]
       let data = []
       for (const query of queries) {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=mx&viewbox=-95.35,16.10,-95.10,16.25&bounded=0`,
-          { headers: { 'Accept-Language': 'es' } }
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&countrycodes=mx&viewbox=${viewbox}&bounded=0&addressdetails=1`,
+          { headers: { 'Accept-Language': 'es', 'User-Agent': 'ChambaApp/1.0' } }
         )
-        data = await res.json()
-        if (data.length > 0) break
+        const json = await res.json()
+        if (json.length > 0) { data = json; break }
       }
-      if (data.length > 0 && origen) {
+      if (data.length > 0 && base) {
         data.sort((a, b) => {
-          const dA = calcularDistancia(origen[0], origen[1], parseFloat(a.lat), parseFloat(a.lon))
-          const dB = calcularDistancia(origen[0], origen[1], parseFloat(b.lat), parseFloat(b.lon))
+          const dA = calcularDistancia(base[0], base[1], parseFloat(a.lat), parseFloat(a.lon))
+          const dB = calcularDistancia(base[0], base[1], parseFloat(b.lat), parseFloat(b.lon))
           return dA - dB
         })
       }
@@ -202,6 +210,23 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
       else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
       else setBuscandoParada(false)
     }
+  }
+
+  function buscarDireccion(texto, tipoBusqueda) {
+    if (texto.trim().length < 3) {
+      if (tipoBusqueda === 'destino') { setResultadosBusqueda([]); setBuscando(false) }
+      else if (tipoBusqueda === 'origen') { setResultadosOrigen([]); setBuscandoOrigen(false) }
+      else { setResultadosParada([]); setBuscandoParada(false) }
+      return
+    }
+
+    if (tipoBusqueda === 'destino') setBuscando(true)
+    else if (tipoBusqueda === 'origen') setBuscandoOrigen(true)
+    else setBuscandoParada(true)
+
+    const ref = tipoBusqueda === 'destino' ? debounceDestino : tipoBusqueda === 'origen' ? debounceOrigen : debounceParada
+    if (ref.current) clearTimeout(ref.current)
+    ref.current = setTimeout(() => { ejecutarBusqueda(texto, tipoBusqueda) }, 450)
   }
 
   function agregarParadaEnMapa(pos) {
@@ -411,12 +436,16 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             )}
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
-            {ubicacionActual && (
+            {ubicacionActual && mapaListo ? (
               <MapContainer center={centro} zoom={15} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 {!origenEsActual && <SeleccionarPunto onSeleccionar={pos => setOrigen(pos)} />}
                 {origen && <Marker position={origen} icon={iconoOrigen}><Popup>📍 Origen</Popup></Marker>}
               </MapContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>
+                Cargando mapa...
+              </div>
             )}
           </div>
           <div style={{ padding: '14px 16px', flexShrink: 0 }}>
@@ -461,7 +490,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             )}
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
-            {ubicacionActual && (
+            {ubicacionActual && mapaListo ? (
               <MapContainer center={centro} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <SeleccionarPunto onSeleccionar={pos => setDestino(pos)} />
@@ -469,6 +498,10 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 {destino && <Marker position={destino} icon={iconoDestino}><Popup>🏁 Destino</Popup></Marker>}
                 {origen && destino && <Polyline positions={[origen, destino]} color="#1D9E75" weight={3} dashArray="8,6" opacity={0.8} />}
               </MapContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>
+                Cargando mapa...
+              </div>
             )}
             {destino && distanciaTotal > 0 && (
               <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.95)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '14px', padding: '10px 18px', zIndex: 1000, display: 'flex', gap: '20px', whiteSpace: 'nowrap' }}>
