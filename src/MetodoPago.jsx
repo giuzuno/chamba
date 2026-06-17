@@ -230,7 +230,19 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
 
       {seleccion === 'nueva' && (
         <div style={{ marginBottom: '12px' }}>
-          <div id="conekta-iframe-tarjeta" style={{ minHeight: '380px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }} />
+          <style>{`
+            #conekta-iframe-tarjeta iframe {
+              width: 100% !important;
+              height: 420px !important;
+              min-height: 420px !important;
+              border: none !important;
+            }
+            #conekta-iframe-tarjeta > div {
+              width: 100% !important;
+              height: 420px !important;
+            }
+          `}</style>
+          <div id="conekta-iframe-tarjeta" style={{ minHeight: '420px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', overflow: 'visible' }} />
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '10px' }}>
             <input type="checkbox" checked={guardarNueva} onChange={e => setGuardarNueva(e.target.checked)} />
             Guardar tarjeta para futuros trabajos
