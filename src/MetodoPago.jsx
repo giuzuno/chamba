@@ -32,26 +32,60 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
   }
 
   function cargarConektaScript() {
-    if (window.ConektaCheckoutComponents) { setComponentListo(true); return }
+    console.log('[Conekta] Verificando si el script ya existe...')
+    if (window.ConektaCheckoutComponents) {
+      console.log('[Conekta] Ya estaba cargado')
+      setComponentListo(true)
+      return
+    }
+    console.log('[Conekta] Cargando script desde CDN...')
     const script = document.createElement('script')
-    script.src = 'https://pay.conekta.com/v2.0.0/conektaCheckoutComponents.js'
-    script.onload = () => setComponentListo(true)
+    script.src = 'https://pay.conekta.com/v1.0/js/conekta-checkout.min.js'
+    script.type = 'text/javascript'
+    script.onload = () => {
+      console.log('[Conekta] Script cargado, window.ConektaCheckoutComponents existe:', !!window.ConektaCheckoutComponents)
+      setComponentListo(true)
+    }
+    script.onerror = (e) => console.error('[Conekta] Error cargando el script:', e)
     document.body.appendChild(script)
   }
 
   function montarFormularioTarjeta() {
-    if (!window.ConektaCheckoutComponents) return
-    const config = { publicKey: CONEKTA_PUBLIC_KEY, targetIFrame: 'conekta-iframe-tarjeta' }
-    const callbacks = {
-      onCreateTokenSucceeded: (token) => { tokenRef.current = token.id; setError('') },
-      onCreateTokenError: (err) => { setError(err.message_to_purchaser || 'No pudimos validar tu tarjeta, revisa los datos') },
+    console.log('[Conekta] Intentando montar formulario...')
+    if (!window.ConektaCheckoutComponents) {
+      console.error('[Conekta] window.ConektaCheckoutComponents no existe todavía')
+      return
     }
+    const div = document.getElementById('conekta-iframe-tarjeta')
+    console.log('[Conekta] Div destino encontrado:', !!div)
+
+    const config = {
+      publicKey: CONEKTA_PUBLIC_KEY,
+      targetIFrame: '#conekta-iframe-tarjeta',
+      locale: 'es',
+      allowTokenization: true,
+    }
+    const callbacks = {
+      onCreateTokenSucceeded: (token) => {
+        console.log('[Conekta] Token creado con éxito:', token.id)
+        tokenRef.current = token.id
+        setError('')
+      },
+      onCreateTokenError: (err) => {
+        console.error('[Conekta] Error al crear token:', err)
+        setError(err.message_to_purchaser || 'No pudimos validar tu tarjeta, revisa los datos')
+      },
+      onGetInfoSuccess: (info) => {
+        console.log('[Conekta] Formulario cargado correctamente:', info)
+      },
+    }
+    console.log('[Conekta] Llamando a Card() con config:', config)
     window.ConektaCheckoutComponents.Card({ config, callbacks })
   }
 
   useEffect(() => {
     if (seleccion === 'nueva' && componentListo) {
-      setTimeout(montarFormularioTarjeta, 100) // esperar a que el div del iframe exista en el DOM
+      setTimeout(montarFormularioTarjeta, 300) // esperar a que el div del iframe exista en el DOM
     }
   }, [seleccion, componentListo])
 
@@ -188,7 +222,7 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
 
       {seleccion === 'nueva' && (
         <div style={{ marginBottom: '12px' }}>
-          <div id="conekta-iframe-tarjeta" style={{ minHeight: '220px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }} />
+          <div id="conekta-iframe-tarjeta" style={{ minHeight: '380px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }} />
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '10px' }}>
             <input type="checkbox" checked={guardarNueva} onChange={e => setGuardarNueva(e.target.checked)} />
             Guardar tarjeta para futuros trabajos
