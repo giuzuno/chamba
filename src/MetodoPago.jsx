@@ -18,6 +18,7 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
   const [resultadoEfectivo, setResultadoEfectivo] = useState(null)
   const [componentListo, setComponentListo] = useState(false)
   const tokenRef = useRef(null) // guarda el token_id generado por el Component
+  const montadoRef = useRef(false) // evita doble montaje por StrictMode
 
   useEffect(() => {
     cargarTarjetas()
@@ -58,6 +59,11 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
     }
     const div = document.getElementById('conekta-iframe-tarjeta')
     console.log('[Conekta] Div destino encontrado:', !!div)
+    if (!div) return
+
+    // Limpiar cualquier contenido previo (evita conflicto si StrictMode re-ejecuta el efecto)
+    div.innerHTML = ''
+    montadoRef.current = true
 
     const config = {
       publicKey: CONEKTA_PUBLIC_KEY,
@@ -85,7 +91,9 @@ export default function MetodoPago({ userId, montoMXN, descripcion, onPagoExitos
 
   useEffect(() => {
     if (seleccion === 'nueva' && componentListo) {
-      setTimeout(montarFormularioTarjeta, 300) // esperar a que el div del iframe exista en el DOM
+      montadoRef.current = false
+      const timer = setTimeout(montarFormularioTarjeta, 300) // esperar a que el div del iframe exista en el DOM
+      return () => clearTimeout(timer)
     }
   }, [seleccion, componentListo])
 
