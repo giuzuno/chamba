@@ -35,6 +35,8 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   const [totalTrabajos, setTotalTrabajos] = useState(0)
   const [historialPagos, setHistorialPagos] = useState([])
   const [gastoTotal, setGastoTotal] = useState(0)
+  const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('')
+  const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
 
   useEffect(() => {
     cargarPerfil()
@@ -47,6 +49,8 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
       setNombre(data.nombre || '')
       setBio(data.bio || '')
       setFotoUrl(data.foto_url || null)
+      setContactoEmergenciaNombre(data.contacto_emergencia_nombre || '')
+      setContactoEmergenciaTelefono(data.contacto_emergencia_telefono || '')
     } else {
       setEditando(true)
     }
@@ -115,6 +119,8 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
       id: userId, email: userEmail, 
       nombre: sanitizarCampo(nombre), 
       bio: sanitizarDescripcion(bio),
+      contacto_emergencia_nombre: contactoEmergenciaNombre,
+      contacto_emergencia_telefono: contactoEmergenciaTelefono,
     })
     setExito(true)
     setTimeout(() => setExito(false), 3000)
@@ -236,6 +242,19 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                     value={bio} onChange={e => setBio(e.target.value)}
                     rows={3} disabled={!editando} style={{ ...inputStyle(false), resize: 'none' }}
                   />
+                </div>
+                
+                <div>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🆘 Contacto de emergencia</p>
+                  <input type="text" placeholder="Nombre del contacto" value={contactoEmergenciaNombre}
+                    onChange={e => setContactoEmergenciaNombre(e.target.value)}
+                    disabled={!editando} style={{ ...inputStyle(false), marginBottom: '8px' }}
+                  />
+                  <input type="tel" placeholder="Teléfono (10 dígitos)" value={contactoEmergenciaTelefono}
+                    onChange={e => setContactoEmergenciaTelefono(e.target.value)}
+                    disabled={!editando} style={inputStyle(false)}
+                  />
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>Se usará solo si activas el botón de pánico durante un viaje.</p>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

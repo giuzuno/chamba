@@ -95,6 +95,8 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [mejorMes, setMejorMes] = useState(null)
   const [rachaMeses, setRachaMeses] = useState(0)
   const [amonestaciones, setAmonestaciones] = useState(0)
+  const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('')
+const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
   // Vehículo
   const [vehiculoMarca, setVehiculoMarca] = useState('')
   const [vehiculoModelo, setVehiculoModelo] = useState('')
@@ -132,6 +134,8 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       setVehiculoPlacas(data.vehiculo_placas || '')
       setVehiculoFotoUrl(data.vehiculo_foto_url || null)
       setAmonestaciones(data.amonestaciones || 0)
+      setContactoEmergenciaNombre(data.contacto_emergencia_nombre || '')
+      setContactoEmergenciaTelefono(data.contacto_emergencia_telefono || '')
     } else {
       setEditando(true)
     }
