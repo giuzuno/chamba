@@ -111,7 +111,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   async function guardarPerfil() {
     if (!validar()) return
     if (tieneInyeccionSQL(nombre) || tieneInyeccionSQL(bio)) {
-      setError('Contenido no válido detectado')
+      setErrores(p => ({ ...p, nombre: 'Contenido no válido detectado' }))
       return
     }
     setGuardando(true)
