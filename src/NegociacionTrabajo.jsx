@@ -18,6 +18,7 @@ const CATEGORIAS_ICONS = {
 }
 
 export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAceptado }) {
+  const [trabajoActual, setTrabajoActual] = useState(trabajo)
   const [ofertas, setOfertas] = useState([])
   const [nuevaOferta, setNuevaOferta] = useState(trabajo.presupuesto)
   const [loading, setLoading] = useState(false)
@@ -25,16 +26,60 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [notaMateriales, setNotaMateriales] = useState('')
   const [cargando, setCargando] = useState(true)
   const [exito, setExito] = useState(false)
+  const [error, setError] = useState('')
   const [verPerfilTrabajador, setVerPerfilTrabajador] = useState(false)
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
+  const [yaNoDisponible, setYaNoDisponible] = useState(false)
 
   const MAX_RONDAS = 3
-  const rondasUsadas = trabajo.rondas_negociacion || 0
+  const rondasUsadas = trabajoActual.rondas_negociacion || 0
   const rondasRestantes = MAX_RONDAS - rondasUsadas
-  const precioActual = trabajo.ultima_oferta || trabajo.presupuesto
+  const precioActual = trabajoActual.ultima_oferta || trabajoActual.presupuesto
 
-  useEffect(() => { cargarOfertas() }, [])
+  useEffect(() => {
+    cargarOfertas()
+
+    // Suscripción en tiempo real: si el cliente acepta, manda otra contraoferta,
+    // o el trabajo deja de estar disponible (otro trabajador lo tomó), esta pantalla
+    // se actualiza sola sin que el usuario tenga que salir y volver a entrar.
+    const canalTrabajo = supabase
+      .channel(`negociacion-trabajo-${trabajo.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'trabajos',
+        filter: `id=eq.${trabajo.id}`,
+      }, (payload) => {
+        const actualizado = payload.new
+        setTrabajoActual(actualizado)
+
+        if (actualizado.status === 'aceptado' && actualizado.trabajador_id === userId) {
+          setExito(true)
+        } else if (actualizado.status !== 'publicado') {
+          // Otro trabajador lo aceptó primero, o el cliente lo canceló
+          setYaNoDisponible(true)
+        }
+      })
+      .subscribe()
+
+    const canalNegociaciones = supabase
+      .channel(`negociaciones-trabajo-${trabajo.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'negociaciones',
+        filter: `trabajo_id=eq.${trabajo.id}`,
+      }, () => {
+        cargarOfertas()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(canalTrabajo)
+      supabase.removeChannel(canalNegociaciones)
+    }
+  }, [trabajo.id])
 
   async function cargarOfertas() {
     setCargando(true)
@@ -66,10 +111,10 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     setLoading(true)
 
     // Verificar que el trabajo siga disponible antes de aceptar
-    const { data: trabajoActual } = await supabase
+    const { data: trabajoVerificado } = await supabase
       .from('trabajos').select('status, trabajador_id').eq('id', trabajo.id).maybeSingle()
 
-    if (!trabajoActual || trabajoActual.status !== 'publicado') {
+    if (!trabajoVerificado || trabajoVerificado.status !== 'publicado') {
       setLoading(false)
       setError('Lo sentimos — este trabajo ya fue aceptado por otro trabajador. Busca otros disponibles.')
       return
@@ -108,6 +153,21 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   )
 
   if (verPerfilTrabajador) return <PerfilPublico usuarioId={userId} rolVisto="trabajador" onVolver={() => setVerPerfilTrabajador(false)} />
+
+  if (yaNoDisponible) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '60px', marginBottom: '20px' }}>😕</div>
+        <h2 style={{ color: '#E8A030', fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>Este trabajo ya no está disponible</h2>
+        <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '24px', maxWidth: '300px' }}>
+          Otro trabajador lo aceptó, o el cliente lo canceló mientras negociabas.
+        </p>
+        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          Buscar otros trabajos
+        </button>
+      </div>
+    )
+  }
 
   if (exito) {
     return (
@@ -211,6 +271,8 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             Se agotaron las rondas de negociación. Solo puedes aceptar o rechazar el precio actual.
           </div>
         )}
+
+        {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
         <button type="button" onClick={aceptarPrecio} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           {loading ? 'Procesando...' : `✅ Aceptar $${precioActual} MXN`}
