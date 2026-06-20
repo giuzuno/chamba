@@ -71,6 +71,124 @@ function EstrellaRating({ rating }) {
   )
 }
 
+// ── PESTAÑA DE PAGOS ──────────────────────────────────────────────
+function PestanaPagos({ userId }) {
+  const [stripeAccountId, setStripeAccountId] = useState(null)
+  const [cargando, setCargando] = useState(true)
+  const [conectando, setConectando] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => { cargarEstado() }, [])
+
+  async function cargarEstado() {
+    const { data } = await supabase.from('usuarios')
+      .select('stripe_account_id').eq('id', userId).maybeSingle()
+    setStripeAccountId(data?.stripe_account_id || null)
+    setCargando(false)
+  }
+
+  async function conectarCuenta() {
+    setConectando(true)
+    setError('')
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('onboarding-trabajador', {
+        body: { trabajadorId: userId }
+      })
+      if (fnError || !data?.url) {
+        setError('No se pudo conectar con Stripe. Intenta de nuevo.')
+        setConectando(false)
+        return
+      }
+      // Abrir el onboarding de Stripe en la misma ventana
+      window.location.href = data.url
+    } catch {
+      setError('Error de conexión. Intenta de nuevo.')
+      setConectando(false)
+    }
+  }
+
+  if (cargando) return (
+    <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.3)' }}>Cargando...</div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+      {/* Estado de la cuenta */}
+      {stripeAccountId ? (
+        <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+          <p style={{ fontSize: '40px', marginBottom: '10px' }}>✅</p>
+          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Cuenta conectada</p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+            Los pagos de tus trabajos se depositarán automáticamente en tu cuenta bancaria cuando el cliente confirme que el trabajo quedó bien.
+          </p>
+        </div>
+      ) : (
+        <div style={{ background: 'rgba(232,160,48,0.08)', border: '1.5px solid rgba(232,160,48,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+          <p style={{ fontSize: '40px', marginBottom: '10px' }}>🏦</p>
+          <p style={{ fontSize: '16px', fontWeight: '700', color: '#E8A030', marginBottom: '6px' }}>Cuenta no conectada</p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+            Conecta tu cuenta bancaria para recibir pagos automáticos cuando completes trabajos.
+          </p>
+        </div>
+      )}
+
+      {/* Cómo funciona */}
+      <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cómo funciona?</p>
+        {[
+          { icon: '💳', texto: 'El cliente paga al aceptar tu trabajo' },
+          { icon: '🔐', texto: 'El dinero queda retenido en escrow hasta que termines' },
+          { icon: '✅', texto: 'El cliente confirma que quedó bien' },
+          { icon: '💰', texto: 'Stripe deposita automáticamente en tu cuenta (1-2 días hábiles)' },
+        ].map((paso, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: i < 3 ? '10px' : '0' }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>{paso.icon}</span>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>{paso.texto}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Comisión */}
+      <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ejemplo de pago</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Precio acordado</span>
+          <span style={{ fontSize: '13px', color: 'white' }}>$500 MXN</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <span style={{ fontSize: '13px', color: '#F09595' }}>Comisión Chamba (12%)</span>
+          <span style={{ fontSize: '13px', color: '#F09595' }}>-$60 MXN</span>
+        </div>
+        <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>Tú recibes</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>$440 MXN</span>
+        </div>
+      </div>
+
+      {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
+
+      {/* Botón principal */}
+      {stripeAccountId ? (
+        <button type="button" onClick={conectarCuenta} disabled={conectando}
+          style={{ width: '100%', padding: '14px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          {conectando ? 'Abriendo Stripe...' : '⚙️ Administrar mi cuenta bancaria'}
+        </button>
+      ) : (
+        <button type="button" onClick={conectarCuenta} disabled={conectando}
+          style={{ width: '100%', padding: '16px', background: conectando ? 'rgba(232,160,48,0.5)' : '#E8A030', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: conectando ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+          {conectando ? '⏳ Abriendo Stripe...' : '🏦 Conectar cuenta bancaria'}
+        </button>
+      )}
+
+      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', lineHeight: '1.6' }}>
+        Powered by Stripe · Tus datos bancarios están encriptados y nunca los vemos nosotros.
+      </p>
+    </div>
+  )
+}
+
 export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [nombre, setNombre] = useState('')
   const [bio, setBio] = useState('')
@@ -96,8 +214,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [rachaMeses, setRachaMeses] = useState(0)
   const [amonestaciones, setAmonestaciones] = useState(0)
   const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('')
-const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
-  // Vehículo
+  const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
   const [vehiculoMarca, setVehiculoMarca] = useState('')
   const [vehiculoModelo, setVehiculoModelo] = useState('')
   const [vehiculoColor, setVehiculoColor] = useState('')
@@ -143,7 +260,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
   }
 
   async function cargarStats() {
-    // Calificaciones
     const { data: cals } = await supabase.from('calificaciones')
       .select('estrellas, comentario, creado_en')
       .eq('calificado_id', userId)
@@ -155,7 +271,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
       setResenas(cals.filter(c => c.comentario))
     }
 
-    // Trabajos completados y ganancias
     const { data: trabajos } = await supabase.from('trabajos')
       .select('precio_acordado, presupuesto, creado_en')
       .eq('trabajador_id', userId)
@@ -165,7 +280,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
       const total = trabajos.reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
       setGananciaTotal(total)
 
-      // Mejor mes
       const porMes = {}
       trabajos.forEach(t => {
         const mes = new Date(t.creado_en).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
@@ -176,7 +290,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
       const mejor = Object.entries(porMes).sort((a, b) => b[1].ganancias - a[1].ganancias)[0]
       if (mejor) setMejorMes({ mes: mejor[0], ...mejor[1] })
 
-      // Racha: meses consecutivos con al menos 1 trabajo
       const mesesConTrabajo = new Set(trabajos.map(t => {
         const d = new Date(t.creado_en)
         return `${d.getFullYear()}-${d.getMonth()}`
@@ -250,7 +363,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
   async function guardarPerfil() {
     if (!validar()) return
     setGuardando(true)
-    // Sanitizar inputs
     const nombreSanitizado = sanitizarCampo(nombre)
     const bioSanitizada = sanitizarDescripcion(bio)
     if (tieneInyeccionSQL(nombre) || tieneInyeccionSQL(bio)) {
@@ -312,6 +424,16 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
     )
   }
 
+  // Pestañas dinámicas
+  const pestanas = [
+    ['info', 'Mi info'],
+    ['servicios', 'Servicios'],
+    ...(necesitaVerificacion ? [['vehiculo', '🚗 Vehículo']] : []),
+    ['pagos', '💰 Pagos'],
+    ['stats', '📊 Stats'],
+    [`resenas`, `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`],
+  ]
+
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -355,35 +477,32 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
             <div style={{ background: 'rgba(55,138,221,0.1)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '100px', padding: '4px 14px', fontSize: '12px', color: '#378ADD', fontWeight: '600' }}>
               🔧 Modo trabajador
             </div>
-            {/* Insignias de confianza */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
               {amonestaciones === 0 && totalTrabajos >= 1 && (
-                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', fontWeight: '600' }}>
-                  ✅ Sin amonestaciones
-                </span>
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', fontWeight: '600' }}>✅ Sin amonestaciones</span>
               )}
               {totalTrabajos >= 5 && (
-                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>
-                  ⭐ {totalTrabajos}+ trabajos
-                </span>
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>⭐ {totalTrabajos}+ trabajos</span>
               )}
               {ratingReal >= 4.5 && (
-                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>
-                  🏆 Top rated
-                </span>
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(245,166,35,0.15)', color: '#F5A623', border: '0.5px solid rgba(245,166,35,0.3)', fontWeight: '600' }}>🏆 Top rated</span>
               )}
               {rachaMeses >= 3 && (
-                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', fontWeight: '600' }}>
-                  🔥 {rachaMeses} meses activo
-                </span>
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', fontWeight: '600' }}>🔥 {rachaMeses} meses activo</span>
               )}
             </div>
           </div>
 
           {/* Pestañas */}
-          <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0' }}>
-            {[['info', 'Mi info'], ['servicios', 'Servicios'], ...(necesitaVerificacion ? [['vehiculo', '🚗 Vehículo']] : []), ['stats', '📊 Stats'], ['resenas', `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`]].map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setPestana(key)} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0', overflowX: 'auto' }}>
+            {pestanas.map(([key, label]) => (
+              <button key={key} type="button" onClick={() => setPestana(key)} style={{
+                flexShrink: 0, padding: '9px 12px', border: 'none', borderRadius: '10px',
+                background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+                color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)',
+                fontSize: '12px', fontWeight: pestana === key ? '600' : '400',
+                cursor: 'pointer', fontFamily: 'sans-serif', whiteSpace: 'nowrap'
+              }}>
                 {label}
               </button>
             ))}
@@ -414,8 +533,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                     rows={3} disabled={!editando} style={{ ...inputStyle(false), resize: 'none' }}
                   />
                 </div>
-
-                {/* NUEVO — Contacto de emergencia */}
                 <div>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🆘 Contacto de emergencia</p>
                   <input type="text" placeholder="Nombre del contacto" value={contactoEmergenciaNombre}
@@ -428,7 +545,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                   />
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px' }}>Se usará solo si activas el botón de pánico durante un viaje.</p>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                     {ratingReal ? <EstrellaRating rating={ratingReal} /> : <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificar</p>}
@@ -524,10 +640,8 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
             {pestana === 'vehiculo' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                  Los clientes verán esta información cuando aceptes un viaje. Mantén los datos actualizados.
+                  Los clientes verán esta información cuando aceptes un viaje.
                 </p>
-
-                {/* Foto del vehículo */}
                 <div>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Foto del vehículo</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -544,8 +658,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                     )}
                   </div>
                 </div>
-
-                {/* Datos del vehículo */}
                 {[
                   { label: 'Marca', value: vehiculoMarca, set: setVehiculoMarca, placeholder: 'Ej: Nissan, Toyota, Honda' },
                   { label: 'Modelo', value: vehiculoModelo, set: setVehiculoModelo, placeholder: 'Ej: Sentra, Tsuru, Beat' },
@@ -561,7 +673,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                     />
                   </div>
                 ))}
-
                 {!editando && vehiculoMarca && (
                   <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px' }}>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Vista del cliente</p>
@@ -577,9 +688,11 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
               </div>
             )}
 
+            {/* ── NUEVA PESTAÑA DE PAGOS ── */}
+            {pestana === 'pagos' && <PestanaPagos userId={userId} />}
+
             {pestana === 'stats' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Ganancias totales */}
                 <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '20px' }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center' }}>Desglose de ganancias</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -595,17 +708,13 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                     <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>✅ Tu ganancia neta</span>
                     <span style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(gananciaTotal * 0.88).toLocaleString('es-MX')}</span>
                   </div>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '6px', textAlign: 'center' }}>MXN acumulados en Chamba</p>
                 </div>
 
-                {/* Amonestaciones */}
                 {amonestaciones > 0 && (
                   <div style={{ background: amonestaciones >= 2 ? 'rgba(240,149,149,0.1)' : 'rgba(232,160,48,0.08)', border: `1px solid ${amonestaciones >= 2 ? 'rgba(240,149,149,0.4)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <span style={{ fontSize: '32px' }}>⚠️</span>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '14px', fontWeight: '700', color: amonestaciones >= 2 ? '#F09595' : '#E8A030', marginBottom: '4px' }}>
-                        {amonestaciones}/3 Amonestaciones
-                      </p>
+                      <p style={{ fontSize: '14px', fontWeight: '700', color: amonestaciones >= 2 ? '#F09595' : '#E8A030', marginBottom: '4px' }}>{amonestaciones}/3 Amonestaciones</p>
                       <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
                         {amonestaciones === 1 && 'Una más y estás en riesgo. Sé puntual y cumple tus trabajos.'}
                         {amonestaciones === 2 && '⚠️ Última advertencia — otra amonestación suspende tu cuenta.'}
@@ -626,7 +735,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                   </div>
                 )}
 
-                {/* Grid de stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
                     <p style={{ fontSize: '32px', fontWeight: '800', color: '#378ADD' }}>{trabajosCompletados}</p>
@@ -638,9 +746,7 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
                     <p style={{ fontSize: '32px', fontWeight: '800', color: '#E8A030' }}>{rachaMeses}</p>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
-                      {rachaMeses === 1 ? 'Mes activo' : 'Meses seguidos'} 🔥
-                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>{rachaMeses === 1 ? 'Mes activo' : 'Meses seguidos'} 🔥</p>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
                     <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>
@@ -650,7 +756,6 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
                   </div>
                 </div>
 
-                {/* Mejor mes */}
                 {mejorMes && (
                   <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
@@ -704,7 +809,7 @@ const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
               </>
             )}
 
-            {editando && (
+            {editando && pestana !== 'pagos' && (
               <>
                 <button type="button" onClick={guardarPerfil} disabled={guardando} style={{ width: '100%', padding: '16px', background: guardando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   {guardando ? 'Guardando...' : '💾 Guardar cambios'}
