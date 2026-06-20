@@ -36,7 +36,6 @@ const CATEGORIAS = [
   { icon: '✳️', nombre: 'Otros' },
 ]
 
-// Fix fecha domingo — usar fecha LOCAL no UTC
 function getHoyLocal() {
   const hoy = new Date()
   const año = hoy.getFullYear()
@@ -74,15 +73,12 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [materiales, setMateriales] = useState('cliente')
-
+  const [trabajoCreado, setTrabajoCreado] = useState(null) // trabajo en BD pendiente de pago
   const [pagando, setPagando] = useState(false)
-  const [pagoInfo, setPagoInfo] = useState(null)
-  const [esperandoEfectivo, setEsperandoEfectivo] = useState(false)
 
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
   const iconCategoria = CATEGORIAS.find(c => c.nombre === categoria)?.icon || '✳️'
-
   const fechaFinal = esAhora ? hoy : fecha
   const horaFinal = esAhora ? getAhoraHora() : hora
 
@@ -105,32 +101,23 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude, texto: 'Tu ubicación actual (GPS)' })
-        setPagando(true)
+        setConfirmando(true)
       },
       () => {
         setUbicacion({ lat: 16.1833, lng: -95.2000, texto: 'Centro de Salina Cruz (sin GPS)' })
-        setPagando(true)
+        setConfirmando(true)
       }
     )
   }
 
-  function onPagoExitoso(info) {
-    setPagoInfo(info)
-    setPagando(false)
-    if (info.metodo === 'efectivo') {
-      setEsperandoEfectivo(true)
-    } else {
-      setConfirmando(true)
-    }
-  }
-
-  async function publicar() {
+  // Paso 1: Crear trabajo en BD, luego abrir pago
+  async function crearTrabajoYPagar() {
     setLoading(true)
     const descripcionSanitizada = sanitizarDescripcion(descripcion)
     const categoriaFinalSanitizada = sanitizarCampo(categoriaFinal)
+
     if (tieneInyeccionSQL(descripcion) || tieneInyeccionSQL(categoriaFinal)) {
       setError('Contenido no válido detectado')
-      setConfirmando(false)
       setLoading(false)
       return
     }
@@ -146,18 +133,24 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       lng: ubicacion.lng,
       materiales,
       status: 'publicado',
-      pago_status: 'autorizado',
-      pago_metodo: 'tarjeta',
-      conekta_order_id: pagoInfo?.ordenId || null,
-      monto_retenido: Math.round(presupuesto * 100),
+      pago_status: 'pendiente',
     }).select().single()
 
-    if (insertError) {
-      setError(insertError.message)
-      setConfirmando(false)
+    if (insertError || !trabajo) {
+      setError(insertError?.message || 'Error al crear el trabajo')
       setLoading(false)
       return
     }
+
+    setTrabajoCreado(trabajo)
+    setLoading(false)
+    setConfirmando(false)
+    setPagando(true)
+  }
+
+  // Paso 2: Pago exitoso → notificar a trabajadores
+  async function onPagoExitoso() {
+    setPagando(false)
 
     try {
       const { data: trabajadores } = await supabase
@@ -177,7 +170,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             titulo: `🔔 Nuevo trabajo de ${categoriaFinal}`,
             cuerpo: `$${presupuesto} MXN — ${descripcion.slice(0, 60)}${descripcion.length > 60 ? '...' : ''} · ${cuandoTexto}`,
             tipo: 'trabajo_aceptado',
-            trabajoId: trabajo.id,
+            trabajoId: trabajoCreado.id,
           })
         }
       }
@@ -186,7 +179,16 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     }
 
     setExito(true)
-    setLoading(false)
+  }
+
+  // Pago cancelado → eliminar trabajo pendiente
+  async function onPagoCancelado() {
+    if (trabajoCreado) {
+      await supabase.from('trabajos').delete().eq('id', trabajoCreado.id)
+      setTrabajoCreado(null)
+    }
+    setPagando(false)
+    setConfirmando(true)
   }
 
   if (fotoUrl !== 'cargando' && !fotoUrl) return (
@@ -196,11 +198,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.6', marginBottom: '24px' }}>
         Los trabajadores necesitan ver tu foto para confiar en ti antes de aceptar un trabajo.
       </p>
-      <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px', marginBottom: '24px', maxWidth: '300px' }}>
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-          🔐 Tu foto ayuda a crear un ambiente de confianza y seguridad en Chamba.
-        </p>
-      </div>
       <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
         ← Ir a mi perfil a subir foto
       </button>
@@ -233,50 +230,14 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     )
   }
 
-  if (esperandoEfectivo) {
+  // ── PANTALLA DE PAGO ──
+  if (pagando && trabajoCreado) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Pago en efectivo</h2>
-        </div>
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginTop: '20px' }}>🧾</div>
-          <h3 style={{ fontSize: '18px', fontWeight: '700' }}>Esperando tu pago</h3>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6', maxWidth: '300px' }}>
-            Tu trabajo se publicará en cuanto confirmes el pago en tienda. Tienes 48 horas para pagar con este código:
-          </p>
-          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '16px 20px', width: '100%' }}>
-            <p style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '0.05em', color: '#1D9E75' }}>{pagoInfo?.referenciaEfectivo}</p>
-          </div>
-          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '14px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5', textAlign: 'left' }}>
-            ⚠️ Si pagas después de la fecha que agendaste, te pediremos elegir una nueva fecha antes de publicar tu trabajo.
-          </div>
-          <button type="button" onClick={onVolver} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginTop: '12px' }}>
-            Entendido
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (pagando) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <button type="button" onClick={() => setPagando(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Método de pago</h2>
-        </div>
-        <div style={{ padding: '20px' }}>
-          <MetodoPago
-            userId={userId}
-            montoMXN={presupuesto}
-            descripcion={categoriaFinal}
-            onPagoExitoso={onPagoExitoso}
-            onCancelar={() => setPagando(false)}
-          />
-        </div>
-      </div>
+      <MetodoPago
+        trabajo={trabajoCreado}
+        onPagoExitoso={onPagoExitoso}
+        onCancelar={onPagoCancelado}
+      />
     )
   }
 
@@ -284,11 +245,11 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <button type="button" onClick={() => { setConfirmando(false); setPagando(true) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <button type="button" onClick={() => setConfirmando(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Confirmar publicación</h2>
         </div>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Revisa los detalles antes de publicar:</p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Revisa los detalles antes de pagar:</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '32px' }}>{iconCategoria}</span>
@@ -302,13 +263,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
               <div>
                 <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>PRESUPUESTO</p>
                 <p style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75' }}>${presupuesto} MXN</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ fontSize: '32px' }}>💳</span>
-              <div>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>PAGO</p>
-                <p style={{ fontSize: '15px', fontWeight: '600', color: '#1D9E75' }}>✅ Autorizado — retenido en escrow</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
@@ -349,35 +303,33 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             </div>
           </div>
 
-          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            ✓ Los trabajadores de <strong style={{ color: '#1D9E75' }}>{categoriaFinal}</strong> cerca de ti recibirán una notificación.
-          </div>
-
           <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '20px', flexShrink: 0 }}>🔐</span>
             <div>
               <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Tu dinero está protegido</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido en escrow y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien. Si hay un problema, lo recuperas.</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido en escrow y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien.</p>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: '700', color: '#E8A030', marginBottom: '3px' }}>Importante</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
+                Si cancelas un trabajo ya aceptado por un trabajador, recibirás una <strong style={{ color: '#E8A030' }}>amonestación</strong>. Con 3 amonestaciones tu cuenta será suspendida.
+              </p>
             </div>
           </div>
 
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-          <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
-            <div>
-              <p style={{ fontSize: '12px', fontWeight: '700', color: '#E8A030', marginBottom: '3px' }}>Importante antes de publicar</p>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                Si cancelas un trabajo que ya fue aceptado por un trabajador, recibirás una <strong style={{ color: '#E8A030' }}>amonestación</strong>. Con 3 amonestaciones tu cuenta será suspendida automáticamente.
-              </p>
-            </div>
-          </div>
-
-          <button type="button" onClick={publicar} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            {loading ? 'Publicando...' : '✅ Confirmar y publicar'}
+          <button type="button" onClick={crearTrabajoYPagar} disabled={loading}
+            style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            {loading ? 'Preparando pago...' : '💳 Continuar al pago →'}
           </button>
-          <button type="button" onClick={() => { setConfirmando(false); setPagando(true) }} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            Cambiar método de pago
+          <button type="button" onClick={() => setConfirmando(false)}
+            style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            Editar trabajo
           </button>
         </div>
       </div>
@@ -393,6 +345,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
+        {/* ⚡ Lo necesito ahora */}
         <div style={{ background: esAhora ? 'rgba(232,160,48,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${esAhora ? '#E8A030' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
           onClick={() => setEsAhora(!esAhora)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -407,6 +360,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
           </div>
         </div>
 
+        {/* Categoría */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Qué necesitas? *</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -432,6 +386,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
           )}
         </div>
 
+        {/* Descripción */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Describe el trabajo *</p>
           <textarea
@@ -442,6 +397,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
           />
         </div>
 
+        {/* Presupuesto */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cuánto pagas</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -453,6 +409,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
           </div>
         </div>
 
+        {/* Fecha y hora */}
         {!esAhora && (
           <>
             <div>
@@ -468,25 +425,19 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
                 </p>
               )}
             </div>
-
             <div>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿A qué hora? * (formato 24 hrs)</p>
               <input
-                type="time"
-                value={hora}
-                min={getMinHora(fecha)}
+                type="time" value={hora} min={getMinHora(fecha)}
                 onChange={e => { setHora(e.target.value); setError('') }}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: hora ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '18px', fontFamily: 'sans-serif', outline: 'none', colorScheme: 'dark' }}
               />
-              {hora && (
-                <p style={{ fontSize: '13px', color: '#1D9E75', marginTop: '8px' }}>
-                  🕐 {hora} hrs
-                </p>
-              )}
+              {hora && <p style={{ fontSize: '13px', color: '#1D9E75', marginTop: '8px' }}>🕐 {hora} hrs</p>}
             </div>
           </>
         )}
 
+        {/* Materiales */}
         <div>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '12px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🔩 ¿Quién pone los materiales?</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
