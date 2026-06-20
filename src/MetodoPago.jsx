@@ -38,7 +38,6 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
       <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '14px', padding: '4px' }}>
         <PaymentElement options={{
           layout: { type: 'tabs', defaultCollapsed: false },
-          fields: { billingDetails: { name: 'never', email: 'never', phone: 'never', address: 'never' } },
           wallets: { applePay: 'never', googlePay: 'never' },
           terms: { card: 'never' },
         }} />
@@ -162,17 +161,6 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       colorDanger: '#F09595',
       fontFamily: 'sans-serif',
       borderRadius: '10px',
-      spacingUnit: '4px',
-    },
-    rules: {
-      '.Tab': { border: '0.5px solid rgba(255,255,255,0.1)' },
-      '.Tab--selected': { borderColor: '#1D9E75', color: '#1D9E75' },
-      '.Input': { border: '0.5px solid rgba(255,255,255,0.15)' },
-      '.Input:focus': { borderColor: '#1D9E75' },
-      // Ocultar el resumen de líneas de Stripe
-      '.LineItemsList': { display: 'none' },
-      '.LineItemsTotal': { display: 'none' },
-      '.BlockDivider': { display: 'none' },
     },
   }
 
@@ -204,7 +192,6 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
 
         {!cargando && !error && clientSecret && totalCliente && (
           <>
-            {/* Total limpio */}
             <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px', fontWeight: '600' }}>{trabajo.categoria}</p>
