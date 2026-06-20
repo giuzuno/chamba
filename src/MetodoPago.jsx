@@ -1,12 +1,24 @@
 import { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from './supabaseClient'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
-// Formulario para tarjeta nueva
-function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente }) {
+const cardStyle = {
+  style: {
+    base: {
+      color: '#ffffff',
+      fontFamily: 'sans-serif',
+      fontSize: '16px',
+      '::placeholder': { color: 'rgba(255,255,255,0.4)' },
+      iconColor: '#1D9E75',
+    },
+    invalid: { color: '#F09595', iconColor: '#F09595' },
+  },
+}
+
+function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente, clientSecret }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -17,10 +29,10 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
     setLoading(true)
     setError('')
 
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: window.location.origin },
-      redirect: 'if_required',
+    const cardElement = elements.getElement(CardElement)
+
+    const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: { card: cardElement },
     })
 
     if (stripeError) {
@@ -29,15 +41,18 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
       return
     }
 
-    await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
-    setLoading(false)
-    onPagoExitoso()
+    if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
+      await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
+      setLoading(false)
+      onPagoExitoso()
+    }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ background: 'white', borderRadius: '14px', padding: '16px' }}>
-        <PaymentElement options={{ layout: 'tabs' }} />
+      <div style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '14px', padding: '18px' }}>
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Datos de tu tarjeta</p>
+        <CardElement options={cardStyle} />
       </div>
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
       <button type="button" onClick={handlePagar} disabled={!stripe || loading}
@@ -49,13 +64,12 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
         Cancelar
       </button>
       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
-        Tu tarjeta se guardará para futuros pagos · Encriptado por Stripe
+        Tu tarjeta se guardará para futuros pagos · Encriptado por Stripe 🔒
       </p>
     </div>
   )
 }
 
-// Pago con tarjeta guardada — un toque
 function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente, tarjeta, clientSecret, onUsarOtraTarjeta }) {
   const stripe = useStripe()
   const [loading, setLoading] = useState(false)
@@ -154,7 +168,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
     theme: 'night',
     variables: {
       colorPrimary: '#1D9E75',
-      colorBackground: '#1A1A1A',
+      colorBackground: '#0D0D0D',
       colorText: '#ffffff',
       colorDanger: '#F09595',
       fontFamily: 'sans-serif',
@@ -190,24 +204,15 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
 
         {!cargando && !error && clientSecret && totalCliente && (
           <>
-            {/* Total limpio — sin desglose de comisiones */}
+            {/* Total limpio */}
             <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>{trabajo.categoria}</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Retenido en escrow hasta confirmar</p>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>{trabajo.categoria}</p>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>🔐 Retenido en escrow hasta confirmar</p>
               </div>
               <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${totalCliente} MXN</p>
             </div>
 
-            {/* Escrow */}
-            <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '18px', flexShrink: 0 }}>🔐</span>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-                Tu pago queda <strong style={{ color: '#1D9E75' }}>retenido en escrow</strong>. Solo se libera cuando confirmes que el trabajo quedó bien.
-              </p>
-            </div>
-
-            {/* Tarjeta guardada O formulario nuevo */}
             {tarjetaGuardada && !usarOtraTarjeta ? (
               <Elements stripe={stripePromise} options={{ clientSecret, appearance, locale: 'es' }}>
                 <CheckoutFormGuardada
@@ -227,6 +232,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
                   onPagoExitoso={onPagoExitoso}
                   onCancelar={onCancelar}
                   totalCliente={totalCliente}
+                  clientSecret={clientSecret}
                 />
               </Elements>
             )}
