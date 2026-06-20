@@ -5,16 +5,8 @@ import { supabase } from './supabaseClient'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
-function iconoMarca(marca) {
-  const m = marca?.toLowerCase()
-  if (m === 'visa') return '💳'
-  if (m === 'mastercard') return '💳'
-  if (m === 'amex') return '💳'
-  return '💳'
-}
-
 // Formulario para tarjeta nueva
-function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, resumen }) {
+function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -50,7 +42,7 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, resumen }) {
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
       <button type="button" onClick={handlePagar} disabled={!stripe || loading}
         style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
-        {loading ? 'Procesando...' : `💳 Pagar $${resumen.totalCliente} MXN`}
+        {loading ? 'Procesando...' : `💳 Pagar $${totalCliente} MXN`}
       </button>
       <button type="button" onClick={onCancelar}
         style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -64,7 +56,7 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, resumen }) {
 }
 
 // Pago con tarjeta guardada — un toque
-function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, resumen, tarjeta, clientSecret, onUsarOtraTarjeta }) {
+function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente, tarjeta, clientSecret, onUsarOtraTarjeta }) {
   const stripe = useStripe()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -91,7 +83,6 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, resumen, tar
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Tarjeta guardada */}
       <div style={{ background: 'rgba(29,158,117,0.08)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
         <span style={{ fontSize: '36px' }}>💳</span>
         <div style={{ flex: 1 }}>
@@ -110,7 +101,7 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, resumen, tar
 
       <button type="button" onClick={handlePagarGuardada} disabled={!stripe || loading}
         style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
-        {loading ? 'Procesando...' : `✅ Confirmar pago — $${resumen.totalCliente} MXN`}
+        {loading ? 'Procesando...' : `✅ Confirmar pago — $${totalCliente} MXN`}
       </button>
 
       <button type="button" onClick={onUsarOtraTarjeta}
@@ -128,7 +119,7 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, resumen, tar
 
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
   const [clientSecret, setClientSecret] = useState(null)
-  const [resumen, setResumen] = useState(null)
+  const [totalCliente, setTotalCliente] = useState(null)
   const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
   const [usarOtraTarjeta, setUsarOtraTarjeta] = useState(false)
   const [cargando, setCargando] = useState(true)
@@ -151,12 +142,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       }
 
       setClientSecret(data.clientSecret)
-      setResumen({
-        precioBase: data.precioBase,
-        comisionStripe: data.comisionStripe,
-        comisionChamba: data.comisionChamba,
-        totalCliente: data.totalCliente,
-      })
+      setTotalCliente(data.totalCliente)
       setTarjetaGuardada(data.tarjetaGuardada || null)
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -175,8 +161,6 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       borderRadius: '10px',
     },
   }
-
-  const mostrarFormNueva = !tarjetaGuardada || usarOtraTarjeta
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -204,22 +188,15 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
           </div>
         )}
 
-        {!cargando && !error && clientSecret && resumen && (
+        {!cargando && !error && clientSecret && totalCliente && (
           <>
-            {/* Resumen del cobro — siempre visible */}
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', overflow: 'hidden' }}>
-              <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Servicio ({trabajo.categoria})</span>
-                <span style={{ fontSize: '14px', color: 'white' }}>${resumen.precioBase} MXN</span>
+            {/* Total limpio — sin desglose de comisiones */}
+            <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>{trabajo.categoria}</p>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>Retenido en escrow hasta confirmar</p>
               </div>
-              <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Comisión de plataforma</span>
-                <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>${resumen.comisionStripe} MXN</span>
-              </div>
-              <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: 'white' }}>Total</span>
-                <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>${resumen.totalCliente} MXN</span>
-              </div>
+              <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${totalCliente} MXN</p>
             </div>
 
             {/* Escrow */}
@@ -237,7 +214,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
                   trabajo={trabajo}
                   onPagoExitoso={onPagoExitoso}
                   onCancelar={onCancelar}
-                  resumen={resumen}
+                  totalCliente={totalCliente}
                   tarjeta={tarjetaGuardada}
                   clientSecret={clientSecret}
                   onUsarOtraTarjeta={() => setUsarOtraTarjeta(true)}
@@ -249,7 +226,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
                   trabajo={trabajo}
                   onPagoExitoso={onPagoExitoso}
                   onCancelar={onCancelar}
-                  resumen={resumen}
+                  totalCliente={totalCliente}
                 />
               </Elements>
             )}
