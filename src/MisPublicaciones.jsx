@@ -56,36 +56,34 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [abrirDisputa, setAbrirDisputa] = useState(null)
   const [menuAbierto, setMenuAbierto] = useState(null)
   const [reportando, setReportando] = useState(null)
-  const [confirmarCancelar, setConfirmarCancelar] = useState(null) 
-  const [contactoEmergencia, setContactoEmergencia] = useState({ nombre: '', telefono: '' })// trabajo a cancelar
+  const [confirmarCancelar, setConfirmarCancelar] = useState(null)
+  const [contactoEmergencia, setContactoEmergencia] = useState({ nombre: '', telefono: '' })
 
   useEffect(() => { cargarMisTrabajos() }, [])
 
   // Abrir trabajo específico desde toast
   useEffect(() => {
     if (!trabajoIdInicial) return
-    // Buscar primero en los trabajos cargados
     const t = trabajos.find(t => t.id === trabajoIdInicial)
     if (t) {
       seleccionarTrabajo(t)
     } else {
-      // Si no está en la lista, buscar directo en BD
       supabase.from('trabajos').select('*').eq('id', trabajoIdInicial).maybeSingle()
         .then(({ data }) => { if (data) seleccionarTrabajo(data) })
     }
   }, [trabajoIdInicial, trabajos])
 
   useEffect(() => {
-  supabase.from('usuarios')
-    .select('contacto_emergencia_nombre, contacto_emergencia_telefono')
-    .eq('id', userId).maybeSingle()
-    .then(({ data }) => {
-      if (data) setContactoEmergencia({
-        nombre: data.contacto_emergencia_nombre,
-        telefono: data.contacto_emergencia_telefono,
+    supabase.from('usuarios')
+      .select('contacto_emergencia_nombre, contacto_emergencia_telefono')
+      .eq('id', userId).maybeSingle()
+      .then(({ data }) => {
+        if (data) setContactoEmergencia({
+          nombre: data.contacto_emergencia_nombre,
+          telefono: data.contacto_emergencia_telefono,
+        })
       })
-    })
-}, [userId])
+  }, [userId])
 
   useEffect(() => {
     const channel = supabase
@@ -95,7 +93,6 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
         setTrabajos(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t))
         if (trabajoSeleccionado?.id === payload.new.id) {
           setTrabajoSeleccionado(prev => ({ ...prev, ...payload.new }))
-          // No cerrar el detalle aunque cambie el status
         }
       })
       .subscribe()
@@ -176,7 +173,6 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setLoadingAccion(true)
     const precioFinal = trabajo.ultima_oferta || trabajo.presupuesto
 
-    // Obtener el trabajador que hizo la contraoferta
     const { data: negs } = await supabase.from('negociaciones')
       .select('usuario_id')
       .eq('trabajo_id', trabajo.id)
@@ -222,14 +218,12 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
-    // Si ya estaba aceptado → amonestar al cliente y notificar al trabajador
     if (trabajo.status === 'aceptado') {
       const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
       const nuevas = (usuario?.amonestaciones || 0) + 1
       const baneado = nuevas >= 3
       await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
 
-      // Notificar al trabajador
       if (trabajo.trabajador_id) {
         await enviarNotificacionCompleta({
           usuarioId: trabajo.trabajador_id,
@@ -242,6 +236,23 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     }
 
     setTrabajoSeleccionado(null)
+    await cargarMisTrabajos()
+    setLoadingAccion(false)
+  }
+
+  async function confirmarLlegada(trabajo) {
+    setLoadingAccion(true)
+    await supabase.from('trabajos').update({ cliente_confirmo_llegada: true }).eq('id', trabajo.id)
+
+    await enviarNotificacionCompleta({
+      usuarioId: trabajo.trabajador_id,
+      titulo: '✅ ¡El cliente confirmó tu llegada!',
+      cuerpo: `Ya puedes iniciar el trabajo de ${trabajo.categoria}.`,
+      tipo: 'general',
+      trabajoId: trabajo.id,
+    })
+
+    setTrabajoSeleccionado(prev => ({ ...prev, cliente_confirmo_llegada: true }))
     await cargarMisTrabajos()
     setLoadingAccion(false)
   }
@@ -261,7 +272,6 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setCalificando(trabajo)
   }
 
-  // Cliente rechaza el "terminé" — devuelve a en progreso
   async function noHaTerminado(trabajo) {
     setLoadingAccion(true)
     await supabase.from('trabajos').update({
@@ -286,14 +296,12 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     setLoadingAccion(true)
     await supabase.from('trabajos').update({ status: 'cancelado' }).eq('id', trabajo.id)
 
-    // Si ya estaba aceptado → amonestar al cliente y notificar al trabajador
     if (trabajo.status === 'aceptado') {
       const { data: usuario } = await supabase.from('usuarios').select('amonestaciones').eq('id', userId).maybeSingle()
       const nuevas = (usuario?.amonestaciones || 0) + 1
       const baneado = nuevas >= 3
       await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', userId)
 
-      // Notificar al trabajador
       if (trabajo.trabajador_id) {
         await enviarNotificacionCompleta({
           usuarioId: trabajo.trabajador_id,
@@ -551,22 +559,22 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
               </div>
             )}
             {trabajoSeleccionado.precio_acordado && (
-                <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '10px', padding: '10px 16px', marginTop: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio del servicio</span>
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Comisión Chamba (12%)</span>
-                    <span style={{ fontSize: '12px', color: '#F09595' }}>+${Math.round(trabajoSeleccionado.precio_acordado * 0.12)} MXN</span>
-                  </div>
-                  <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '6px 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Total a pagar</span>
-                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(trabajoSeleccionado.precio_acordado * 1.12)} MXN</span>
-                  </div>
+              <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '10px', padding: '10px 16px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio del servicio</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
                 </div>
-              )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Comisión Chamba (12%)</span>
+                  <span style={{ fontSize: '12px', color: '#F09595' }}>+${Math.round(trabajoSeleccionado.precio_acordado * 0.12)} MXN</span>
+                </div>
+                <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '6px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Total a pagar</span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(trabajoSeleccionado.precio_acordado * 1.12)} MXN</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Negociación */}
@@ -645,9 +653,24 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                 </div>
               )}
 
-              {trabajoSeleccionado.trabajador_llego && !trabajoSeleccionado.trabajo_iniciado && (
+              {/* ✅ NUEVO — Confirmar llegada del trabajador */}
+              {trabajoSeleccionado.trabajador_llego && !trabajoSeleccionado.cliente_confirmo_llegada && (
+                <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid #1D9E75', borderRadius: '14px', padding: '18px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '28px', marginBottom: '8px' }}>🏠</p>
+                  <p style={{ fontSize: '15px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>¡El trabajador dice que llegó!</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '14px', lineHeight: '1.5' }}>
+                    ¿Lo ves en la puerta? Confirma su llegada para que pueda iniciar el trabajo.
+                  </p>
+                  <button type="button" onClick={() => confirmarLlegada(trabajoSeleccionado)} disabled={loadingAccion}
+                    style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+                    {loadingAccion ? 'Confirmando...' : '✅ Sí, ya llegó — confirmar'}
+                  </button>
+                </div>
+              )}
+
+              {trabajoSeleccionado.trabajador_llego && trabajoSeleccionado.cliente_confirmo_llegada && !trabajoSeleccionado.trabajo_iniciado && (
                 <div style={{ background: 'rgba(29,158,117,0.12)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '12px', padding: '14px', textAlign: 'center', fontSize: '14px', color: '#1D9E75', fontWeight: '600' }}>
-                  🏠 ¡El trabajador llegó! Esperando que inicie el trabajo...
+                  ✅ Llegada confirmada — esperando que el trabajador inicie...
                 </div>
               )}
 
@@ -701,7 +724,6 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                   ¿Quedó bien? Confirma para liberar{' '}
                   <strong style={{ color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN</strong>.
                 </p>
-                {/* Foto del trabajo terminado */}
                 {trabajoSeleccionado.foto_trabajo_url && (
                   <div style={{ marginBottom: '14px' }}>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📸 Foto del trabajo</p>
@@ -713,15 +735,12 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                   style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                   {loadingAccion ? 'Procesando...' : '🏁 Confirmar y liberar pago'}
                 </button>
-
-                {/* NUEVO — No ha terminado */}
                 <button type="button" onClick={() => noHaTerminado(trabajoSeleccionado)} disabled={loadingAccion}
                   style={{ width: '100%', padding: '12px', background: 'rgba(232,160,48,0.1)', color: '#E8A030', border: '1px solid rgba(232,160,48,0.3)', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
                   ❌ No ha terminado — devolver al trabajador
                 </button>
               </div>
 
-              {/* Botón de pánico — viajes recién terminados, aún en_revision */}
               {trabajoSeleccionado.es_viaje && (
                 <BotonPanico
                   trabajo={trabajoSeleccionado}
@@ -733,13 +752,11 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
               )}
 
               <button type="button" onClick={async () => {
-                // Verificar si ya hubo chat con el trabajador
                 const { data: msgs } = await supabase.from('mensajes')
                   .select('id').eq('trabajo_id', trabajoSeleccionado.id)
                   .eq('emisor_id', userId).limit(1)
                 if (!msgs || msgs.length === 0) {
                   setChatAbierto(trabajoSeleccionado)
-                  setError('⚠️ Primero intenta resolver con el trabajador por chat antes de abrir una disputa.')
                   return
                 }
                 setAbrirDisputa(trabajoSeleccionado)
@@ -862,7 +879,6 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
           const noLeidos = mensajesNoLeidos[trabajo.id] || 0
           return (
             <div key={trabajo.id} style={{ position: 'relative' }}>
-            {/* Menú ··· */}
             {menuAbierto === trabajo.id && (
               <div onClick={() => setMenuAbierto(null)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
             )}
