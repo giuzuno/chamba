@@ -302,7 +302,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
               usuarioId: chofer.id,
               titulo: `${tipoSeleccionado.icon} ${tipoSeleccionado.label} — ${distanciaTotal.toFixed(1)} km`,
               cuerpo: `$${precioTotal} MXN · ${personas} persona(s) · ${tipoLabel} · ${esAhora ? 'Ahora mismo' : `${fCita} ${hCita}`}`,
-              tipo: 'trabajo_aceptado',
+              tipo: 'nuevo_trabajo',
               trabajoId: trabajo.id,
             })
           }

@@ -169,7 +169,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             usuarioId: trabajador.id,
             titulo: `🔔 Nuevo trabajo de ${categoriaFinal}`,
             cuerpo: `$${presupuesto} MXN — ${descripcion.slice(0, 60)}${descripcion.length > 60 ? '...' : ''} · ${cuandoTexto}`,
-            tipo: 'trabajo_aceptado',
+            tipo: 'nuevo_trabajo',
             trabajoId: trabajoCreado.id,
           })
         }
