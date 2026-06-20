@@ -54,13 +54,11 @@ function calcularETAViaje(distanciaKm, categoria) {
 
 function puedeIrAlTrabajo(trabajo) {
   if (!trabajo.fecha_cita || !trabajo.hora_cita) return true
-  // Construir fecha/hora local sin conversión UTC
   const horaStr = trabajo.hora_cita.slice(0, 5)
   const fechaHoraStr = `${trabajo.fecha_cita}T${horaStr}:00`
-  const cita = new Date(fechaHoraStr) // Sin Z — interpreta como local
+  const cita = new Date(fechaHoraStr)
   const ahora = new Date()
   const diffHoras = (cita - ahora) / (1000 * 60 * 60)
-  // Puede ir si faltan 2hrs o menos, o si ya pasó (hasta 4hrs después)
   return diffHoras <= 2 && diffHoras > -4
 }
 
@@ -134,7 +132,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [infoViaje, setInfoViaje] = useState(null)
   const [modalRechazo, setModalRechazo] = useState(false)
   const [motivoRechazo, setMotivoRechazo] = useState('')
-  const [modalFotoTrabajo, setModalFotoTrabajo] = useState(null) // trabajo pendiente de foto
+  const [modalFotoTrabajo, setModalFotoTrabajo] = useState(null)
   const [fotoTrabajoUrl, setFotoTrabajoUrl] = useState(null)
   const [subiendoFotoTrabajo, setSubiendoFotoTrabajo] = useState(false)
 
@@ -143,15 +141,12 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     cargarMisTrabajos()
     cargarHistorial()
 
-    // Escuchar cambios en trabajos para remover de disponibles cuando se aceptan
     const channel = supabase.channel('trabajos-disponibles')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
         if (payload.new.status !== 'publicado') {
-          // Remover de disponibles si ya no está publicado
           setTrabajos(prev => prev.filter(t => t.id !== payload.new.id))
         }
         if (payload.new.trabajador_id === userId) {
-          // Si me asignaron un trabajo → recargar activos
           cargarMisTrabajos()
         }
       })
@@ -161,28 +156,17 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }, [])
 
   useEffect(() => {
-    if (irAActivos) {
-      setPestana('mis')
-      onNavegacionCompletada?.()
-    }
+    if (irAActivos) { setPestana('mis'); onNavegacionCompletada?.() }
   }, [irAActivos])
 
   useEffect(() => {
-    if (irAHistorial) {
-      setPestana('historial')
-      onNavegacionCompletada?.()
-    }
+    if (irAHistorial) { setPestana('historial'); onNavegacionCompletada?.() }
   }, [irAHistorial])
 
-  // Si viene del onboarding como trabajador → abrir perfil directo
   useEffect(() => {
-    if (irAPerfil) {
-      setVerPerfil(true)
-      onPerfilAbierto?.()
-    }
+    if (irAPerfil) { setVerPerfil(true); onPerfilAbierto?.() }
   }, [irAPerfil])
 
-  // Abrir trabajo específico desde toast
   useEffect(() => {
     if (!trabajoIdInicial) return
     const t = misTrabajos.find(t => t.id === trabajoIdInicial)
@@ -190,17 +174,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       setPestana('mis')
       setTrabajoSeleccionado(t)
     } else {
-      // Si no está en activos, buscar en BD (puede estar en disponibles)
       supabase.from('trabajos').select('*').eq('id', trabajoIdInicial).maybeSingle()
         .then(({ data }) => {
           if (data) {
-            if (data.status === 'publicado') {
-              setPestana('disponibles')
-              setTrabajoSeleccionado(data)
-            } else {
-              setPestana('mis')
-              setTrabajoSeleccionado(data)
-            }
+            if (data.status === 'publicado') { setPestana('disponibles'); setTrabajoSeleccionado(data) }
+            else { setPestana('mis'); setTrabajoSeleccionado(data) }
           }
         })
     }
@@ -212,7 +190,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     if (!perfil?.foto_url) faltantes.push('Foto de perfil')
     if (!perfil?.categorias_servicio || perfil.categorias_servicio.length === 0) faltantes.push('Categorías de servicio')
 
-    // Validaciones extra SOLO para trabajos de viaje
     const CATS_CHOFER = ['Taxi / Chofer', 'Moto taxi', 'Repartidor moto', 'Fletes', 'Mandados', 'Repartidor']
     const esViajeTrabajo = trabajo?.es_viaje || CATS_CHOFER.includes(trabajo?.categoria)
 
@@ -228,15 +205,10 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function intentarVerTrabajo(trabajo) {
     const faltantes = validarPerfilCompleto(perfilUsuario, trabajo)
-    if (faltantes.length > 0) {
-      setCamposFaltantes(faltantes)
-      setPerfilIncompleto(true)
-      return
-    }
+    if (faltantes.length > 0) { setCamposFaltantes(faltantes); setPerfilIncompleto(true); return }
     setInfoViaje(null)
     setTrabajoSeleccionado(trabajo)
 
-    // Si es viaje, cargar zonas aproximadas
     if (trabajo.es_viaje && trabajo.origen_lat && trabajo.destino_lat) {
       const distancia = trabajo.distancia_km || calcularDistanciaKm(trabajo.origen_lat, trabajo.origen_lng, trabajo.destino_lat, trabajo.destino_lng)
       const eta = calcularETAViaje(distancia, trabajo.categoria)
@@ -303,7 +275,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   async function marcarCompletado(trabajo) {
-    // Primero pedir foto del trabajo terminado
     setFotoTrabajoUrl(null)
     setModalFotoTrabajo(trabajo)
   }
@@ -483,7 +454,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   if (reportando) return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="trabajador" onVolver={() => setReportando(null)} />
-
   if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} onVolver={() => { setVerPerfil(false); cargarPerfilUsuario() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
@@ -491,13 +461,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   if (tracking) return <TrackingTrabajador trabajo={tracking} userId={userId} perfilUsuario={perfilUsuario} onVolver={() => { setTracking(null); cargarMisTrabajos() }} />
   if (negociando) return (
     <NegociacionTrabajo trabajo={negociando} userId={userId} onVolver={() => setNegociando(null)}
-      onAceptado={async () => { 
-              setNegociando(null)
-              setTrabajoSeleccionado(null)
-              await cargarMisTrabajos()
-              await cargarTrabajos(perfilUsuario)
-              setPestana('mis')
-            }}
+      onAceptado={async () => {
+        setNegociando(null)
+        setTrabajoSeleccionado(null)
+        await cargarMisTrabajos()
+        await cargarTrabajos(perfilUsuario)
+        setPestana('mis')
+      }}
     />
   )
 
@@ -538,8 +508,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               La foto protege a ambas partes. Si el cliente abre una disputa, esta imagen es la prueba de que el trabajo quedó bien. Sin foto no puedes marcar como terminado.
             </p>
           </div>
-
-          {/* Upload foto */}
           {fotoTrabajoUrl ? (
             <div style={{ position: 'relative' }}>
               <img src={fotoTrabajoUrl} alt="trabajo" style={{ width: '100%', maxHeight: '280px', objectFit: 'cover', borderRadius: '16px', border: '2px solid rgba(29,158,117,0.4)' }} />
@@ -558,13 +526,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               <input type="file" accept="image/*" capture="environment" onChange={subirFotoTrabajo} style={{ display: 'none' }} disabled={subiendoFotoTrabajo} />
             </label>
           )}
-
           <button type="button" onClick={() => confirmarCompletadoConFoto(modalFotoTrabajo)}
             disabled={!fotoTrabajoUrl || loadingCompletar === modalFotoTrabajo.id}
             style={{ width: '100%', padding: '16px', background: fotoTrabajoUrl ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: fotoTrabajoUrl ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: fotoTrabajoUrl ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
             {loadingCompletar === modalFotoTrabajo.id ? 'Enviando...' : fotoTrabajoUrl ? '✅ Confirmar trabajo terminado' : 'Sube una foto primero'}
           </button>
-
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', lineHeight: '1.6' }}>
             La foto será visible para el cliente y el equipo de Chamba en caso de disputa.
           </p>
@@ -670,7 +636,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>🕐 {tiempoTranscurrido(trabajoSeleccionado.creado_en)}</p>
                 </div>
               </div>
-              {/* Info del viaje — solo para viajes */}
+
               {trabajoSeleccionado.es_viaje && (
                 <div style={{ background: 'rgba(55,138,221,0.06)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '16px', padding: '16px' }}>
                   <p style={{ fontSize: '11px', color: '#378ADD', fontWeight: '700', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🗺️ Resumen del viaje</p>
@@ -739,7 +705,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 </div>
               )}
 
-              {/* Info del cliente para viajes */}
               {trabajoSeleccionado.es_viaje && trabajoSeleccionado.cliente_id && (
                 <ClienteInfoViaje clienteId={trabajoSeleccionado.cliente_id} notaCliente={trabajoSeleccionado.nota_cliente} />
               )}
@@ -775,9 +740,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       {modalOpciones && <ModalOpciones />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-        <div>
-          <LogoChamba size='sm' />
-        </div>
+        <div><LogoChamba size='sm' /></div>
         <HeaderBotones />
       </div>
 
@@ -883,7 +846,6 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   💬 Chat con el cliente
                 </button>
 
-                {/* Botón permanente de navegación */}
                 {(trabajo.origen_lat || trabajo.lat) && (
                   <BotonNavegacion
                     lat={trabajo.origen_lat || trabajo.lat}
@@ -892,11 +854,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   />
                 )}
                 {esViaje(trabajo) && trabajo.destino_lat && trabajo.status !== 'en_revision' && (
-                  <BotonNavegacion
-                    lat={trabajo.destino_lat}
-                    lng={trabajo.destino_lng}
-                    label="🏁 Ver destino del viaje"
-                  />
+                  <BotonNavegacion lat={trabajo.destino_lat} lng={trabajo.destino_lng} label="🏁 Ver destino del viaje" />
                 )}
 
                 <button type="button" onClick={() => setReportando(trabajo)} style={{ width: '100%', padding: '7px', marginBottom: '8px', background: 'transparent', color: 'rgba(240,149,149,0.5)', border: '0.5px solid rgba(240,149,149,0.15)', borderRadius: '8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -935,8 +893,15 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                   </button>
                 )}
 
-                {/* Llegó pero no ha iniciado */}
-                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && !trabajo.trabajo_iniciado && (
+                {/* ✅ NUEVO — Llegó pero esperando que cliente confirme */}
+                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && !trabajo.cliente_confirmo_llegada && !trabajo.trabajo_iniciado && (
+                  <div style={{ padding: '10px 14px', background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '10px', fontSize: '12px', color: '#E8A030', textAlign: 'center', marginBottom: '8px' }}>
+                    ⏳ Marcaste que llegaste — esperando que el cliente confirme tu llegada...
+                  </div>
+                )}
+
+                {/* ✅ Llegó Y cliente confirmó — puede iniciar */}
+                {trabajo.status === 'aceptado' && trabajo.trabajador_llego && trabajo.cliente_confirmo_llegada && !trabajo.trabajo_iniciado && (
                   <button type="button" onClick={() => iniciarTrabajo(trabajo)} disabled={loadingIniciar === trabajo.id}
                     style={{ width: '100%', padding: '10px', background: loadingIniciar === trabajo.id ? 'rgba(55,138,221,0.3)' : 'rgba(55,138,221,0.8)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>
                     {loadingIniciar === trabajo.id ? 'Registrando...' : '🔨 Empecé el trabajo'}
