@@ -95,6 +95,8 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   const [resultadosParada, setResultadosParada] = useState([])
   const [buscandoParada, setBuscandoParada] = useState(false)
   const [mapaListo, setMapaListo] = useState(false)
+  const [distanciaReal, setDistanciaReal] = useState(null)
+  const [calculandoRuta, setCalculandoRuta] = useState(false)
 
   // ✅ NUEVO — estados de pago
   const [trabajoCreado, setTrabajoCreado] = useState(null)
@@ -133,6 +135,31 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
 
   const tipoSeleccionado = TIPOS_VIAJE.find(t => t.id === tipo)
 
+  // Calcular distancia real por calles con OSRM
+  useEffect(() => {
+    if (!origen || !destino) { setDistanciaReal(null); return }
+    async function calcularRutaReal() {
+      setCalculandoRuta(true)
+      try {
+        const puntos = [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
+        const coords = puntos.map(p => `${p[1]},${p[0]}`).join(';')
+        const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`
+        const res = await fetch(url)
+        const data = await res.json()
+        if (data.routes && data.routes[0]) {
+          let distKm = data.routes[0].distance / 1000
+          if (tipoViaje === 'redondo') distKm *= 2
+          setDistanciaReal(distKm)
+        }
+      } catch (e) {
+        console.log('OSRM error, usando línea recta:', e)
+        setDistanciaReal(null)
+      }
+      setCalculandoRuta(false)
+    }
+    calcularRutaReal()
+  }, [origen, destino, paradas, tipoViaje])
+
   function calcularDistanciaTotal() {
     if (!origen || !destino) return 0
     let puntos = [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
@@ -153,7 +180,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     return precio
   }
 
-  const distanciaTotal = calcularDistanciaTotal()
+  const distanciaTotal = distanciaReal !== null ? distanciaReal : calcularDistanciaTotal()
   const precioTotal = calcularPrecioTotal()
   const eta = tipoSeleccionado ? calcularETA(distanciaTotal, tipo) : ''
   const centro = ubicacionActual || [16.1833, -95.2000]
@@ -511,7 +538,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             )}
             {destino && distanciaTotal > 0 && (
               <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.95)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '14px', padding: '10px 18px', zIndex: 1000, display: 'flex', gap: '20px', whiteSpace: 'nowrap' }}>
-                <div style={{ textAlign: 'center' }}><p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>{distanciaTotal.toFixed(1)} km</p><p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Distancia</p></div>
+                <div style={{ textAlign: 'center' }}><p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>{calculandoRuta ? '...' : distanciaTotal.toFixed(1)} km</p><p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{calculandoRuta ? 'Calculando' : 'Por calles'}</p></div>
                 <div style={{ width: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
                 <div style={{ textAlign: 'center' }}><p style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>${calcularPrecioTotal()}</p><p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Estimado</p></div>
                 <div style={{ width: '0.5px', background: 'rgba(255,255,255,0.1)' }} />
