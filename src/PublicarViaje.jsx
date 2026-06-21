@@ -198,7 +198,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     try {
       const base = origen || ubicacionActual || [16.1833, -95.2000]
       const res = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6&lang=es`
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6`
       )
       const json = await res.json()
       const data = (json.features || []).map(f => ({
@@ -737,4 +737,3 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     </div>
   )
 }
-
