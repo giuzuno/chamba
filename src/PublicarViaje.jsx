@@ -432,7 +432,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
       )}
 
       {paso === 2 && (
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
             <button type="button" onClick={() => { setOrigenEsActual(true); setOrigen(ubicacionActual) }} style={{ padding: '12px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', background: origenEsActual ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '12px', borderLeft: `3px solid ${origenEsActual ? '#1D9E75' : 'transparent'}` }}>
               <span style={{ fontSize: '18px' }}>📍</span>
@@ -455,7 +455,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <div style={{ position: 'relative' }}>
                   <input type="text" placeholder="🔍 Buscar dirección de origen..." value={busquedaOrigen}
                     onChange={e => { setBusquedaOrigen(e.target.value); buscarDireccion(e.target.value, 'origen') }}
-                    onBlur={() => limpiarResultados('origen')}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
                   />
                   {buscandoOrigen && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
@@ -484,7 +483,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>Cargando mapa...</div>
             )}
           </div>
-          <div style={{ padding: '14px 16px', flexShrink: 0 }}>
+          <div style={{ padding: '14px 16px', flexShrink: 0, background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
             <button type="button" onClick={() => setPaso(3)} disabled={!origen} style={{ width: '100%', padding: '15px', background: origen ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: origen ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: origen ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
               {origen ? 'Continuar →' : 'Selecciona el origen'}
             </button>
@@ -508,10 +507,10 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             <div style={{ position: 'relative' }}>
               <input type="text" placeholder="🔍 Buscar dirección de destino..." value={busquedaDestino}
                 onChange={e => { setBusquedaDestino(e.target.value); buscarDireccion(e.target.value, 'destino') }}
-                onBlur={() => limpiarResultados('destino')}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
               />
               {buscando && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
+              {busquedaDestino && !buscando && <button type="button" onClick={() => { setBusquedaDestino(''); setResultadosBusqueda([]) }} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '16px', cursor: 'pointer' }}>✕</button>}
             </div>
             {resultadosBusqueda.length > 0 && (
               <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden', zIndex: 100, position: 'relative' }}>
@@ -546,7 +545,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
               </div>
             )}
           </div>
-          <div style={{ padding: '14px 16px', flexShrink: 0 }}>
+          <div style={{ padding: '14px 16px', flexShrink: 0, background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
             <button type="button" onClick={() => setPaso(4)} disabled={!destino} style={{ width: '100%', padding: '15px', background: destino ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: destino ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: destino ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
               {destino ? 'Continuar →' : 'Marca el destino primero'}
             </button>
@@ -613,7 +612,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <input type="text" placeholder="🔍 Buscar dirección de parada..."
                   value={busquedaParada}
                   onChange={e => { setBusquedaParada(e.target.value); buscarDireccion(e.target.value, 'parada') }}
-                  onBlur={() => limpiarResultados('parada')}
                   style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
                 />
                 {buscandoParada && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
