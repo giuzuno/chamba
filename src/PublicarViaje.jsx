@@ -197,30 +197,26 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   async function ejecutarBusqueda(texto, tipoBusqueda) {
     try {
       const base = origen || ubicacionActual || [16.1833, -95.2000]
-      const delta = 0.25
-      const viewbox = `${base[1]-delta},${base[0]-delta},${base[1]+delta},${base[0]+delta}`
-      const queries = [`${texto}, Oaxaca, Mexico`, `${texto}, Mexico`, texto]
-      let data = []
-      for (const query of queries) {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&countrycodes=mx&viewbox=${viewbox}&bounded=0&addressdetails=1`,
-          { headers: { 'Accept-Language': 'es', 'User-Agent': 'ChambaApp/1.0' } }
-        )
-        const json = await res.json()
-        if (json.length > 0) { data = json; break }
-      }
-      if (data.length > 0 && base) {
-        data.sort((a, b) => {
-          const dA = calcularDistancia(base[0], base[1], parseFloat(a.lat), parseFloat(a.lon))
-          const dB = calcularDistancia(base[0], base[1], parseFloat(b.lat), parseFloat(b.lon))
-          return dA - dB
-        })
-      }
+      const res = await fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6&lang=es`
+      )
+      const json = await res.json()
+      const data = (json.features || []).map(f => ({
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
+        display_name: [
+          f.properties.name,
+          f.properties.street,
+          f.properties.city || f.properties.town || f.properties.village,
+          f.properties.state,
+        ].filter(Boolean).join(', '),
+        nombre: f.properties.name || texto,
+      }))
       if (tipoBusqueda === 'destino') setResultadosBusqueda(data)
       else if (tipoBusqueda === 'origen') setResultadosOrigen(data)
       else setResultadosParada(data)
     } catch (e) {
-      console.log('Error búsqueda:', e)
+      console.log('Error búsqueda Photon:', e)
     } finally {
       if (tipoBusqueda === 'destino') setBuscando(false)
       else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
@@ -229,10 +225,15 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   }
 
   function buscarDireccion(texto, tipoBusqueda) {
+    // Limpiar resultados anteriores inmediatamente al cambiar texto
+    if (tipoBusqueda === 'destino') setResultadosBusqueda([])
+    else if (tipoBusqueda === 'origen') setResultadosOrigen([])
+    else setResultadosParada([])
+
     if (texto.trim().length < 3) {
-      if (tipoBusqueda === 'destino') { setResultadosBusqueda([]); setBuscando(false) }
-      else if (tipoBusqueda === 'origen') { setResultadosOrigen([]); setBuscandoOrigen(false) }
-      else { setResultadosParada([]); setBuscandoParada(false) }
+      if (tipoBusqueda === 'destino') setBuscando(false)
+      else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
+      else setBuscandoParada(false)
       return
     }
     if (tipoBusqueda === 'destino') setBuscando(true)
@@ -240,7 +241,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     else setBuscandoParada(true)
     const ref = tipoBusqueda === 'destino' ? debounceDestino : tipoBusqueda === 'origen' ? debounceOrigen : debounceParada
     if (ref.current) clearTimeout(ref.current)
-    ref.current = setTimeout(() => { ejecutarBusqueda(texto, tipoBusqueda) }, 450)
+    ref.current = setTimeout(() => { ejecutarBusqueda(texto, tipoBusqueda) }, 400)
   }
 
   function eliminarParada(idx) {
@@ -462,9 +463,9 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 {resultadosOrigen.length > 0 && (
                   <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden' }}>
                     {resultadosOrigen.map((r, i) => (
-                      <button key={i} type="button" onClick={() => { setOrigen([parseFloat(r.lat), parseFloat(r.lon)]); setBusquedaOrigen(r.display_name.split(',')[0]); setResultadosOrigen([]) }}
+                      <button key={i} type="button" onClick={() => { setOrigen([r.lat, r.lon]); setBusquedaOrigen(r.nombre); setResultadosOrigen([]) }}
                         style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: i < resultadosOrigen.length-1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
-                        📍 {r.display_name.split(',').slice(0,2).join(',')}
+                        📍 {r.display_name}
                       </button>
                     ))}
                   </div>
@@ -515,9 +516,9 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             {resultadosBusqueda.length > 0 && (
               <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden', zIndex: 100, position: 'relative' }}>
                 {resultadosBusqueda.map((r, i) => (
-                  <button key={i} type="button" onClick={() => { setDestino([parseFloat(r.lat), parseFloat(r.lon)]); setBusquedaDestino(r.display_name.split(',')[0]); setResultadosBusqueda([]) }}
+                  <button key={i} type="button" onClick={() => { setDestino([r.lat, r.lon]); setBusquedaDestino(r.nombre); setResultadosBusqueda([]) }}
                     style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: i < resultadosBusqueda.length-1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
-                    🏁 {r.display_name.split(',').slice(0,2).join(',')}
+                    🏁 {r.display_name}
                   </button>
                 ))}
               </div>
@@ -620,13 +621,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', marginBottom: '8px', overflow: 'hidden' }}>
                   {resultadosParada.map((r, i) => (
                     <button key={i} type="button" onClick={() => {
-                      const nuevaParada = { lat: parseFloat(r.lat), lng: parseFloat(r.lon), nombre: r.display_name.split(',')[0] }
+                      const nuevaParada = { lat: r.lat, lng: r.lon, nombre: r.nombre }
                       setParadas(prev => [...prev, nuevaParada])
                       setBusquedaParada('')
                       setResultadosParada([])
                     }}
                       style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: i < resultadosParada.length-1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
-                      🔶 {r.display_name.split(',').slice(0,2).join(',')}
+                      🔶 {r.display_name}
                     </button>
                   ))}
                 </div>
