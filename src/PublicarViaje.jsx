@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
+import MetodoPago from './MetodoPago'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -29,7 +30,7 @@ const TIPOS_VIAJE = [
 ]
 
 const OPCIONES_ESPERA = [15, 30, 45, 60, 90, 120]
-const COSTO_ESPERA_POR_MIN = 3 // $3 MXN por minuto de espera
+const COSTO_ESPERA_POR_MIN = 3
 
 function SeleccionarPunto({ onSeleccionar }) {
   useMapEvents({ click(e) { onSeleccionar([e.latlng.lat, e.latlng.lng]) } })
@@ -87,18 +88,18 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [errorFecha, setErrorFecha] = useState('')
-
-  // Nuevos estados para tipo de viaje
-  const [tipoViaje, setTipoViaje] = useState('sencillo') // sencillo, redondo, paradas
+  const [tipoViaje, setTipoViaje] = useState('sencillo')
   const [tiempoEspera, setTiempoEspera] = useState(30)
-  const [paradas, setParadas] = useState([]) // [{ lat, lng, nombre }]
-  const [agregandoParada, setAgregandoParada] = useState(false)
+  const [paradas, setParadas] = useState([])
   const [busquedaParada, setBusquedaParada] = useState('')
   const [resultadosParada, setResultadosParada] = useState([])
   const [buscandoParada, setBuscandoParada] = useState(false)
   const [mapaListo, setMapaListo] = useState(false)
 
-  // Refs para debounce — evita llamadas excesivas a Nominatim
+  // ✅ NUEVO — estados de pago
+  const [trabajoCreado, setTrabajoCreado] = useState(null)
+  const [pagando, setPagando] = useState(false)
+
   const debounceDestino = useRef(null)
   const debounceOrigen = useRef(null)
   const debounceParada = useRef(null)
@@ -124,7 +125,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     if (origenEsActual && ubicacionActual) setOrigen(ubicacionActual)
   }, [origenEsActual, ubicacionActual])
 
-  // El mapa de Leaflet necesita un pequeño delay para renderizar bien en Capacitor
   useEffect(() => {
     setMapaListo(false)
     const t = setTimeout(() => setMapaListo(true), 250)
@@ -133,7 +133,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
 
   const tipoSeleccionado = TIPOS_VIAJE.find(t => t.id === tipo)
 
-  // Calcular distancia total incluyendo paradas
   function calcularDistanciaTotal() {
     if (!origen || !destino) return 0
     let puntos = [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
@@ -150,7 +149,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     const dist = calcularDistanciaTotal()
     let precio = Math.max(tipoSeleccionado.minimo, Math.round(dist * tipoSeleccionado.precioPorKm))
     if (tipoViaje === 'redondo') precio += tiempoEspera * COSTO_ESPERA_POR_MIN
-    if (paradas.length > 0) precio += paradas.length * 20 // $20 extra por parada
+    if (paradas.length > 0) precio += paradas.length * 20
     return precio
   }
 
@@ -158,11 +157,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   const precioTotal = calcularPrecioTotal()
   const eta = tipoSeleccionado ? calcularETA(distanciaTotal, tipo) : ''
   const centro = ubicacionActual || [16.1833, -95.2000]
-
-  // Puntos para dibujar la ruta
-  const puntosRuta = origen && destino
-    ? [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
-    : []
+  const puntosRuta = origen && destino ? [origen, ...paradas.map(p => [p.lat, p.lng]), destino] : []
 
   function limpiarResultados(tipoBusqueda) {
     setTimeout(() => {
@@ -174,16 +169,10 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
 
   async function ejecutarBusqueda(texto, tipoBusqueda) {
     try {
-      // Viewbox dinámico alrededor del origen del usuario (~25km) — funciona en cualquier ciudad del Istmo
       const base = origen || ubicacionActual || [16.1833, -95.2000]
       const delta = 0.25
       const viewbox = `${base[1]-delta},${base[0]-delta},${base[1]+delta},${base[0]+delta}`
-
-      const queries = [
-        `${texto}, Oaxaca, Mexico`,
-        `${texto}, Mexico`,
-        texto,
-      ]
+      const queries = [`${texto}, Oaxaca, Mexico`, `${texto}, Mexico`, texto]
       let data = []
       for (const query of queries) {
         const res = await fetch(
@@ -219,21 +208,12 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
       else { setResultadosParada([]); setBuscandoParada(false) }
       return
     }
-
     if (tipoBusqueda === 'destino') setBuscando(true)
     else if (tipoBusqueda === 'origen') setBuscandoOrigen(true)
     else setBuscandoParada(true)
-
     const ref = tipoBusqueda === 'destino' ? debounceDestino : tipoBusqueda === 'origen' ? debounceOrigen : debounceParada
     if (ref.current) clearTimeout(ref.current)
     ref.current = setTimeout(() => { ejecutarBusqueda(texto, tipoBusqueda) }, 450)
-  }
-
-  function agregarParadaEnMapa(pos) {
-    if (!agregandoParada) return
-    const nuevaParada = { lat: pos[0], lng: pos[1], nombre: `Parada ${paradas.length + 1}` }
-    setParadas(prev => [...prev, nuevaParada])
-    setAgregandoParada(false)
   }
 
   function eliminarParada(idx) {
@@ -254,14 +234,14 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     return true
   }
 
-  async function publicarViaje() {
+  // ✅ PASO 1: Crear viaje en BD → abrir pago
+  async function crearViajeYPagar() {
     if (!origen || !destino || !tipo) return
     if (!validarFecha()) return
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     setPublicando(true)
 
     const fCita = esAhora ? getHoyLocal() : fechaCita
-    // Para "ahora mismo" — dar 2hrs de margen para que el cron no cancele
     function getHoraConMargen() {
       const ahora = new Date()
       ahora.setHours(ahora.getHours() + 2)
@@ -270,7 +250,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     const hCita = esAhora ? getHoraConMargen() : horaCita
     const precioEspera = tipoViaje === 'redondo' ? tiempoEspera * COSTO_ESPERA_POR_MIN : 0
 
-    const { data: trabajo } = await supabase.from('trabajos').insert({
+    const { data: trabajo, error: insertError } = await supabase.from('trabajos').insert({
       cliente_id: userId,
       categoria: tipoSeleccionado.categoria,
       descripcion: descripcion || `${tipoSeleccionado.label} — ${distanciaTotal.toFixed(1)} km${tipoViaje === 'redondo' ? ' (redondo)' : ''}${paradas.length > 0 ? ` · ${paradas.length} parada(s)` : ''}`,
@@ -289,29 +269,49 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
       fecha_cita: fCita,
       hora_cita: hCita,
       status: 'publicado',
+      pago_status: 'pendiente',
     }).select().single()
 
-    if (trabajo) {
-      try {
-        const { data: choferes } = await supabase.from('usuarios').select('id')
-          .contains('categorias_servicio', [tipoSeleccionado.categoria]).neq('id', userId)
-        if (choferes && choferes.length > 0) {
-          const tipoLabel = tipoViaje === 'redondo' ? '🔄 Redondo' : tipoViaje === 'paradas' ? '🔶 Con paradas' : '➡️ Sencillo'
-          for (const chofer of choferes) {
-            await enviarNotificacionCompleta({
-              usuarioId: chofer.id,
-              titulo: `${tipoSeleccionado.icon} ${tipoSeleccionado.label} — ${distanciaTotal.toFixed(1)} km`,
-              cuerpo: `$${precioTotal} MXN · ${personas} persona(s) · ${tipoLabel} · ${esAhora ? 'Ahora mismo' : `${fCita} ${hCita}`}`,
-              tipo: 'nuevo_trabajo',
-              trabajoId: trabajo.id,
-            })
-          }
-        }
-      } catch (e) { console.log('Error notificando:', e) }
+    if (insertError || !trabajo) {
+      console.log('Error creando viaje:', insertError)
+      setPublicando(false)
+      return
     }
 
-    setExito(true)
+    setTrabajoCreado(trabajo)
     setPublicando(false)
+    setPagando(true)
+  }
+
+  // ✅ PASO 2: Pago exitoso → notificar conductores
+  async function onPagoExitoso() {
+    setPagando(false)
+    try {
+      const { data: choferes } = await supabase.from('usuarios').select('id')
+        .contains('categorias_servicio', [tipoSeleccionado.categoria]).neq('id', userId)
+      if (choferes && choferes.length > 0) {
+        const tipoLabel = tipoViaje === 'redondo' ? '🔄 Redondo' : tipoViaje === 'paradas' ? '🔶 Con paradas' : '➡️ Sencillo'
+        for (const chofer of choferes) {
+          await enviarNotificacionCompleta({
+            usuarioId: chofer.id,
+            titulo: `${tipoSeleccionado.icon} ${tipoSeleccionado.label} — ${distanciaTotal.toFixed(1)} km`,
+            cuerpo: `$${precioTotal} MXN · ${personas} persona(s) · ${tipoLabel}`,
+            tipo: 'nuevo_trabajo',
+            trabajoId: trabajoCreado.id,
+          })
+        }
+      }
+    } catch (e) { console.log('Error notificando:', e) }
+    setExito(true)
+  }
+
+  // Pago cancelado → eliminar viaje pendiente
+  async function onPagoCancelado() {
+    if (trabajoCreado) {
+      await supabase.from('trabajos').delete().eq('id', trabajoCreado.id)
+      setTrabajoCreado(null)
+    }
+    setPagando(false)
   }
 
   if (fotoUrl !== 'cargando' && !fotoUrl) return (
@@ -330,10 +330,21 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="cliente"
-      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); publicarViaje() }}
+      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); crearViajeYPagar() }}
       onCerrar={() => setMostrarReglas(false)}
     />
   )
+
+  // ✅ PANTALLA DE PAGO
+  if (pagando && trabajoCreado) {
+    return (
+      <MetodoPago
+        trabajo={trabajoCreado}
+        onPagoExitoso={onPagoExitoso}
+        onCancelar={onPagoCancelado}
+      />
+    )
+  }
 
   if (exito) {
     return (
@@ -356,7 +367,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={paso === 1 ? onVolver : () => setPaso(p => p - 1)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <div style={{ flex: 1 }}>
@@ -370,7 +380,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         </div>
       </div>
 
-      {/* Paso 1 — Tipo de servicio */}
       {paso === 1 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Selecciona el tipo de servicio</p>
@@ -391,7 +400,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         </div>
       )}
 
-      {/* Paso 2 — Origen */}
       {paso === 2 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)' }}>
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
@@ -417,7 +425,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                   <input type="text" placeholder="🔍 Buscar dirección de origen..." value={busquedaOrigen}
                     onChange={e => { setBusquedaOrigen(e.target.value); buscarDireccion(e.target.value, 'origen') }}
                     onBlur={() => limpiarResultados('origen')}
-    
                     style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
                   />
                   {buscandoOrigen && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
@@ -443,9 +450,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 {origen && <Marker position={origen} icon={iconoOrigen}><Popup>📍 Origen</Popup></Marker>}
               </MapContainer>
             ) : (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>
-                Cargando mapa...
-              </div>
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>Cargando mapa...</div>
             )}
           </div>
           <div style={{ padding: '14px 16px', flexShrink: 0 }}>
@@ -456,7 +461,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         </div>
       )}
 
-      {/* Paso 3 — Destino */}
       {paso === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)' }}>
           <div style={{ padding: '14px 16px', flexShrink: 0 }}>
@@ -499,9 +503,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 {origen && destino && <Polyline positions={[origen, destino]} color="#1D9E75" weight={3} dashArray="8,6" opacity={0.8} />}
               </MapContainer>
             ) : (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>
-                Cargando mapa...
-              </div>
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>Cargando mapa...</div>
             )}
             {destino && distanciaTotal > 0 && (
               <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(13,13,13,0.95)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: '14px', padding: '10px 18px', zIndex: 1000, display: 'flex', gap: '20px', whiteSpace: 'nowrap' }}>
@@ -521,12 +523,9 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         </div>
       )}
 
-      {/* Paso 4 — Tipo de viaje */}
       {paso === 4 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>¿Cómo será tu viaje?</p>
-
-          {/* Selector tipo viaje */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
               { id: 'sencillo', icon: '➡️', label: 'Sencillo', desc: 'Del origen al destino, sin regreso', extra: '' },
@@ -546,7 +545,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             ))}
           </div>
 
-          {/* Opciones de espera si es redondo */}
           {tipoViaje === 'redondo' && (
             <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '14px', padding: '16px' }}>
               <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '12px' }}>⏱️ ¿Cuánto tiempo esperará el chofer?</p>
@@ -562,18 +560,12 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 <span>Costo de espera:</span>
                 <span style={{ color: '#E8A030', fontWeight: '600' }}>+${tiempoEspera * COSTO_ESPERA_POR_MIN} MXN ({tiempoEspera} min × $3)</span>
               </div>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '6px', lineHeight: '1.5' }}>
-                Si necesitas más tiempo, puedes negociar con el chofer por chat.
-              </p>
             </div>
           )}
 
-          {/* Paradas */}
           {tipoViaje === 'paradas' && (
             <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '14px', padding: '16px' }}>
               <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '10px' }}>🔶 Paradas en la ruta (+$20 por parada)</p>
-
-              {/* Lista de paradas */}
               {paradas.map((p, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '10px 12px', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -586,8 +578,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                   <button type="button" onClick={() => eliminarParada(i)} style={{ background: 'transparent', color: '#F09595', border: 'none', fontSize: '16px', cursor: 'pointer' }}>✕</button>
                 </div>
               ))}
-
-              {/* Buscador de parada */}
               <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <input type="text" placeholder="🔍 Buscar dirección de parada..."
                   value={busquedaParada}
@@ -612,38 +602,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                   ))}
                 </div>
               )}
-
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', lineHeight: '1.5' }}>
-                Cada parada agrega +$20 MXN al precio. El chofer sabrá dónde parar.
-              </p>
             </div>
           )}
 
-          {/* Resumen precio */}
           <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '14px 16px' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Resumen de precio</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
-                <span>Distancia ({distanciaTotal.toFixed(1)} km{tipoViaje === 'redondo' ? ' × 2' : ''})</span>
-                <span>${Math.max(tipoSeleccionado?.minimo || 0, Math.round(distanciaTotal * (tipoSeleccionado?.precioPorKm || 0)))}</span>
-              </div>
-              {tipoViaje === 'redondo' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#E8A030' }}>
-                  <span>Tiempo de espera ({tiempoEspera} min)</span>
-                  <span>+${tiempoEspera * COSTO_ESPERA_POR_MIN}</span>
-                </div>
-              )}
-              {paradas.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#E8A030' }}>
-                  <span>{paradas.length} parada(s)</span>
-                  <span>+${paradas.length * 20}</span>
-                </div>
-              )}
-              <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.1)', margin: '4px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>
-                <span>Total estimado</span>
-                <span>${precioTotal} MXN</span>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>
+              <span>Total estimado</span>
+              <span>${precioTotal} MXN</span>
             </div>
           </div>
 
@@ -653,10 +618,8 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
         </div>
       )}
 
-      {/* Paso 5 — Confirmar */}
       {paso === 5 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Mapa resumen */}
           {origen && destino && (
             <div style={{ height: '180px', borderRadius: '16px', overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.1)' }}>
               <MapContainer center={[(origen[0]+destino[0])/2, (origen[1]+destino[1])/2]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false}>
@@ -669,43 +632,29 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             </div>
           )}
 
-          {/* Precio total */}
-          <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '16px', padding: '18px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div>
-                <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${precioTotal} MXN</p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{distanciaTotal.toFixed(1)} km · {tipoSeleccionado?.icon} {tipoSeleccionado?.label}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#378ADD' }}>⏱️ {eta}</p>
-                {tipoViaje === 'redondo' && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '4px' }}>🔄 +{tiempoEspera} min espera</p>}
-                {paradas.length > 0 && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '4px' }}>🔶 {paradas.length} parada(s)</p>}
-              </div>
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${precioTotal} MXN</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{distanciaTotal.toFixed(1)} km · {tipoSeleccionado?.icon} {tipoSeleccionado?.label}</p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: tipoViaje === 'redondo' ? 'rgba(232,160,48,0.15)' : tipoViaje === 'paradas' ? 'rgba(232,160,48,0.15)' : 'rgba(29,158,117,0.15)', color: tipoViaje === 'sencillo' ? '#1D9E75' : '#E8A030', border: `0.5px solid ${tipoViaje === 'sencillo' ? 'rgba(29,158,117,0.3)' : 'rgba(232,160,48,0.3)'}` }}>
-                {tipoViaje === 'sencillo' ? '➡️ Sencillo' : tipoViaje === 'redondo' ? '🔄 Redondo' : '🔶 Con paradas'}
-              </span>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#378ADD' }}>⏱️ {eta}</p>
+              {tipoViaje === 'redondo' && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '4px' }}>🔄 +{tiempoEspera} min espera</p>}
+              {paradas.length > 0 && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '4px' }}>🔶 {paradas.length} parada(s)</p>}
             </div>
           </div>
 
-          {/* Cuándo */}
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cuándo?</p>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <button type="button" onClick={() => setEsAhora(true)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: esAhora ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: esAhora ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: esAhora ? '700' : '400', cursor: 'pointer', fontFamily: 'sans-serif', fontSize: '14px' }}>
-                ⚡ Ahora mismo
-              </button>
-              <button type="button" onClick={() => setEsAhora(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: !esAhora ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: !esAhora ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: !esAhora ? '700' : '400', cursor: 'pointer', fontFamily: 'sans-serif', fontSize: '14px' }}>
-                📅 Agendar
-              </button>
+              <button type="button" onClick={() => setEsAhora(true)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: esAhora ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: esAhora ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: esAhora ? '700' : '400', cursor: 'pointer', fontFamily: 'sans-serif', fontSize: '14px' }}>⚡ Ahora mismo</button>
+              <button type="button" onClick={() => setEsAhora(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: !esAhora ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: !esAhora ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: !esAhora ? '700' : '400', cursor: 'pointer', fontFamily: 'sans-serif', fontSize: '14px' }}>📅 Agendar</button>
             </div>
             {!esAhora && (
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>Fecha</p>
-                  <input type="date" value={fechaCita} onChange={e => { setFechaCita(e.target.value); setErrorFecha('') }}
-                    min={getHoyLocal()}
+                  <input type="date" value={fechaCita} onChange={e => { setFechaCita(e.target.value); setErrorFecha('') }} min={getHoyLocal()}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${errorFecha ? '#F09595' : 'rgba(255,255,255,0.15)'}`, borderRadius: '12px', padding: '12px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none', colorScheme: 'dark' }}
                   />
                 </div>
@@ -720,7 +669,6 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             {errorFecha && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>{errorFecha}</p>}
           </div>
 
-          {/* Cuántas personas van */}
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>👥 ¿Cuántas personas van?</p>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -731,72 +679,28 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
                 </button>
               ))}
             </div>
-            {personas >= 4 && (
-              <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '6px' }}>⚠️ {personas} personas — verifica que el vehículo tenga capacidad suficiente.</p>
-            )}
+            {personas >= 4 && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '6px' }}>⚠️ {personas} personas — verifica capacidad del vehículo.</p>}
           </div>
 
-          {/* Nota al conductor */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📝 ¿Cómo te identificas? (opcional)</p>
-              <input type="text" placeholder='Ej: "Camisa roja en la entrada", "Portón azul"...'
-                value={notaCliente} onChange={e => setNotaCliente(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: notaCliente ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
-              />
-            </div>
-            <div>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💬 Nota adicional (opcional)</p>
-              <textarea placeholder="Ej: Voy con niños, son 3 cajas, necesito llegar antes de las 3pm..."
-                value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
-              />
-            </div>
+          <div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📝 ¿Cómo te identificas? (opcional)</p>
+            <input type="text" placeholder='Ej: "Camisa roja en la entrada"...'
+              value={notaCliente} onChange={e => setNotaCliente(e.target.value)}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: notaCliente ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
+            />
           </div>
 
-          {/* Desglose detallado del precio por km */}
-<div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
-  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📊 ¿Cómo se calculó?</p>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
-      <span>{distanciaTotal.toFixed(1)} km × ${tipoSeleccionado?.precioPorKm}/km</span>
-      <span>${Math.round(distanciaTotal * (tipoSeleccionado?.precioPorKm || 0))} MXN</span>
-    </div>
-    {Math.round(distanciaTotal * (tipoSeleccionado?.precioPorKm || 0)) < (tipoSeleccionado?.minimo || 0) && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
-        <span>⬆️ Precio mínimo aplicado</span>
-        <span>${tipoSeleccionado?.minimo} MXN</span>
-      </div>
-    )}
-    {tipoViaje === 'redondo' && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
-        <span>🔄 Espera ({tiempoEspera} min × $3)</span>
-        <span>+${tiempoEspera * 3} MXN</span>
-      </div>
-    )}
-    {paradas.length > 0 && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#E8A030' }}>
-        <span>🔶 {paradas.length} parada(s) × $20</span>
-        <span>+${paradas.length * 20} MXN</span>
-      </div>
-    )}
-    <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>
-      <span>Total estimado</span>
-      <span>${precioTotal} MXN</span>
-    </div>
-    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '4px' }}>
-      El conductor puede hacer una contraoferta antes de aceptar.
-    </p>
-  </div>
-</div>
-
-          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '12px', padding: '12px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-            ⚠️ El conductor puede negociar el precio antes de aceptar.
+          <div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💬 Nota adicional (opcional)</p>
+            <textarea placeholder="Ej: Voy con niños, son 3 cajas..."
+              value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
+            />
           </div>
 
-          <button type="button" onClick={publicarViaje} disabled={publicando} style={{ width: '100%', padding: '16px', background: publicando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            {publicando ? 'Publicando...' : `${tipoSeleccionado?.icon} Solicitar — $${precioTotal} MXN`}
+          <button type="button" onClick={crearViajeYPagar} disabled={publicando}
+            style={{ width: '100%', padding: '16px', background: publicando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            {publicando ? 'Preparando pago...' : `${tipoSeleccionado?.icon} Continuar al pago — $${precioTotal} MXN`}
           </button>
         </div>
       )}
