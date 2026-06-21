@@ -390,7 +390,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
           {tipoViaje === 'redondo' && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔄 Viaje redondo · {tiempoEspera} min de espera incluidos</p>}
           {paradas.length > 0 && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔶 {paradas.length} parada(s) incluida(s)</p>}
         </div>
-        <button type="button" onClick={onIrAMisPublicaciones || onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        <button type="button" onClick={() => { if (onIrAMisPublicaciones) { onIrAMisPublicaciones() } else { onVolver() } }} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Ver mis publicaciones
         </button>
       </div>
