@@ -235,10 +235,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   }
 
   // ✅ PASO 1: Crear viaje en BD → abrir pago
-  async function crearViajeYPagar() {
-    if (!origen || !destino || !tipo) return
-    if (!validarFecha()) return
-    if (!reglasAceptadas) { setMostrarReglas(true); return }
+  async function _publicar() {
     setPublicando(true)
 
     const fCita = esAhora ? getHoyLocal() : fechaCita
@@ -281,6 +278,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     setTrabajoCreado(trabajo)
     setPublicando(false)
     setPagando(true)
+  }
+
+  async function crearViajeYPagar() {
+    if (!origen || !destino || !tipo) return
+    if (!validarFecha()) return
+    if (!reglasAceptadas) { setMostrarReglas(true); return }
+    await _publicar()
   }
 
   // ✅ PASO 2: Pago exitoso → notificar conductores
@@ -330,7 +334,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="cliente"
-      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); crearViajeYPagar() }}
+      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); _publicar() }}
       onCerrar={() => setMostrarReglas(false)}
     />
   )
