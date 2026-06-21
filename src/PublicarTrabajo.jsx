@@ -57,7 +57,7 @@ function getMinHora(fechaSeleccionada) {
   return '00:00'
 }
 
-export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
+export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPublicaciones }) {
   const [categoria, setCategoria] = useState('')
   const [otroServicio, setOtroServicio] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -169,7 +169,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             usuarioId: trabajador.id,
             titulo: `🔔 Nuevo trabajo de ${categoriaFinal}`,
             cuerpo: `$${presupuesto} MXN — ${descripcion.slice(0, 60)}${descripcion.length > 60 ? '...' : ''} · ${cuandoTexto}`,
-            tipo: 'nuevo_trabajo',
+            tipo: 'trabajo_aceptado',
             trabajoId: trabajoCreado.id,
           })
         }
@@ -223,8 +223,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
         <p style={{ color: '#1D9E75', fontSize: '14px', marginBottom: '32px' }}>
           {esAhora ? '⚡ Lo necesitas ahora mismo' : `📅 ${formatearFecha(fecha)} a las ${hora} hrs`}
         </p>
-        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-          Ver mapa
+        <button type="button" onClick={() => { if (onIrAMisPublicaciones) { onIrAMisPublicaciones() } else { onVolver() } }} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          Ver mis publicaciones
         </button>
       </div>
     )

@@ -17,8 +17,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const SALINA_CRUZ = [16.1833, -95.2000]
-
 const CATEGORIAS_ICONS_MAPA = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
   'Limpieza': '🧹', 'Planchado': '👔', 'Pintor': '🖌️',
@@ -105,7 +103,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
-  // Navegar a Mis publicaciones desde toast
   useEffect(() => {
     if (irAMisPublicaciones) {
       setPantalla('publicaciones')
@@ -121,8 +118,9 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   async function obtenerCiudad() {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords
+      setCentroMapa([latitude, longitude]) // ✅ centrar mapa en ubicación real
       try {
-        const { latitude, longitude } = pos.coords
         const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
           { headers: { 'Accept-Language': 'es' } }
@@ -162,7 +160,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   return (
     <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column', background: '#0D0D0D' }}>
 
-      {/* Modal Opciones */}
       {modalOpciones && (
         <div onClick={() => setModalOpciones(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#1A1A1A', borderRadius: '20px 20px 0 0', padding: '24px', width: '100%', maxWidth: '480px', border: '0.5px solid rgba(255,255,255,0.1)' }}>
@@ -178,7 +175,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         </div>
       )}
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: '#0D0D0D', borderBottom: '0.5px solid rgba(255,255,255,0.1)', zIndex: 1000 }}>
         <LogoChamba size='sm' />
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>📍 {ciudad}</span>
@@ -197,7 +193,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         </div>
       </div>
 
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', padding: '10px 16px', overflowX: 'auto', background: '#0D0D0D', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         {CATEGORIAS.map(cat => (
           <button key={cat} type="button" onClick={() => setCategoriaFiltro(cat)} style={{ background: categoriaFiltro === cat ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: categoriaFiltro === cat ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '20px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'sans-serif' }}>
@@ -206,11 +201,9 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         ))}
       </div>
 
-      {/* Mapa */}
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={centroMapa} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer attribution='&cop
-          y; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <MapaDragListener onDragStart={() => setBarVisible(false)} onDragEnd={() => setBarVisible(true)} />
           {trabajosFiltrados.map(t => {
             const icono = L.divIcon({
@@ -250,7 +243,6 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         )}
       </div>
 
-      {/* Bottom bar */}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0', background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.1)', transform: barVisible ? 'translateY(0)' : 'translateY(100%)', transition: 'transform 0.3s ease', position: 'relative', zIndex: 1000 }}>
         {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['🔍', 'Buscar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
           <button key={label} type="button"
