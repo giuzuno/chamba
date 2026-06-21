@@ -737,3 +737,4 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     </div>
   )
 }
+
