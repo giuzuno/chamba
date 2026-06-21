@@ -64,7 +64,7 @@ function getHoyLocal() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
 }
 
-export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
+export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPublicaciones }) {
   const [tipo, setTipo] = useState(null)
   const [paso, setPaso] = useState(1)
   const [ubicacionActual, setUbicacionActual] = useState(null)
@@ -198,7 +198,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     try {
       const base = origen || ubicacionActual || [16.1833, -95.2000]
       const res = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6`
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6&lang=es`
       )
       const json = await res.json()
       const data = (json.features || []).map(f => ({
@@ -390,7 +390,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
           {tipoViaje === 'redondo' && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔄 Viaje redondo · {tiempoEspera} min de espera incluidos</p>}
           {paradas.length > 0 && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔶 {paradas.length} parada(s) incluida(s)</p>}
         </div>
-        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        <button type="button" onClick={onIrAMisPublicaciones || onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Ver mis publicaciones
         </button>
       </div>
@@ -720,6 +720,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
             />
           </div>
 
+
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💬 Nota adicional (opcional)</p>
             <textarea placeholder="Ej: Voy con niños, son 3 cajas..."
@@ -737,3 +738,4 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
     </div>
   )
 }
+

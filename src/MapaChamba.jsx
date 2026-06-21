@@ -101,6 +101,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   const [barVisible, setBarVisible] = useState(true)
   const [ciudad, setCiudad] = useState('...')
   const [modalOpciones, setModalOpciones] = useState(false)
+  const [centroMapa, setCentroMapa] = useState([16.1833, -95.2000])
 
   const CATEGORIAS = ['Todos', 'Electricista', 'Plomero', 'Cocinera', 'Limpieza', 'Pintor', 'Cerrajero', 'Mecánico']
 
@@ -153,7 +154,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
   if (pantalla === 'seleccionar') return <SeleccionarTipoPublicacion onVolver={() => setPantalla('mapa')} onServicio={() => setPantalla('publicar')} onViaje={() => setPantalla('viaje')} />
   if (pantalla === 'publicar') return <PublicarTrabajo onVolver={() => setPantalla('seleccionar')} userId={userId} fotoUrl={fotoVerificada ? fotoUrlCliente : 'cargando'} />
-  if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} userId={userId} fotoUrl={fotoVerificada ? fotoUrlCliente : 'cargando'} />
+  if (pantalla === 'viaje') return <PublicarViaje onVolver={() => setPantalla('seleccionar')} onIrAMisPublicaciones={() => setPantalla('publicaciones')} userId={userId} fotoUrl={fotoVerificada ? fotoUrlCliente : 'cargando'} />
   if (pantalla === 'publicaciones') return <MisPublicaciones onVolver={() => setPantalla('mapa')} userId={userId} trabajoIdInicial={trabajoIdInicial} onTrabajoAbierto={() => {}} />
   if (pantalla === 'perfil') return <PerfilCliente onVolver={() => setPantalla('mapa')} userId={userId} userEmail={userEmail} />
   if (pantalla === 'buscar') return <BuscarTrabajadores userId={userId} onVolver={() => setPantalla('mapa')} />
@@ -207,8 +208,9 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
 
       {/* Mapa */}
       <div style={{ flex: 1, position: 'relative' }}>
-        <MapContainer center={SALINA_CRUZ} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapContainer center={centroMapa} zoom={14} style={{ height: '100%', width: '100%' }}>
+          <TileLayer attribution='&cop
+          y; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <MapaDragListener onDragStart={() => setBarVisible(false)} onDragEnd={() => setBarVisible(true)} />
           {trabajosFiltrados.map(t => {
             const icono = L.divIcon({
