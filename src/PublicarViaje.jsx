@@ -25,9 +25,11 @@ const iconoParada = L.divIcon({
 const TIPOS_VIAJE = [
   { id: 'raite', icon: '🚕', label: 'Raite', desc: 'Traslado en auto', precioPorKm: 15, minimo: 50, categoria: 'Taxi / Chofer' },
   { id: 'moto_raite', icon: '🏍️', label: 'Moto Raite', desc: 'Rápido y económico en moto', precioPorKm: 8, minimo: 30, categoria: 'Moto taxi' },
+  { id: 'tuk_tuk', icon: '🛺', label: 'Tuk Tuk', desc: 'Mototaxi de 3 ruedas', precioPorKm: 6, minimo: 25, categoria: 'Moto taxi' },
   { id: 'moto_mandados', icon: '🛵', label: 'Moto Mandados', desc: 'Entregas y paquetes', precioPorKm: 10, minimo: 35, categoria: 'Repartidor moto' },
   { id: 'flete', icon: '🚛', label: 'Flete', desc: 'Mudanza o carga pesada', precioPorKm: 25, minimo: 150, categoria: 'Fletes' },
 ]
+
 
 const OPCIONES_ESPERA = [15, 30, 45, 60, 90, 120]
 const COSTO_ESPERA_POR_MIN = 3
