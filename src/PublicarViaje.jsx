@@ -25,7 +25,6 @@ const iconoParada = L.divIcon({
 const TIPOS_VIAJE = [
   { id: 'raite', icon: '🚕', label: 'Raite', desc: 'Traslado en auto', precioPorKm: 15, minimo: 50, categoria: 'Taxi / Chofer' },
   { id: 'moto_raite', icon: '🏍️', label: 'Moto Raite', desc: 'Rápido y económico en moto', precioPorKm: 8, minimo: 30, categoria: 'Moto taxi' },
-  { id: 'tuk_tuk', icon: '🛺', label: 'Tuk Tuk', desc: 'Mototaxi de 3 ruedas', precioPorKm: 6, minimo: 25, categoria: 'Moto taxi' },
   { id: 'moto_mandados', icon: '🛵', label: 'Moto Mandados', desc: 'Entregas y paquetes', precioPorKm: 10, minimo: 35, categoria: 'Repartidor moto' },
   { id: 'flete', icon: '🚛', label: 'Flete', desc: 'Mudanza o carga pesada', precioPorKm: 25, minimo: 150, categoria: 'Fletes' },
 ]
@@ -65,7 +64,7 @@ function getHoyLocal() {
   return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
 }
 
-export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
+export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPublicaciones }) {
   const [tipo, setTipo] = useState(null)
   const [paso, setPaso] = useState(1)
   const [ubicacionActual, setUbicacionActual] = useState(null)
@@ -391,7 +390,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl }) {
           {tipoViaje === 'redondo' && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔄 Viaje redondo · {tiempoEspera} min de espera incluidos</p>}
           {paradas.length > 0 && <p style={{ fontSize: '12px', color: '#E8A030' }}>🔶 {paradas.length} parada(s) incluida(s)</p>}
         </div>
-        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        <button type="button" onClick={() => { if (onIrAMisPublicaciones) { onIrAMisPublicaciones() } else { onVolver() } }} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Ver mis publicaciones
         </button>
       </div>
