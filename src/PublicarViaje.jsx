@@ -313,6 +313,15 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
   async function crearViajeYPagar() {
     if (!origen || !destino || !tipo) return
     if (!validarFecha()) return
+
+    // Verificar duplicados — solo 1 viaje activo en total
+    const { data: duplicados } = await supabase.from('trabajos')
+      .select('id').eq('cliente_id', userId).eq('status', 'publicado').eq('es_viaje', true)
+    if (duplicados && duplicados.length > 0) {
+      setErrorFecha('Ya tienes un viaje publicado activo. Cancélalo antes de publicar otro.')
+      return
+    }
+
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     await _publicar()
   }
