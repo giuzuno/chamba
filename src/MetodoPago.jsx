@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
+import { loadStripe } from '@stripe/stripe-js/pure'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from './supabaseClient'
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
 function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente }) {
   const stripe = useStripe()
@@ -52,7 +50,7 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
         Cancelar
       </button>
       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
-        Tu tarjeta se guardará para futuros pagos · Encriptado por Stripe 🔒
+        Encriptado por Stripe 🔒
       </p>
     </div>
   )
@@ -120,6 +118,7 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente
 }
 
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
+  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
   const [clientSecret, setClientSecret] = useState(null)
   const [totalCliente, setTotalCliente] = useState(null)
   const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
