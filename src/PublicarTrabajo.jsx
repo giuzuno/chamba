@@ -62,6 +62,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [otroServicio, setOtroServicio] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [presupuesto, setPresupuesto] = useState(300)
+  const [presupuestoMax, setPresupuestoMax] = useState(500)
+  const [usarRango, setUsarRango] = useState(false)
   const [esAhora, setEsAhora] = useState(false)
   const [fecha, setFecha] = useState('')
   const [hora, setHora] = useState('')
@@ -116,12 +118,21 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     setFotosProblema(prev => prev.filter((_, i) => i !== idx))
   }
 
-  function verConfirmacion() {
+  async function verConfirmacion() {
     if (!categoria) { setError('Selecciona una categoría'); return }
     if (categoria === 'Otros' && !otroServicio) { setError('Describe qué servicio necesitas'); return }
     if (!descripcion) { setError('Describe el trabajo'); return }
     if (!esAhora && !fecha) { setError('Selecciona la fecha en que lo necesitas'); return }
     if (!esAhora && !hora) { setError('Selecciona la hora en que lo necesitas'); return }
+
+    // Verificar duplicados — mismo cliente, misma categoría, status publicado
+    const { data: duplicados } = await supabase.from('trabajos')
+      .select('id').eq('cliente_id', userId).eq('categoria', categoriaFinal).eq('status', 'publicado')
+    if (duplicados && duplicados.length > 0) {
+      setError('Ya tienes un trabajo publicado de esta categoría. Cancélalo antes de publicar otro.')
+      return
+    }
+
     setError('')
 
     if (!reglasAceptadas) { setMostrarReglas(true); return }
@@ -155,6 +166,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       categoria: categoriaFinalSanitizada,
       descripcion: descripcionSanitizada,
       presupuesto,
+      presupuesto_max: usarRango ? presupuestoMax : null,
       fecha_cita: fechaFinal,
       hora_cita: horaFinal,
       lat: ubicacion.lat,
@@ -291,7 +303,10 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
               <span style={{ fontSize: '32px' }}>💰</span>
               <div>
                 <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>PRESUPUESTO</p>
-                <p style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75' }}>${presupuesto} MXN</p>
+                {usarRango
+                  ? <p style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75' }}>${presupuesto} — ${Math.max(presupuestoMax, presupuesto)} MXN</p>
+                  : <p style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75' }}>${presupuesto} MXN</p>
+                }
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
@@ -428,14 +443,36 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
         {/* Presupuesto */}
         <div>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cuánto pagas</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <input type="range" min="100" max="3000" step="50"
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cuánto pagas</p>
+            <button type="button" onClick={() => setUsarRango(!usarRango)} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', background: usarRango ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.08)', color: usarRango ? '#1D9E75' : 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
+              {usarRango ? '✓ Rango' : '+ Rango de precio'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: usarRango ? '12px' : '0' }}>
+            <input type="range" min="50" max="3000" step="50"
               value={presupuesto} onChange={e => setPresupuesto(Number(e.target.value))}
               style={{ flex: 1, accentColor: '#1D9E75' }}
             />
-            <span style={{ fontSize: '20px', fontWeight: '700', color: '#1D9E75', minWidth: '90px', textAlign: 'right' }}>${presupuesto} MXN</span>
+            <span style={{ fontSize: '18px', fontWeight: '700', color: '#1D9E75', minWidth: '90px', textAlign: 'right' }}>
+              {usarRango ? `$${presupuesto}` : `$${presupuesto} MXN`}
+            </span>
           </div>
+          {usarRango && (
+            <>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>Precio máximo:</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <input type="range" min={presupuesto} max="5000" step="50"
+                  value={Math.max(presupuestoMax, presupuesto)} onChange={e => setPresupuestoMax(Number(e.target.value))}
+                  style={{ flex: 1, accentColor: '#E8A030' }}
+                />
+                <span style={{ fontSize: '18px', fontWeight: '700', color: '#E8A030', minWidth: '90px', textAlign: 'right' }}>${Math.max(presupuestoMax, presupuesto)} MXN</span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '8px' }}>
+                Rango: <strong style={{ color: '#1D9E75' }}>${presupuesto}</strong> — <strong style={{ color: '#E8A030' }}>${Math.max(presupuestoMax, presupuesto)} MXN</strong>
+              </p>
+            </>
+          )}
         </div>
 
         {/* Fecha y hora */}
