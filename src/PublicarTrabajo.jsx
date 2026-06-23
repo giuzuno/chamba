@@ -57,7 +57,7 @@ function getMinHora(fechaSeleccionada) {
   return '00:00'
 }
 
-export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPublicaciones }) {
+export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [categoria, setCategoria] = useState('')
   const [otroServicio, setOtroServicio] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -75,6 +75,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPub
   const [materiales, setMateriales] = useState('cliente')
   const [trabajoCreado, setTrabajoCreado] = useState(null) // trabajo en BD pendiente de pago
   const [pagando, setPagando] = useState(false)
+  const [fotosProblema, setFotosProblema] = useState([])
+  const [subiendoFotos, setSubiendoFotos] = useState(false)
 
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
@@ -86,6 +88,32 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPub
     if (!f) return ''
     const d = new Date(f + 'T12:00:00')
     return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+  }
+
+  async function subirFotosProblema(e) {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    if (fotosProblema.length + files.length > 10) {
+      setError('Máximo 10 fotos permitidas')
+      return
+    }
+    setSubiendoFotos(true)
+    const nuevasFotos = []
+    for (const file of files) {
+      const ext = file.name.split('.').pop()
+      const path = `problemas/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+      if (!uploadError) {
+        const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+        nuevasFotos.push(data.publicUrl)
+      }
+    }
+    setFotosProblema(prev => [...prev, ...nuevasFotos])
+    setSubiendoFotos(false)
+  }
+
+  function eliminarFotoProblema(idx) {
+    setFotosProblema(prev => prev.filter((_, i) => i !== idx))
   }
 
   function verConfirmacion() {
@@ -132,6 +160,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPub
       lat: ubicacion.lat,
       lng: ubicacion.lng,
       materiales,
+      fotos_problema: fotosProblema,
       status: 'publicado',
       pago_status: 'pendiente',
     }).select().single()
@@ -223,8 +252,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPub
         <p style={{ color: '#1D9E75', fontSize: '14px', marginBottom: '32px' }}>
           {esAhora ? '⚡ Lo necesitas ahora mismo' : `📅 ${formatearFecha(fecha)} a las ${hora} hrs`}
         </p>
-        <button type="button" onClick={() => { if (onIrAMisPublicaciones) { onIrAMisPublicaciones() } else { onVolver() } }} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-          Ver mis publicaciones
+        <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          Ver mapa
         </button>
       </div>
     )
@@ -436,6 +465,32 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl, onIrAMisPub
             </div>
           </>
         )}
+
+        {/* Fotos del problema */}
+        <div>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📷 Fotos del problema (opcional)</p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '12px', lineHeight: '1.5' }}>Sube fotos para que el trabajador entienda mejor qué hay que hacer. Máximo 10 fotos.</p>
+          {fotosProblema.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+              {fotosProblema.map((url, i) => (
+                <div key={i} style={{ position: 'relative' }}>
+                  <img src={url} alt={`foto ${i+1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(29,158,117,0.3)' }} />
+                  <button type="button" onClick={() => eliminarFotoProblema(i)} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px', fontFamily: 'sans-serif' }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {fotosProblema.length < 10 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(255,255,255,0.04)', border: '1.5px dashed rgba(255,255,255,0.15)', borderRadius: '12px', cursor: 'pointer' }}>
+              <span style={{ fontSize: '24px' }}>{subiendoFotos ? '⏳' : '📷'}</span>
+              <div>
+                <p style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>{subiendoFotos ? 'Subiendo...' : 'Agregar fotos'}</p>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{fotosProblema.length}/10 fotos · Toca para seleccionar</p>
+              </div>
+              <input type="file" accept="image/*" multiple onChange={subirFotosProblema} style={{ display: 'none' }} disabled={subiendoFotos} />
+            </label>
+          )}
+        </div>
 
         {/* Materiales */}
         <div>

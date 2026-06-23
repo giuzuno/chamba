@@ -133,7 +133,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [modalRechazo, setModalRechazo] = useState(false)
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [modalFotoTrabajo, setModalFotoTrabajo] = useState(null)
-  const [fotoTrabajoUrl, setFotoTrabajoUrl] = useState(null)
+  const [fotosTrabajoUrls, setFotosTrabajoUrls] = useState([])
   const [subiendoFotoTrabajo, setSubiendoFotoTrabajo] = useState(false)
 
   useEffect(() => {
@@ -275,7 +275,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   async function marcarCompletado(trabajo) {
-    setFotoTrabajoUrl(null)
+    setFotosTrabajoUrls([])
     setModalFotoTrabajo(trabajo)
   }
 
@@ -284,7 +284,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     await supabase.from('trabajos').update({
       status: 'en_revision',
       en_revision_desde: new Date().toISOString(),
-      foto_trabajo_url: fotoTrabajoUrl,
+      foto_trabajo_url: fotosTrabajoUrls[0] || null,
+      fotos_trabajo_urls: fotosTrabajoUrls,
     }).eq('id', trabajo.id)
     await enviarNotificacionCompleta({
       usuarioId: trabajo.cliente_id,
@@ -297,20 +298,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     await cargarHistorial()
     setLoadingCompletar(null)
     setModalFotoTrabajo(null)
-    setFotoTrabajoUrl(null)
+    setFotosTrabajoUrls([])
     setCalificando(trabajo)
   }
 
   async function subirFotoTrabajo(e) {
-    const file = e.target.files[0]
-    if (!file) return
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    if (fotosTrabajoUrls.length + files.length > 10) return
     setSubiendoFotoTrabajo(true)
-    const ext = file.name.split('.').pop()
-    const path = `trabajos/${modalFotoTrabajo.id}/terminado.${ext}`
-    const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
-    if (!error) {
-      const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      setFotoTrabajoUrl(data.publicUrl)
+    for (const file of files) {
+      const ext = file.name.split('.').pop()
+      const path = `trabajos/${modalFotoTrabajo.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+      if (!error) {
+        const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+        setFotosTrabajoUrls(prev => [...prev, data.publicUrl])
+      }
     }
     setSubiendoFotoTrabajo(false)
   }
@@ -508,28 +512,32 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               La foto protege a ambas partes. Si el cliente abre una disputa, esta imagen es la prueba de que el trabajo quedó bien. Sin foto no puedes marcar como terminado.
             </p>
           </div>
-          {fotoTrabajoUrl ? (
-            <div style={{ position: 'relative' }}>
-              <img src={fotoTrabajoUrl} alt="trabajo" style={{ width: '100%', maxHeight: '280px', objectFit: 'cover', borderRadius: '16px', border: '2px solid rgba(29,158,117,0.4)' }} />
-              <button type="button" onClick={() => setFotoTrabajoUrl(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', fontFamily: 'sans-serif' }}>✕</button>
-              <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(29,158,117,0.9)', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>✅ Foto lista</div>
+          {fotosTrabajoUrls.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px' }}>
+              {fotosTrabajoUrls.map((url, i) => (
+                <div key={i} style={{ position: 'relative' }}>
+                  <img src={url} alt={`foto ${i+1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(29,158,117,0.4)' }} />
+                  <button type="button" onClick={() => setFotosTrabajoUrls(prev => prev.filter((_, j) => j !== i))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                </div>
+              ))}
             </div>
-          ) : (
-            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '40px 20px', background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '16px', cursor: 'pointer', textAlign: 'center' }}>
-              <span style={{ fontSize: '48px' }}>{subiendoFotoTrabajo ? '⏳' : '📷'}</span>
+          )}
+          {fotosTrabajoUrls.length < 10 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '16px', cursor: 'pointer' }}>
+              <span style={{ fontSize: '36px' }}>{subiendoFotoTrabajo ? '⏳' : '📷'}</span>
               <div>
-                <p style={{ fontSize: '15px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>
-                  {subiendoFotoTrabajo ? 'Subiendo foto...' : 'Toca para subir foto'}
+                <p style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>
+                  {subiendoFotoTrabajo ? 'Subiendo...' : 'Agregar fotos'}
                 </p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Toma una foto del trabajo terminado</p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{fotosTrabajoUrls.length}/10 fotos del trabajo terminado</p>
               </div>
-              <input type="file" accept="image/*" capture="environment" onChange={subirFotoTrabajo} style={{ display: 'none' }} disabled={subiendoFotoTrabajo} />
+              <input type="file" accept="image/*" capture="environment" multiple onChange={subirFotoTrabajo} style={{ display: 'none' }} disabled={subiendoFotoTrabajo} />
             </label>
           )}
           <button type="button" onClick={() => confirmarCompletadoConFoto(modalFotoTrabajo)}
-            disabled={!fotoTrabajoUrl || loadingCompletar === modalFotoTrabajo.id}
-            style={{ width: '100%', padding: '16px', background: fotoTrabajoUrl ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: fotoTrabajoUrl ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: fotoTrabajoUrl ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
-            {loadingCompletar === modalFotoTrabajo.id ? 'Enviando...' : fotoTrabajoUrl ? '✅ Confirmar trabajo terminado' : 'Sube una foto primero'}
+            disabled={fotosTrabajoUrls.length === 0 || loadingCompletar === modalFotoTrabajo.id}
+            style={{ width: '100%', padding: '16px', background: fotosTrabajoUrls.length > 0 ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: fotosTrabajoUrls.length > 0 ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: fotosTrabajoUrls.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
+            {loadingCompletar === modalFotoTrabajo.id ? 'Enviando...' : fotosTrabajoUrls.length > 0 ? `✅ Confirmar trabajo terminado (${fotosTrabajoUrls.length} foto${fotosTrabajoUrls.length > 1 ? 's' : ''})` : 'Sube al menos una foto'}
           </button>
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', lineHeight: '1.6' }}>
             La foto será visible para el cliente y el equipo de Chamba en caso de disputa.
