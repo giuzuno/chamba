@@ -502,7 +502,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
-          <button type="button" onClick={() => { setModalFotoTrabajo(null); setFotoTrabajoUrl(null) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <button type="button" onClick={() => { setModalFotoTrabajo(null); setFotosTrabajoUrls([]) }} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>📸 Foto del trabajo terminado</h2>
         </div>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -615,9 +615,21 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               </div>
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>DESCRIPCIÓN</p>
-                  <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>{trabajoSeleccionado.descripcion}</p>
-                </div>
+  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>DESCRIPCIÓN</p>
+  <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'rgba(255,255,255,0.85)' }}>{trabajoSeleccionado.descripcion}</p>
+  {trabajoSeleccionado.fotos_problema && trabajoSeleccionado.fotos_problema.length > 0 && (
+    <div style={{ marginTop: '12px' }}>
+      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>📷 FOTOS DEL PROBLEMA ({trabajoSeleccionado.fotos_problema.length})</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+        {trabajoSeleccionado.fotos_problema.map((url, i) => (
+          <a key={i} href={url} target="_blank" rel="noreferrer">
+            <img src={url} alt={`problema ${i+1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
+          </a>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
                 {trabajoSeleccionado.fecha_cita && (
                   <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)', background: 'rgba(29,158,117,0.05)' }}>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>CUÁNDO LO NECESITAN</p>
