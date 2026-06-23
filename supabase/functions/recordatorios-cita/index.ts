@@ -109,10 +109,10 @@ serve(async (req) => {
     const ahora = new Date()
     let enviados = 0
 
-    // ── Buscar trabajos aceptados con fecha_cita y hora_cita ──
+    // Buscar trabajos aceptados con cita, que NO hayan recibido ya los recordatorios
     const { data: trabajos } = await supabase
       .from('trabajos')
-      .select('id, categoria, fecha_cita, hora_cita, cliente_id, trabajador_id')
+      .select('id, categoria, fecha_cita, hora_cita, cliente_id, trabajador_id, recordatorio_24h_enviado, recordatorio_1h_enviado')
       .eq('status', 'aceptado')
       .not('fecha_cita', 'is', null)
       .not('hora_cita', 'is', null)
@@ -128,7 +128,7 @@ serve(async (req) => {
       const diffMs = citaDateTime.getTime() - ahora.getTime()
       const diffHoras = diffMs / (1000 * 60 * 60)
 
-      // Obtener tokens FCM de cliente y trabajador
+      // Obtener tokens FCM
       const { data: usuarios } = await supabase
         .from('usuarios')
         .select('id, fcm_token')
@@ -137,33 +137,41 @@ serve(async (req) => {
       const cliente = usuarios?.find((u: any) => u.id === trabajo.cliente_id)
       const trabajador = usuarios?.find((u: any) => u.id === trabajo.trabajador_id)
 
-      // ── Recordatorio 24 hrs antes (entre 23 y 25 hrs) ──
-      if (diffHoras >= 23 && diffHoras <= 25) {
+      // ── Recordatorio 24 hrs antes (ventana: 23-25 hrs) ──
+      if (diffHoras >= 23 && diffHoras <= 25 && !trabajo.recordatorio_24h_enviado) {
         const titulo = `📅 Cita mañana — ${trabajo.categoria}`
         const cuerpoCliente = `Mañana a las ${trabajo.hora_cita?.slice(0,5)} hrs tienes tu ${trabajo.categoria}. ¡Asegúrate de estar en casa!`
         const cuerpoTrabajador = `Mañana a las ${trabajo.hora_cita?.slice(0,5)} hrs tienes el trabajo de ${trabajo.categoria}. ¡Prepárate!`
 
         if (cliente?.fcm_token) await enviarPush(cliente.fcm_token, titulo, cuerpoCliente, accessToken)
         if (trabajador?.fcm_token) await enviarPush(trabajador.fcm_token, titulo, cuerpoTrabajador, accessToken)
-
         if (trabajo.cliente_id) await guardarNotificacion(supabase, trabajo.cliente_id, titulo, cuerpoCliente, trabajo.id)
         if (trabajo.trabajador_id) await guardarNotificacion(supabase, trabajo.trabajador_id, titulo, cuerpoTrabajador, trabajo.id)
+
+        // Marcar como enviado para no repetir
+        await supabase.from('trabajos')
+          .update({ recordatorio_24h_enviado: true })
+          .eq('id', trabajo.id)
 
         enviados += 2
         console.log(`Recordatorio 24hrs enviado: trabajo ${trabajo.id}`)
       }
 
-      // ── Recordatorio 1 hr antes (entre 50 y 70 minutos) ──
-      if (diffHoras >= 0.83 && diffHoras <= 1.17) {
+      // ── Recordatorio 1 hr antes (ventana: 50-70 min) ──
+      if (diffHoras >= 0.83 && diffHoras <= 1.17 && !trabajo.recordatorio_1h_enviado) {
         const titulo = `⏰ En 1 hora — ${trabajo.categoria}`
         const cuerpoCliente = `En aprox. 1 hora llegará el trabajador para tu ${trabajo.categoria}. ¡Prepárate!`
         const cuerpoTrabajador = `En aprox. 1 hora es tu cita de ${trabajo.categoria}. ¡Ya es hora de salir!`
 
         if (cliente?.fcm_token) await enviarPush(cliente.fcm_token, titulo, cuerpoCliente, accessToken)
         if (trabajador?.fcm_token) await enviarPush(trabajador.fcm_token, titulo, cuerpoTrabajador, accessToken)
-
         if (trabajo.cliente_id) await guardarNotificacion(supabase, trabajo.cliente_id, titulo, cuerpoCliente, trabajo.id)
         if (trabajo.trabajador_id) await guardarNotificacion(supabase, trabajo.trabajador_id, titulo, cuerpoTrabajador, trabajo.id)
+
+        // Marcar como enviado
+        await supabase.from('trabajos')
+          .update({ recordatorio_1h_enviado: true })
+          .eq('id', trabajo.id)
 
         enviados += 2
         console.log(`Recordatorio 1hr enviado: trabajo ${trabajo.id}`)
