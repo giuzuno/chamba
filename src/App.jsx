@@ -416,6 +416,7 @@ function AppContenido() {
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
+  const [verPassword, setVerPassword] = useState(false)
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
 
@@ -671,7 +672,12 @@ function AppContenido() {
         <div style={{ marginBottom: '32px' }}><LogoChamba size='md' /></div>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <input id="email" name="email" type="email" placeholder="Tu correo" value={email} onChange={e => setEmail(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
-          <input id="password" name="password" type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} required style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
+          <div style={{ position: 'relative' }}>
+  <input id="password" name="password" type={verPassword ? 'text' : 'password'} placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '14px 48px 14px 16px', color: 'white', fontSize: '15px', outline: 'none' }} />
+  <button type="button" onClick={() => setVerPassword(!verPassword)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'rgba(255,255,255,0.4)' }}>
+    {verPassword ? '🙈' : '👁️'}
+  </button>
+</div>
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>{loading ? 'Cargando...' : 'Entrar'}</button>
           <button type="button" onClick={handleRegister} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
