@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from './supabaseClient'
 
-function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente }) {
+function CheckoutForm({ trabajo, onPagoExitoso, onCancelar, totalCliente, clientSecret }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -14,17 +14,10 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
     setLoading(true)
     setError('')
 
-    const { error: submitError } = await elements.submit()
-    if (submitError) {
-      setError(submitError.message || 'Error al validar el formulario')
-      setLoading(false)
-      return
-    }
+    const cardElement = elements.getElement(CardElement)
 
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: window.location.origin },
-      redirect: 'if_required',
+    const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: { card: cardElement },
     })
 
     if (stripeError) {
@@ -33,18 +26,27 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
       return
     }
 
-    await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
-    setLoading(false)
-    onPagoExitoso()
+    if (paymentIntent.status === 'succeeded') {
+      await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
+      setLoading(false)
+      onPagoExitoso()
+    }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '14px', padding: '4px' }}>
-        <PaymentElement options={{
-          layout: { type: 'tabs', defaultCollapsed: false },
-          wallets: { applePay: 'never', googlePay: 'never' },
-          terms: { card: 'never' },
+      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '16px', border: '0.5px solid rgba(255,255,255,0.15)' }}>
+        <CardElement options={{
+          style: {
+            base: {
+              fontSize: '16px',
+              color: '#ffffff',
+              fontFamily: 'sans-serif',
+              '::placeholder': { color: 'rgba(255,255,255,0.3)' },
+            },
+            invalid: { color: '#F09595' },
+          },
+          hidePostalCode: true,
         }} />
       </div>
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
@@ -63,74 +65,10 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
   )
 }
 
-function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente, tarjeta, clientSecret, onUsarOtraTarjeta }) {
-  const stripe = useStripe()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handlePagarGuardada() {
-    if (!stripe) return
-    setLoading(true)
-    setError('')
-
-    const { error: stripeError } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: tarjeta.id,
-    })
-
-    if (stripeError) {
-      setError(stripeError.message || 'Error al procesar el pago')
-      setLoading(false)
-      return
-    }
-
-    await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
-    setLoading(false)
-    onPagoExitoso()
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ background: 'rgba(29,158,117,0.08)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <span style={{ fontSize: '36px' }}>💳</span>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tarjeta guardada</p>
-          <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', textTransform: 'capitalize' }}>
-            {tarjeta.marca} •••• {tarjeta.ultimos4}
-          </p>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-            Vence {String(tarjeta.expMes).padStart(2, '0')}/{String(tarjeta.expAnio).slice(-2)}
-          </p>
-        </div>
-        <span style={{ fontSize: '20px', color: '#1D9E75' }}>✓</span>
-      </div>
-
-      {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
-
-      <button type="button" onClick={handlePagarGuardada} disabled={!stripe || loading}
-        style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
-        {loading ? 'Procesando...' : `✅ Confirmar pago — $${totalCliente} MXN`}
-      </button>
-
-      <button type="button" onClick={onUsarOtraTarjeta}
-        style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-        Usar otra tarjeta
-      </button>
-
-      <button type="button" onClick={onCancelar}
-        style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-        Cancelar
-      </button>
-    </div>
-  )
-}
-
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
   const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
   const [clientSecret, setClientSecret] = useState(null)
-  const [customerSessionClientSecret, setCustomerSessionClientSecret] = useState(null)
   const [totalCliente, setTotalCliente] = useState(null)
-  const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
-  const [usarOtraTarjeta, setUsarOtraTarjeta] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
@@ -151,9 +89,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       }
 
       setClientSecret(data.clientSecret)
-      setCustomerSessionClientSecret(data.customerSessionClientSecret || null)
       setTotalCliente(data.totalCliente)
-      setTarjetaGuardada(data.tarjetaGuardada || null)
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
     }
@@ -170,16 +106,6 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       fontFamily: 'sans-serif',
       borderRadius: '10px',
     },
-  }
-
-  const elementsOptions = {
-    clientSecret,
-    appearance,
-    locale: 'es',
-  }
-
-  if (customerSessionClientSecret) {
-    elementsOptions.customerSessionClientSecret = customerSessionClientSecret
   }
 
   return (
@@ -218,28 +144,15 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
               <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${totalCliente} MXN</p>
             </div>
 
-            {tarjetaGuardada && !usarOtraTarjeta ? (
-              <Elements stripe={stripePromise} options={elementsOptions}>
-                <CheckoutFormGuardada
-                  trabajo={trabajo}
-                  onPagoExitoso={onPagoExitoso}
-                  onCancelar={onCancelar}
-                  totalCliente={totalCliente}
-                  tarjeta={tarjetaGuardada}
-                  clientSecret={clientSecret}
-                  onUsarOtraTarjeta={() => setUsarOtraTarjeta(true)}
-                />
-              </Elements>
-            ) : (
-              <Elements stripe={stripePromise} options={elementsOptions}>
-                <CheckoutFormNueva
-                  trabajo={trabajo}
-                  onPagoExitoso={onPagoExitoso}
-                  onCancelar={onCancelar}
-                  totalCliente={totalCliente}
-                />
-              </Elements>
-            )}
+            <Elements stripe={stripePromise} options={{ appearance, locale: 'es' }}>
+              <CheckoutForm
+                trabajo={trabajo}
+                onPagoExitoso={onPagoExitoso}
+                onCancelar={onCancelar}
+                totalCliente={totalCliente}
+                clientSecret={clientSecret}
+              />
+            </Elements>
           </>
         )}
       </div>
