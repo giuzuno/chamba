@@ -14,6 +14,13 @@ function CheckoutFormNueva({ trabajo, onPagoExitoso, onCancelar, totalCliente })
     setLoading(true)
     setError('')
 
+    const { error: submitError } = await elements.submit()
+    if (submitError) {
+      setError(submitError.message || 'Error al validar el formulario')
+      setLoading(false)
+      return
+    }
+
     const { error: stripeError } = await stripe.confirmPayment({
       elements,
       confirmParams: { return_url: window.location.origin },
@@ -118,8 +125,9 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente
 }
 
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) 
+  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
   const [clientSecret, setClientSecret] = useState(null)
+  const [customerSessionClientSecret, setCustomerSessionClientSecret] = useState(null)
   const [totalCliente, setTotalCliente] = useState(null)
   const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
   const [usarOtraTarjeta, setUsarOtraTarjeta] = useState(false)
@@ -143,6 +151,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
       }
 
       setClientSecret(data.clientSecret)
+      setCustomerSessionClientSecret(data.customerSessionClientSecret || null)
       setTotalCliente(data.totalCliente)
       setTarjetaGuardada(data.tarjetaGuardada || null)
     } catch {
@@ -161,6 +170,16 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
       fontFamily: 'sans-serif',
       borderRadius: '10px',
     },
+  }
+
+  const elementsOptions: any = {
+    clientSecret,
+    appearance,
+    locale: 'es',
+  }
+
+  if (customerSessionClientSecret) {
+    elementsOptions.customerSessionClientSecret = customerSessionClientSecret
   }
 
   return (
@@ -200,7 +219,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
             </div>
 
             {tarjetaGuardada && !usarOtraTarjeta ? (
-              <Elements stripe={stripePromise} options={{ clientSecret, appearance, locale: 'es' }}>
+              <Elements stripe={stripePromise} options={elementsOptions}>
                 <CheckoutFormGuardada
                   trabajo={trabajo}
                   onPagoExitoso={onPagoExitoso}
@@ -212,7 +231,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
                 />
               </Elements>
             ) : (
-              <Elements stripe={stripePromise} options={{ clientSecret, appearance, locale: 'es' }}>
+              <Elements stripe={stripePromise} options={elementsOptions}>
                 <CheckoutFormNueva
                   trabajo={trabajo}
                   onPagoExitoso={onPagoExitoso}
