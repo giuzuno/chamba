@@ -172,7 +172,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
     },
   }
 
-  const elementsOptions: any = {
+  const elementsOptions = {
     clientSecret,
     appearance,
     locale: 'es',
