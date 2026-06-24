@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { loadStripe } from '@stripe/stripe-js/pure'
+import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from './supabaseClient'
 
@@ -118,7 +118,9 @@ function CheckoutFormGuardada({ trabajo, onPagoExitoso, onCancelar, totalCliente
 }
 
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
-  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY, {
+    apiVersion: '2024-12-18.acacia',
+  })
   const [clientSecret, setClientSecret] = useState(null)
   const [totalCliente, setTotalCliente] = useState(null)
   const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
