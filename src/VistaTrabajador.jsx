@@ -738,7 +738,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                 ❓ Pedir más detalles al cliente
               </button>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                🔒 Al aceptar, el pago queda protegido en escrow.
+                🔒 Al aceptar, el pago queda protegido en protegido hasta confirmar.
               </div>
               <button type="button" onClick={() => setNegociando(trabajoSeleccionado)} style={{ width: '100%', padding: '16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 💰 Ver y negociar precio
@@ -856,7 +856,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                         ? <span style={{ fontSize: '11px', color: '#E8A030', fontWeight: '500' }}>⏳ Esperando confirmación del cliente</span>
                         : trabajo.trabajo_iniciado
                           ? <span style={{ fontSize: '11px', color: '#378ADD', fontWeight: '500' }}>🔨 Trabajo en progreso</span>
-                          : <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago en escrow</span>
+                          : <span style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '500' }}>✅ Aceptado · Pago protegido hasta confirmar</span>
                       }
                     </div>
                   </div>

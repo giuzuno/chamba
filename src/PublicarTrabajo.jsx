@@ -341,7 +341,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             <span style={{ fontSize: '20px', flexShrink: 0 }}>🔐</span>
             <div>
               <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Tu dinero está protegido</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido en escrow y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien.</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido hasta confirma y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien.</p>
             </div>
           </div>
 
