@@ -1,121 +1,200 @@
 import { useState, useEffect } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from './supabaseClient'
 
-function CheckoutForm({ trabajo, onPagoExitoso, onCancelar, totalCliente, clientSecret }) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handlePagar() {
-    if (!stripe || !elements) return
-    setLoading(true)
-    setError('')
-
-    const cardElement = elements.getElement(CardElement)
-
-    const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: { card: cardElement },
-    })
-
-    if (stripeError) {
-      setError(stripeError.message || 'Error al procesar el pago')
-      setLoading(false)
-      return
-    }
-
-    if (paymentIntent.status === 'succeeded') {
-      await supabase.from('trabajos').update({ pago_status: 'pagado' }).eq('id', trabajo.id)
-      setLoading(false)
-      onPagoExitoso()
-    }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '16px', border: '0.5px solid rgba(255,255,255,0.15)' }}>
-        <CardElement options={{
-          style: {
-            base: {
-              fontSize: '16px',
-              color: '#ffffff',
-              fontFamily: 'sans-serif',
-              '::placeholder': { color: 'rgba(255,255,255,0.3)' },
-            },
-            invalid: { color: '#F09595' },
-          },
-          hidePostalCode: true,
-        }} />
-      </div>
-      {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
-      <button type="button" onClick={handlePagar} disabled={!stripe || loading}
-        style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
-        {loading ? 'Procesando...' : `💳 Pagar $${totalCliente} MXN`}
-      </button>
-      <button type="button" onClick={onCancelar}
-        style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-        Cancelar
-      </button>
-      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
-        Encriptado por Stripe 🔒
-      </p>
-    </div>
-  )
-}
-
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
-  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-  const [clientSecret, setClientSecret] = useState(null)
-  const [totalCliente, setTotalCliente] = useState(null)
   const [cargando, setCargando] = useState(true)
+  const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
+  const [config, setConfig] = useState(null)
+  const [mpListo, setMpListo] = useState(false)
+  const [cardForm, setCardForm] = useState(null)
+  const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
+  const [usarGuardada, setUsarGuardada] = useState(false)
+  const [cvv, setCvv] = useState('')
+  const [guardarTarjeta, setGuardarTarjeta] = useState(true)
 
-  useEffect(() => { crearPaymentIntent() }, [])
+  // 1. Cargar config desde edge function
+  useEffect(() => { iniciarPago() }, [])
 
-  async function crearPaymentIntent() {
+  async function iniciarPago() {
     setCargando(true)
     setError('')
     try {
       const { data, error: fnError } = await supabase.functions.invoke('cobrar-trabajo', {
         body: { trabajoId: trabajo.id }
       })
-
-      if (fnError || !data?.clientSecret) {
-        setError('No se pudo iniciar el pago. Intenta de nuevo.')
+      if (fnError || !data?.ok) {
+        setError(data?.error || 'No se pudo iniciar el pago.')
         setCargando(false)
         return
       }
+      setConfig(data)
 
-      setClientSecret(data.clientSecret)
-      setTotalCliente(data.totalCliente)
+      // Si tiene tarjeta guardada
+      if (data.mpCustomerId) {
+        await cargarTarjetaGuardada(data.mpCustomerId, data.trabajadorToken)
+      }
+
+      // Cargar SDK de MP
+      await cargarSDKMercadoPago(data.trabajadorToken)
+      setCargando(false)
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
+      setCargando(false)
     }
-    setCargando(false)
   }
 
-  const appearance = {
-    theme: 'night',
-    variables: {
-      colorPrimary: '#1D9E75',
-      colorBackground: '#1A1A1A',
-      colorText: '#ffffff',
-      colorDanger: '#F09595',
-      fontFamily: 'sans-serif',
-      borderRadius: '10px',
-    },
+  async function cargarTarjetaGuardada(customerId, accessToken) {
+    try {
+      const res = await fetch(`https://api.mercadopago.com/v1/customers/${customerId}/cards`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      })
+      const cards = await res.json()
+      if (cards && cards.length > 0) {
+        setTarjetaGuardada(cards[0])
+        setUsarGuardada(true)
+      }
+    } catch { /* sin tarjeta guardada */ }
+  }
+
+  async function cargarSDKMercadoPago(accessToken) {
+    return new Promise((resolve) => {
+      if (window.MercadoPago) { inicializarForm(accessToken); resolve(); return }
+      const script = document.createElement('script')
+      script.src = 'https://sdk.mercadopago.com/js/v2'
+      script.onload = () => { inicializarForm(accessToken); resolve() }
+      document.body.appendChild(script)
+    })
+  }
+
+  function inicializarForm(accessToken) {
+    const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
+    const form = mp.cardForm({
+      amount: String(config?.monto || trabajo.presupuesto),
+      iframe: true,
+      form: {
+        id: 'form-checkout',
+        cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número de tarjeta' },
+        expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/YY' },
+        securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
+        cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nombre en la tarjeta' },
+        issuer: { id: 'form-checkout__issuer' },
+        installments: { id: 'form-checkout__installments' },
+      },
+      callbacks: {
+        onFormMounted: (err) => { if (!err) setMpListo(true) },
+        onSubmit: async (event) => {
+          event.preventDefault()
+          await procesarPago(form.getCardFormData())
+        },
+        onFetching: (resource) => {
+          if (resource === 'installments') setProcesando(false)
+        }
+      }
+    })
+    setCardForm(form)
+    setMpListo(true)
+  }
+
+  async function procesarPago(formData) {
+    setProcesando(true)
+    setError('')
+    try {
+      const { token, issuerId, paymentMethodId, installments } = formData
+      const { data: userData } = await supabase.auth.getUser()
+      const email = userData?.user?.email || 'cliente@chamba.mx'
+
+      // Crear el pago en MP vía nuestra edge function
+      const { data, error: fnError } = await supabase.functions.invoke('crear-pago-mp', {
+        body: {
+          trabajoId: trabajo.id,
+          token,
+          issuerId,
+          paymentMethodId,
+          installments,
+          email,
+          guardarTarjeta,
+        }
+      })
+
+      if (fnError || !data?.ok) {
+        setError(data?.error || 'El pago fue rechazado. Verifica tu tarjeta.')
+        setProcesando(false)
+        return
+      }
+
+      onPagoExitoso()
+    } catch {
+      setError('Error al procesar el pago. Intenta de nuevo.')
+      setProcesando(false)
+    }
+  }
+
+  async function pagarConGuardada() {
+    if (!cvv || cvv.length < 3) { setError('Ingresa el CVV de tu tarjeta.'); return }
+    setProcesando(true)
+    setError('')
+    try {
+      const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
+      const { id: token } = await mp.createCardToken({
+        cardId: tarjetaGuardada.id,
+        securityCode: cvv,
+      })
+
+      const { data: userData } = await supabase.auth.getUser()
+
+      const { data, error: fnError } = await supabase.functions.invoke('crear-pago-mp', {
+        body: {
+          trabajoId: trabajo.id,
+          token,
+          issuerId: tarjetaGuardada.issuer.id,
+          paymentMethodId: tarjetaGuardada.payment_method.id,
+          installments: 1,
+          email: userData?.user?.email || 'cliente@chamba.mx',
+          guardarTarjeta: false,
+        }
+      })
+
+      if (fnError || !data?.ok) {
+        setError(data?.error || 'El pago fue rechazado.')
+        setProcesando(false)
+        return
+      }
+
+      onPagoExitoso()
+    } catch {
+      setError('Error al procesar el pago. Intenta de nuevo.')
+      setProcesando(false)
+    }
+  }
+
+  const inputStyle = {
+    width: '100%', height: '48px', background: 'rgba(255,255,255,0.06)',
+    border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px',
+    padding: '0 14px', color: 'white', fontSize: '15px', fontFamily: 'sans-serif',
+    boxSizing: 'border-box',
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={onCancelar} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>💳 Pagar trabajo</h2>
       </div>
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* Resumen del trabajo */}
+        {config && (
+          <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px', fontWeight: '600' }}>{trabajo.categoria}</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>🔐 Retenido hasta confirmar el trabajo</p>
+            </div>
+            <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${config.totalCliente} MXN</p>
+          </div>
+        )}
 
         {cargando && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
@@ -125,34 +204,78 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
         )}
 
         {error && (
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <p style={{ color: '#F09595', marginBottom: '16px' }}>{error}</p>
-            <button type="button" onClick={crearPaymentIntent}
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ color: '#F09595', fontSize: '13px', marginBottom: '16px' }}>{error}</p>
+            <button type="button" onClick={iniciarPago}
               style={{ padding: '12px 24px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
               Reintentar
             </button>
           </div>
         )}
 
-        {!cargando && !error && clientSecret && totalCliente && (
+        {!cargando && !error && (
           <>
-            <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px', fontWeight: '600' }}>{trabajo.categoria}</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>🔐 Retenido en escrow hasta confirmar</p>
+            {/* Tarjeta guardada */}
+            {tarjetaGuardada && (
+              <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px', padding: '16px' }}>
+                <p style={{ fontSize: '12px', color: '#378ADD', fontWeight: '700', marginBottom: '10px' }}>💳 TARJETA GUARDADA</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div>
+                    <p style={{ fontSize: '15px', fontWeight: '600' }}>{tarjetaGuardada.payment_method?.name?.toUpperCase()} ···· {tarjetaGuardada.last_four_digits}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Vence {tarjetaGuardada.expiration_month}/{tarjetaGuardada.expiration_year}</p>
+                  </div>
+                  <button type="button" onClick={() => setUsarGuardada(!usarGuardada)}
+                    style={{ fontSize: '12px', color: usarGuardada ? '#1D9E75' : 'rgba(255,255,255,0.4)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    {usarGuardada ? '✅ Usar esta' : 'Usar otra'}
+                  </button>
+                </div>
+                {usarGuardada && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <input
+                      type="number" placeholder="CVV" value={cvv}
+                      onChange={e => setCvv(e.target.value)} maxLength={4}
+                      style={{ ...inputStyle, width: '120px' }}
+                    />
+                    <button type="button" onClick={pagarConGuardada} disabled={procesando}
+                      style={{ width: '100%', padding: '16px', background: procesando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: procesando ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+                      {procesando ? 'Procesando...' : `💳 Pagar $${config?.totalCliente} MXN`}
+                    </button>
+                  </div>
+                )}
               </div>
-              <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${totalCliente} MXN</p>
-            </div>
+            )}
 
-            <Elements stripe={stripePromise} options={{ appearance, locale: 'es' }}>
-              <CheckoutForm
-                trabajo={trabajo}
-                onPagoExitoso={onPagoExitoso}
-                onCancelar={onCancelar}
-                totalCliente={totalCliente}
-                clientSecret={clientSecret}
-              />
-            </Elements>
+            {/* Formulario nueva tarjeta */}
+            {(!tarjetaGuardada || !usarGuardada) && (
+              <div id="form-checkout" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div id="form-checkout__cardNumber" style={{ ...inputStyle, display: 'flex', alignItems: 'center' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div id="form-checkout__expirationDate" style={{ ...inputStyle, display: 'flex', alignItems: 'center' }} />
+                  <div id="form-checkout__securityCode" style={{ ...inputStyle, display: 'flex', alignItems: 'center' }} />
+                </div>
+                <input id="form-checkout__cardholderName" type="text" placeholder="Nombre en la tarjeta" style={inputStyle} />
+                <select id="form-checkout__issuer" style={{ ...inputStyle, display: 'none' }} />
+                <select id="form-checkout__installments" style={{ ...inputStyle, background: '#1A1A1A' }} />
+
+                {/* Opción guardar tarjeta */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px' }}>
+                  <input type="checkbox" id="guardar" checked={guardarTarjeta} onChange={e => setGuardarTarjeta(e.target.checked)}
+                    style={{ width: '18px', height: '18px', accentColor: '#1D9E75', cursor: 'pointer' }} />
+                  <label htmlFor="guardar" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                    💾 Guardar tarjeta para futuros pagos
+                  </label>
+                </div>
+
+                <button type="submit" form="form-checkout" disabled={!mpListo || procesando}
+                  style={{ width: '100%', padding: '16px', background: (!mpListo || procesando) ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: (!mpListo || procesando) ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+                  {procesando ? 'Procesando...' : mpListo ? `💳 Pagar $${config?.totalCliente || trabajo.presupuesto} MXN` : 'Cargando...'}
+                </button>
+              </div>
+            )}
+
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
+              Encriptado por Mercado Pago 🔒
+            </p>
           </>
         )}
       </div>

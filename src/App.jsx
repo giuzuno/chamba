@@ -14,6 +14,7 @@ import { verificarDispositivoBaneado, guardarFingerprint } from './useFingerprin
 import PanelAdmin from './PanelAdmin'
 import Terminos from './Terminos'
 import NotFound from './NotFound'
+import MpCallback from './MpCallback'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -700,6 +701,7 @@ export default function App() {
       <Routes>
         <Route path="/privacidad" element={<Privacidad />} />
         <Route path="/terminos" element={<Terminos />} />
+        <Route path="/mp-callback" element={<MpCallback />} />
         <Route path="/*" element={<AppContenido />} />
         <Route path="/404" element={<NotFound />} />
       </Routes>
