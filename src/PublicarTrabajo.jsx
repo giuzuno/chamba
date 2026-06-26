@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
-import MetodoPago from './MetodoPago'
 import { sanitizarDescripcion, sanitizarCampo, tieneInyeccionSQL } from './sanitize'
 
 const CATEGORIAS = [
@@ -78,8 +77,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [materiales, setMateriales] = useState('cliente')
-  const [trabajoCreado, setTrabajoCreado] = useState(null) // trabajo en BD pendiente de pago
-  const [pagando, setPagando] = useState(false)
   const [fotosProblema, setFotosProblema] = useState([])
   const [subiendoFotos, setSubiendoFotos] = useState(false)
 
@@ -143,8 +140,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     )
   }
 
-  // Paso 1: Crear trabajo en BD, luego abrir pago
-  async function crearTrabajoYPagar() {
+  // Publicar trabajo directo — el pago se hace cuando un trabajador acepta
+  async function publicarTrabajo() {
     setLoading(true)
     const descripcionSanitizada = sanitizarDescripcion(descripcion)
     const categoriaFinalSanitizada = sanitizarCampo(categoriaFinal)
@@ -171,21 +168,12 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     }).select().single()
 
     if (insertError || !trabajo) {
-      setError(insertError?.message || 'Error al crear el trabajo')
+      setError(insertError?.message || 'Error al publicar el trabajo')
       setLoading(false)
       return
     }
 
-    setTrabajoCreado(trabajo)
-    setLoading(false)
-    setConfirmando(false)
-    setPagando(true)
-  }
-
-  // Paso 2: Pago exitoso → notificar a trabajadores
-  async function onPagoExitoso() {
-    setPagando(false)
-
+    // Notificar a trabajadores de esa categoría
     try {
       const { data: trabajadores } = await supabase
         .from('usuarios')
@@ -201,10 +189,10 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
         for (const trabajador of trabajadores) {
           await enviarNotificacionCompleta({
             usuarioId: trabajador.id,
-            titulo: `🔔 Nuevo trabajo de ${categoriaFinal}`,
-            cuerpo: `$${presupuesto} MXN — ${descripcion.slice(0, 60)}${descripcion.length > 60 ? '...' : ''} · ${cuandoTexto}`,
+            titulo: `🔔 Nuevo trabajo de ${categoriaFinalSanitizada}`,
+            cuerpo: `$${presupuesto} MXN — ${descripcionSanitizada.slice(0, 60)}${descripcionSanitizada.length > 60 ? '...' : ''} · ${cuandoTexto}`,
             tipo: 'trabajo_aceptado',
-            trabajoId: trabajoCreado.id,
+            trabajoId: trabajo.id,
           })
         }
       }
@@ -212,17 +200,8 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       console.log('Error notificando trabajadores:', e)
     }
 
+    setLoading(false)
     setExito(true)
-  }
-
-  // Pago cancelado → eliminar trabajo pendiente
-  async function onPagoCancelado() {
-    if (trabajoCreado) {
-      await supabase.from('trabajos').delete().eq('id', trabajoCreado.id)
-      setTrabajoCreado(null)
-    }
-    setPagando(false)
-    setConfirmando(true)
   }
 
   if (fotoUrl !== 'cargando' && !fotoUrl) return (
@@ -254,6 +233,9 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
         <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px', maxWidth: '300px' }}>
           Los trabajadores de <strong style={{ color: 'white' }}>{categoriaFinal}</strong> cerca de ti ya fueron notificados.
         </p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '8px', maxWidth: '300px', lineHeight: '1.5' }}>
+          Cuando un trabajador acepte, te avisamos y podrás completar el pago.
+        </p>
         <p style={{ color: '#1D9E75', fontSize: '14px', marginBottom: '32px' }}>
           {esAhora ? '⚡ Lo necesitas ahora mismo' : `📅 ${formatearFecha(fecha)} a las ${hora} hrs`}
         </p>
@@ -264,17 +246,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     )
   }
 
-  // ── PANTALLA DE PAGO ──
-  if (pagando && trabajoCreado) {
-    return (
-      <MetodoPago
-        trabajo={trabajoCreado}
-        onPagoExitoso={onPagoExitoso}
-        onCancelar={onPagoCancelado}
-      />
-    )
-  }
-
+  // ── PANTALLA DE CONFIRMACIÓN ──
   if (confirmando) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -283,7 +255,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
           <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Confirmar publicación</h2>
         </div>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Revisa los detalles antes de pagar:</p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>Revisa los detalles antes de publicar:</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '32px' }}>{iconCategoria}</span>
@@ -341,7 +313,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
             <span style={{ fontSize: '20px', flexShrink: 0 }}>🔐</span>
             <div>
               <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Tu dinero está protegido</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>El pago queda retenido hasta confirma y solo se libera al trabajador cuando tú confirmes que el trabajo quedó bien.</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>Pagarás cuando un trabajador acepte tu trabajo. El dinero queda retenido y solo se libera cuando confirmes que quedó bien.</p>
             </div>
           </div>
 
@@ -357,9 +329,9 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-          <button type="button" onClick={crearTrabajoYPagar} disabled={loading}
+          <button type="button" onClick={publicarTrabajo} disabled={loading}
             style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            {loading ? 'Preparando pago...' : '💳 Continuar al pago →'}
+            {loading ? 'Publicando...' : '🚀 Publicar trabajo →'}
           </button>
           <button type="button" onClick={() => setConfirmando(false)}
             style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
