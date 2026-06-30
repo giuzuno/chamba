@@ -75,7 +75,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
     // Espera un tick para asegurar que los divs del DOM ya están montados
     setTimeout(() => {
       try {
-        const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
+        const mp = new window.MercadoPago(data?.trabajadorPublicKey || import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
         const form = mp.cardForm({
           amount: String(data?.monto || trabajo.precio_acordado || trabajo.presupuesto),
           iframe: true,
