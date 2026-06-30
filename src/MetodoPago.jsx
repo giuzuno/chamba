@@ -7,7 +7,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
   const [error, setError] = useState('')
   const [config, setConfig] = useState(null)
   const [mpListo, setMpListo] = useState(false)
-  const [cardForm, setCardForm] = useState(null)
+  const [formRef, setFormRef] = useState(null)
   const [tarjetaGuardada, setTarjetaGuardada] = useState(null)
   const [usarGuardada, setUsarGuardada] = useState(false)
   const [cvv, setCvv] = useState('')
@@ -107,7 +107,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
             }
           }
         })
-        setCardForm(form)
+        setFormRef(form)
       } catch (e) {
         console.error('Error inicializando MP cardForm:', e)
         setError('No se pudo iniciar el formulario de pago.')
@@ -291,9 +291,13 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
 
                 <button type="button" disabled={!mpListo || procesando}
                   onClick={() => {
-                    console.log('Click en pagar, mpListo:', mpListo)
-                    const formEl = document.getElementById('form-checkout')
-                    if (formEl) formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit()
+                    console.log('Click en pagar, mpListo:', mpListo, 'formRef:', !!formRef)
+                    if (formRef && typeof formRef.submit === 'function') {
+                      formRef.submit()
+                    } else {
+                      console.error('formRef no disponible o sin método submit')
+                      setError('El formulario de pago no está listo. Reintenta.')
+                    }
                   }}
                   style={{ width: '100%', padding: '16px', background: (!mpListo || procesando) ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: (!mpListo || procesando) ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
                   {procesando ? 'Procesando...' : mpListo ? `💳 Pagar $${config?.totalCliente || trabajo.presupuesto} MXN` : 'Cargando...'}
