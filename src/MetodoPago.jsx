@@ -99,6 +99,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
             },
             onSubmit: async (event) => {
               event.preventDefault()
+              console.log('onSubmit disparado')
               await procesarPago(form.getCardFormData())
             },
             onFetching: (resource) => {
@@ -288,7 +289,12 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
                   </label>
                 </div>
 
-                <button type="submit" form="form-checkout" disabled={!mpListo || procesando}
+                <button type="button" disabled={!mpListo || procesando}
+                  onClick={() => {
+                    console.log('Click en pagar, mpListo:', mpListo)
+                    const formEl = document.getElementById('form-checkout')
+                    if (formEl) formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit()
+                  }}
                   style={{ width: '100%', padding: '16px', background: (!mpListo || procesando) ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: (!mpListo || procesando) ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
                   {procesando ? 'Procesando...' : mpListo ? `💳 Pagar $${config?.totalCliente || trabajo.presupuesto} MXN` : 'Cargando...'}
                 </button>
