@@ -35,8 +35,8 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
         await cargarTarjetaGuardada(data.mpCustomerId, data.trabajadorToken)
       }
 
-      // Cargar SDK de MP
-      await cargarSDKMercadoPago(data.trabajadorToken)
+      // Cargar SDK de MP — pasamos data directo, NO dependemos del state config
+      await cargarSDKMercadoPago(data)
       setCargando(false)
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -57,43 +57,61 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
     } catch { /* sin tarjeta guardada */ }
   }
 
-  async function cargarSDKMercadoPago(accessToken) {
+  function cargarSDKMercadoPago(data) {
     return new Promise((resolve) => {
-      if (window.MercadoPago) { inicializarForm(accessToken); resolve(); return }
+      if (window.MercadoPago) { inicializarForm(data); resolve(); return }
       const script = document.createElement('script')
       script.src = 'https://sdk.mercadopago.com/js/v2'
-      script.onload = () => { inicializarForm(accessToken); resolve() }
+      script.onload = () => { inicializarForm(data); resolve() }
+      script.onerror = () => {
+        setError('No se pudo cargar Mercado Pago. Verifica tu conexión.')
+        resolve()
+      }
       document.body.appendChild(script)
     })
   }
 
-  function inicializarForm(accessToken) {
-    const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
-    const form = mp.cardForm({
-      amount: String(config?.monto || trabajo.presupuesto),
-      iframe: true,
-      form: {
-        id: 'form-checkout',
-        cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número de tarjeta' },
-        expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/YY' },
-        securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
-        cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nombre en la tarjeta' },
-        issuer: { id: 'form-checkout__issuer' },
-        installments: { id: 'form-checkout__installments' },
-      },
-      callbacks: {
-        onFormMounted: (err) => { if (!err) setMpListo(true) },
-        onSubmit: async (event) => {
-          event.preventDefault()
-          await procesarPago(form.getCardFormData())
-        },
-        onFetching: (resource) => {
-          if (resource === 'installments') setProcesando(false)
-        }
+  function inicializarForm(data) {
+    // Espera un tick para asegurar que los divs del DOM ya están montados
+    setTimeout(() => {
+      try {
+        const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
+        const form = mp.cardForm({
+          amount: String(data?.monto || trabajo.precio_acordado || trabajo.presupuesto),
+          iframe: true,
+          form: {
+            id: 'form-checkout',
+            cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número de tarjeta' },
+            expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/YY' },
+            securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
+            cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nombre en la tarjeta' },
+            issuer: { id: 'form-checkout__issuer' },
+            installments: { id: 'form-checkout__installments' },
+          },
+          callbacks: {
+            onFormMounted: (err) => {
+              if (err) {
+                console.error('Error montando formulario MP:', err)
+                setError('No se pudo cargar el formulario de pago. Reintenta.')
+                return
+              }
+              setMpListo(true)
+            },
+            onSubmit: async (event) => {
+              event.preventDefault()
+              await procesarPago(form.getCardFormData())
+            },
+            onFetching: (resource) => {
+              if (resource === 'installments') setProcesando(false)
+            }
+          }
+        })
+        setCardForm(form)
+      } catch (e) {
+        console.error('Error inicializando MP cardForm:', e)
+        setError('No se pudo iniciar el formulario de pago.')
       }
-    })
-    setCardForm(form)
-    setMpListo(true)
+    }, 100)
   }
 
   async function procesarPago(formData) {
@@ -256,6 +274,10 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
                 <input id="form-checkout__cardholderName" type="text" placeholder="Nombre en la tarjeta" style={inputStyle} />
                 <select id="form-checkout__issuer" style={{ ...inputStyle, display: 'none' }} />
                 <select id="form-checkout__installments" style={{ ...inputStyle, background: '#1A1A1A' }} />
+
+                {!mpListo && (
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>⏳ Cargando formulario seguro de Mercado Pago...</p>
+                )}
 
                 {/* Opción guardar tarjeta */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px' }}>
