@@ -137,7 +137,19 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       })
 
       if (fnError || !data?.ok) {
-        setError(data?.error || 'El pago fue rechazado. Verifica tu tarjeta.')
+        console.error('fnError completo:', fnError)
+        let mensajeError = data?.error || 'El pago fue rechazado. Verifica tu tarjeta.'
+        // Cuando hay fnError, el body real viene en fnError.context (Response)
+        if (fnError?.context) {
+          try {
+            const bodyError = await fnError.context.json()
+            console.error('Body del error de MP:', bodyError)
+            mensajeError = bodyError?.error || mensajeError
+          } catch (e) {
+            console.error('No se pudo parsear el body del error:', e)
+          }
+        }
+        setError(mensajeError)
         setProcesando(false)
         return
       }
