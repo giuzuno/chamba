@@ -5,11 +5,21 @@
   "android": {
     "allowMixedContent": true,
     "captureInput": true,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": true
   },
   "server": {
+    "url": "https://chamba-delta.vercel.app",
     "androidScheme": "https",
-    "cleartext": true
+    "cleartext": true,
+    "allowNavigation": [
+      "*.mercadopago.com",
+      "*.mercadopago.com.mx",
+      "*.mercadolibre.com",
+      "sdk.mercadopago.com",
+      "api.mercadopago.com",
+      "auth.mercadopago.com",
+      "*.supabase.co"
+    ]
   },
   "plugins": {
     "Geolocation": {
