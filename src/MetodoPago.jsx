@@ -84,6 +84,11 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
         const form = mp.cardForm({
           amount: String(data?.monto || trabajo.precio_acordado || trabajo.presupuesto),
           iframe: true,
+          style: {
+            cardNumber: { color: '#FFFFFF', 'font-size': '16px', placeholder: { color: 'rgba(255,255,255,0.4)' } },
+            expirationDate: { color: '#FFFFFF', 'font-size': '16px', placeholder: { color: 'rgba(255,255,255,0.4)' } },
+            securityCode: { color: '#FFFFFF', 'font-size': '16px', placeholder: { color: 'rgba(255,255,255,0.4)' } },
+          },
           form: {
             id: 'form-checkout',
             cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número de tarjeta' },
