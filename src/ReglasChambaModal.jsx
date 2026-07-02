@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 const REGLAS_CLIENTE = [
-  { icon: '💰', titulo: 'Tu dinero está protegido', desc: 'El pago se retiene en escrow hasta que confirmes que el trabajo quedó bien. Si no quedó, puedes disputarlo y recuperar tu dinero.' },
+  { icon: '💰', titulo: 'Tu dinero está protegido', desc: 'El pago se retiene en protegido hasta que confirmes que el trabajo quedó bien. Si no quedó, puedes disputarlo y recuperar tu dinero.' },
   { icon: '✅', titulo: 'Confirma solo si quedó bien', desc: 'Al confirmar liberas el pago al trabajador. Si hay un problema, usa el botón de disputa antes de confirmar.' },
   { icon: '❌', titulo: 'No canceles sin avisar', desc: '3 cancelaciones de trabajos ya aceptados = cuenta suspendida automáticamente.' },
   { icon: '🚫', titulo: 'No pagues fuera de la app', desc: 'Pagar fuera de Chamba cancela tu protección. Si el trabajo sale mal, no podremos ayudarte. Usa siempre los medios de pago de la app.' },
@@ -15,7 +15,7 @@ const REGLAS_TRABAJADOR = [
   { icon: '⭐', titulo: 'Tu reputación importa', desc: 'Los clientes ven tu rating antes de contratarte. Un buen servicio = más trabajos y mejores ingresos.' },
   { icon: '📋', titulo: 'Completa lo acordado', desc: 'Acepta solo trabajos que puedas completar. Si surge un problema, comunícate con el cliente por chat.' },
   { icon: '🚫', titulo: 'Datos verídicos', desc: 'Para viajes: los datos de tu vehículo deben ser reales. Datos falsos = suspensión inmediata. 3 amonestaciones = ban permanente.' },
-  { icon: '🔒', titulo: 'Tu pago está protegido', desc: 'El dinero está retenido en escrow desde que el cliente publica. Al completar el trabajo y ser confirmado, se libera a tu cuenta.' },
+  { icon: '🔒', titulo: 'Tu pago está protegido', desc: 'El dinero está retenido en protegido desde que el cliente publica. Al completar el trabajo y ser confirmado, se libera a tu cuenta.' },
 ]
 
 export default function ReglasChambaModal({ tipo, onAceptar, onCerrar }) {
@@ -39,11 +39,11 @@ export default function ReglasChambaModal({ tipo, onAceptar, onCerrar }) {
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>{subtitulo}</p>
         </div>
 
-        {/* Escrow banner */}
+        {/* protegido banner */}
         <div style={{ margin: '14px 16px 0', background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '24px', flexShrink: 0 }}>🔐</span>
           <div>
-            <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Pago protegido con escrow</p>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Pago protegido con protegido</p>
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
               {tipo === 'cliente'
                 ? 'Tu dinero queda retenido de forma segura. Solo se libera al trabajador cuando tú confirmas que el trabajo quedó bien. Si hay un problema, lo recuperas.'

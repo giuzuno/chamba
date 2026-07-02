@@ -189,7 +189,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
           {/* Features */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '32px' }}>
             {[
-              { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero protegido en escrow hasta confirmar' },
+              { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero protegido en protegido hasta confirmar' },
               { icon: '⭐', titulo: 'Trabajadores verificados', desc: 'Con calificaciones reales de tus vecinos' },
               { icon: '⚡', titulo: 'Respuesta inmediata', desc: 'Publica y recibe respuestas en minutos' },
             ].map(f => (
@@ -379,7 +379,7 @@ function SeleccionModo({ onCliente, onTrabajador, onLogout, nombre, noLeidas, on
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>Ve los trabajos disponibles y acepta los que te convengan</p>
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
               {['💰', '📍', '⭐'].map(e => <span key={e} style={{ fontSize: '16px' }}>{e}</span>)}
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>Pago seguro con escrow</span>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>Pago seguro con protegido</span>
             </div>
           </div>
         </button>

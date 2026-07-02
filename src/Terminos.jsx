@@ -24,8 +24,8 @@ export default function Terminos({ onAceptar, onVolver }) {
             texto: 'Chamba retiene el 12% de cada transacción completada como comisión por el uso de la plataforma. Este porcentaje es descontado automáticamente del monto acordado entre cliente y trabajador. El trabajador recibe el 88% restante. La comisión es visible para ambas partes antes de confirmar cualquier trabajo.'
           },
           {
-            titulo: '3. Sistema de pagos y escrow',
-            texto: 'Los pagos se retienen de forma segura en escrow hasta que el cliente confirme que el trabajo fue completado satisfactoriamente. El dinero se libera al trabajador únicamente tras dicha confirmación. Si el cliente no confirma ni disputa dentro de las 24 horas siguientes a que el trabajador reporte el trabajo como terminado, el pago se libera automáticamente.'
+            titulo: '3. Sistema de pagos y protegido',
+            texto: 'Los pagos se retienen de forma segura en protegido hasta que el cliente confirme que el trabajo fue completado satisfactoriamente. El dinero se libera al trabajador únicamente tras dicha confirmación. Si el cliente no confirma ni disputa dentro de las 24 horas siguientes a que el trabajador reporte el trabajo como terminado, el pago se libera automáticamente.'
           },
           {
             titulo: '4. Materiales y costos adicionales',

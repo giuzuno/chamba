@@ -73,7 +73,7 @@ function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
           <span style={{ color: 'rgba(255,255,255,0.06)', letterSpacing: '4px', fontSize: '10px' }}>∴</span>
           <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
         </div>
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>Todo dentro de Chamba — seguro y con escrow</p>
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>Todo dentro de Chamba — seguro y con protegido</p>
       </div>
     </div>
   )

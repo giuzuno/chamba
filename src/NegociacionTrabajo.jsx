@@ -178,7 +178,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         <p style={{ color: '#1D9E75', fontSize: '32px', fontWeight: '800', marginBottom: '16px' }}>${precioActual} MXN</p>
         <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '14px 18px', marginBottom: '24px', maxWidth: '300px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            🔐 El dinero del cliente está retenido en escrow. Se liberará a tu cuenta cuando confirme que el trabajo quedó bien.
+            🔐 El dinero del cliente está retenido en protegido. Se liberará a tu cuenta cuando confirme que el trabajo quedó bien.
           </p>
         </div>
         <button type="button" onClick={onAceptado} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -206,11 +206,11 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
           </div>
         </div>
 
-        {/* Banner escrow para trabajador */}
+        {/* Banner protegido para trabajador */}
         <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '18px', flexShrink: 0 }}>🔐</span>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-            El dinero queda retenido en escrow. Cobra siempre dentro de la app para garantizar tu pago.
+            El dinero queda retenido en protegido. Cobra siempre dentro de la app para garantizar tu pago.
           </p>
         </div>
 
