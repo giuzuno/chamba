@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
 import { sanitizarDescripcion, sanitizarCampo, tieneInyeccionSQL } from './sanitize'
+import { esZonaIstmo } from './zonaIstmo'
 
 const CATEGORIAS = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -18,7 +19,7 @@ const CATEGORIAS = [
   { icon: '✂️', nombre: 'Costurera' },
   { icon: '📚', nombre: 'Clases' },
   { icon: '🌿', nombre: 'Jardinero' },
-  { icon: '🚗', nombre: 'Lavado autos' }, 
+  { icon: '🚗', nombre: 'Lavado autos' },
   { icon: '🪵', nombre: 'Carpintero' },
   { icon: '🛵', nombre: 'Repartidor' },
   { icon: '⚓', nombre: 'Soldador' },
@@ -79,6 +80,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [materiales, setMateriales] = useState('cliente')
   const [fotosProblema, setFotosProblema] = useState([])
   const [subiendoFotos, setSubiendoFotos] = useState(false)
+  const [fueraDeZona, setFueraDeZona] = useState(false)
 
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
@@ -130,7 +132,13 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude, texto: 'Tu ubicación actual (GPS)' })
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        if (!esZonaIstmo(lat, lng)) {
+          setFueraDeZona(true)
+          return
+        }
+        setUbicacion({ lat, lng, texto: 'Tu ubicación actual (GPS)' })
         setConfirmando(true)
       },
       () => {
@@ -140,7 +148,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     )
   }
 
-  // Publicar trabajo directo — el pago se hace cuando un trabajador acepta
   async function publicarTrabajo() {
     setLoading(true)
     const descripcionSanitizada = sanitizarDescripcion(descripcion)
@@ -173,7 +180,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
       return
     }
 
-    // Notificar a trabajadores de esa categoría
     try {
       const { data: trabajadores } = await supabase
         .from('usuarios')
@@ -217,6 +223,32 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     </div>
   )
 
+  // ── PANTALLA FUERA DE ZONA ──
+  if (fueraDeZona) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '72px', marginBottom: '20px' }}>📍</div>
+      <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px', color: '#E8A030' }}>Aún no llegamos a tu zona</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '320px', lineHeight: '1.7', marginBottom: '16px', fontSize: '15px' }}>
+        Chamba está en su <strong style={{ color: '#1D9E75' }}>primera etapa</strong> y por el momento solo está disponible en el <strong style={{ color: 'white' }}>Istmo de Tehuantepec</strong>, Oaxaca.
+      </p>
+      <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px 20px', maxWidth: '320px', marginBottom: '24px' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ciudades disponibles</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+          {['Salina Cruz', 'Tehuantepec', 'Juchitán', 'Ixtepec', 'Matías Romero', 'Unión Hidalgo', 'El Espinal', 'San Blas Atempa'].map(c => (
+            <span key={c} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.12)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.25)' }}>{c}</span>
+          ))}
+          <span style={{ fontSize: '11px', padding: '4px 10px', color: 'rgba(255,255,255,0.3)' }}>y más...</span>
+        </div>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', maxWidth: '280px', lineHeight: '1.6', marginBottom: '32px' }}>
+        Estamos creciendo rápido. Pronto estaremos en tu ciudad. ¡Gracias por tu interés!
+      </p>
+      <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '16px 32px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        ← Volver al inicio
+      </button>
+    </div>
+  )
+
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="cliente"
@@ -246,7 +278,6 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
     )
   }
 
-  // ── PANTALLA DE CONFIRMACIÓN ──
   if (confirmando) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -351,7 +382,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-        {/* ⚡ Lo necesito ahora */}
+        {/* Lo necesito ahora */}
         <div style={{ background: esAhora ? 'rgba(232,160,48,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${esAhora ? '#E8A030' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
           onClick={() => setEsAhora(!esAhora)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
