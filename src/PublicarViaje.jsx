@@ -6,6 +6,7 @@ import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
 import MetodoPago from './MetodoPago'
+import { esZonaIstmo } from './zonaIstmo'
 
 delete L.Icon.Default.prototype._getIconUrl
 
@@ -99,6 +100,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
   const [mapaListo, setMapaListo] = useState(false)
   const [distanciaReal, setDistanciaReal] = useState(null)
   const [calculandoRuta, setCalculandoRuta] = useState(false)
+  const [fueraDeZona, setFueraDeZona] = useState(false)
 
   // ✅ NUEVO — estados de pago
   const [trabajoCreado, setTrabajoCreado] = useState(null)
@@ -111,7 +113,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       pos => {
-        const pos2 = [pos.coords.latitude, pos.coords.longitude]
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        if (!esZonaIstmo(lat, lng)) {
+          setFueraDeZona(true)
+          return
+        }
+        const pos2 = [lat, lng]
         setUbicacionActual(pos2)
         setOrigen(pos2)
       },
@@ -356,6 +364,31 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     }
     setPagando(false)
   }
+
+  if (fueraDeZona) return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
+      <div style={{ fontSize: '72px', marginBottom: '20px' }}>📍</div>
+      <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px', color: '#E8A030' }}>Aún no llegamos a tu zona</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '320px', lineHeight: '1.7', marginBottom: '16px', fontSize: '15px' }}>
+        Chamba está en su <strong style={{ color: '#1D9E75' }}>primera etapa</strong> y por el momento solo está disponible en el <strong style={{ color: 'white' }}>Istmo de Tehuantepec</strong>, Oaxaca.
+      </p>
+      <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '16px 20px', maxWidth: '320px', marginBottom: '24px' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ciudades disponibles</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+          {['Salina Cruz', 'Tehuantepec', 'Juchitán', 'Ixtepec', 'Matías Romero', 'Unión Hidalgo', 'El Espinal', 'San Blas Atempa'].map(c => (
+            <span key={c} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.12)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.25)' }}>{c}</span>
+          ))}
+          <span style={{ fontSize: '11px', padding: '4px 10px', color: 'rgba(255,255,255,0.3)' }}>y más...</span>
+        </div>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', maxWidth: '280px', lineHeight: '1.6', marginBottom: '32px' }}>
+        Estamos creciendo rápido. Pronto estaremos en tu ciudad. ¡Gracias por tu interés!
+      </p>
+      <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', padding: '16px 32px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        ← Volver al inicio
+      </button>
+    </div>
+  )
 
   if (fotoUrl !== 'cargando' && !fotoUrl) return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
