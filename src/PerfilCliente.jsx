@@ -88,14 +88,14 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
     const file = e.target.files[0]
     if (!file) return
     setSubiendoFoto(true)
-    const ext = file.name.split('.').pop()
-    const path = `${userId}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    const path = `${userId}/perfil.jpg`
+    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true, contentType: file.type })
     if (!uploadError) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      setFotoUrl(data.publicUrl)
+      const urlConCache = `${data.publicUrl}?t=${Date.now()}`
+      setFotoUrl(urlConCache)
       setErrores(p => ({ ...p, foto: null }))
-      await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
+      await supabase.from('usuarios').upsert({ id: userId, foto_url: urlConCache })
     }
     setSubiendoFoto(false)
   }
@@ -305,7 +305,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         {[
                           { label: '✅ Completados', count: completados.length, total: totalCompletado, color: '#1D9E75', bg: 'rgba(29,158,117,0.08)', border: 'rgba(29,158,117,0.2)' },
-                          { label: '🔄 Retenido', count: enProceso.length, total: totalProceso, color: '#378ADD', bg: 'rgba(55,138,221,0.08)', border: 'rgba(55,138,221,0.2)' },
+                          { label: '🔄 En escrow', count: enProceso.length, total: totalProceso, color: '#378ADD', bg: 'rgba(55,138,221,0.08)', border: 'rgba(55,138,221,0.2)' },
                           { label: '❌ Cancelados', count: cancelados.length, total: totalCancelado, color: '#F09595', bg: 'rgba(240,149,149,0.06)', border: 'rgba(240,149,149,0.15)' },
                           { label: '⚠️ En disputa', count: enDisputa.length, total: totalDisputa, color: '#E8A030', bg: 'rgba(232,160,48,0.06)', border: 'rgba(232,160,48,0.15)' },
                         ].map(s => (
@@ -331,7 +331,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                 {[
                   { status: 'completado', label: '✅ Pagados', color: '#1D9E75' },
                   { status: 'en_revision', label: '🔧 Pendiente de confirmar', color: '#378ADD' },
-                  { status: 'aceptado', label: '🔄 Retenido', color: '#378ADD' },
+                  { status: 'aceptado', label: '🔄 En escrow', color: '#378ADD' },
                   { status: 'en_disputa', label: '⚠️ En disputa', color: '#E8A030' },
                   { status: 'cancelado', label: '❌ Cancelados / Devueltos', color: '#F09595' },
                 ].map(grupo => {

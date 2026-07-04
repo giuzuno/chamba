@@ -73,7 +73,7 @@ function EstrellaRating({ rating }) {
 
 // ── PESTAÑA DE PAGOS ──────────────────────────────────────────────
 function PestanaPagos({ userId }) {
-  const [mpAccountId, setMpAccountId] = useState(null)
+  const [stripeAccountId, setStripeAccountId] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [conectando, setConectando] = useState(false)
   const [error, setError] = useState('')
@@ -82,23 +82,24 @@ function PestanaPagos({ userId }) {
 
   async function cargarEstado() {
     const { data } = await supabase.from('usuarios')
-      .select('mp_account_id').eq('id', userId).maybeSingle()
-    setMpAccountId(data?.mp_account_id || null)
+      .select('stripe_account_id').eq('id', userId).maybeSingle()
+    setStripeAccountId(data?.stripe_account_id || null)
     setCargando(false)
   }
 
-  async function conectarCuentaMP() {
+  async function conectarCuenta() {
     setConectando(true)
     setError('')
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('oauth-mp-trabajador', {
+      const { data, error: fnError } = await supabase.functions.invoke('onboarding-trabajador', {
         body: { trabajadorId: userId }
       })
       if (fnError || !data?.url) {
-        setError('No se pudo conectar con Mercado Pago. Intenta de nuevo.')
+        setError('No se pudo conectar con Stripe. Intenta de nuevo.')
         setConectando(false)
         return
       }
+      // Abrir el onboarding de Stripe en la misma ventana
       window.location.href = data.url
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -114,12 +115,12 @@ function PestanaPagos({ userId }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Estado de la cuenta */}
-      {mpAccountId ? (
+      {stripeAccountId ? (
         <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
           <p style={{ fontSize: '40px', marginBottom: '10px' }}>✅</p>
-          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Cuenta de Mercado Pago conectada</p>
+          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75', marginBottom: '6px' }}>Cuenta conectada</p>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            Cuando el cliente confirme tu trabajo, el pago llega automáticamente a tu cuenta de Mercado Pago.
+            Los pagos de tus trabajos se depositarán automáticamente en tu cuenta bancaria cuando el cliente confirme que el trabajo quedó bien.
           </p>
         </div>
       ) : (
@@ -127,7 +128,7 @@ function PestanaPagos({ userId }) {
           <p style={{ fontSize: '40px', marginBottom: '10px' }}>🏦</p>
           <p style={{ fontSize: '16px', fontWeight: '700', color: '#E8A030', marginBottom: '6px' }}>Cuenta no conectada</p>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            Conecta tu cuenta de Mercado Pago para recibir pagos cuando completes trabajos.
+            Conecta tu cuenta bancaria para recibir pagos automáticos cuando completes trabajos.
           </p>
         </div>
       )}
@@ -137,9 +138,9 @@ function PestanaPagos({ userId }) {
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cómo funciona?</p>
         {[
           { icon: '💳', texto: 'El cliente paga al aceptar tu trabajo' },
-          { icon: '🔐', texto: 'El dinero queda retenido hasta que termines' },
+          { icon: '🔐', texto: 'El dinero queda retenido en escrow hasta que termines' },
           { icon: '✅', texto: 'El cliente confirma que quedó bien' },
-          { icon: '💰', texto: 'Mercado Pago deposita automáticamente en tu cuenta' },
+          { icon: '💰', texto: 'Stripe deposita automáticamente en tu cuenta (1-2 días hábiles)' },
         ].map((paso, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: i < 3 ? '10px' : '0' }}>
             <span style={{ fontSize: '20px', flexShrink: 0 }}>{paso.icon}</span>
@@ -159,41 +160,30 @@ function PestanaPagos({ userId }) {
           <span style={{ fontSize: '13px', color: '#F09595' }}>Comisión Chamba (12%)</span>
           <span style={{ fontSize: '13px', color: '#F09595' }}>-$60 MXN</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <span style={{ fontSize: '13px', color: '#F09595' }}>Comisión MP (~3.5%)</span>
-          <span style={{ fontSize: '13px', color: '#F09595' }}>-$17.50 MXN</span>
-        </div>
         <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>Tú recibes</span>
-          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>~$422.50 MXN</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>$440 MXN</span>
         </div>
       </div>
-
-      {/* Requisito: cuenta MP */}
-      {!mpAccountId && (
-        <div style={{ background: 'rgba(55,138,221,0.06)', border: '0.5px solid rgba(55,138,221,0.2)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>
-          💡 ¿No tienes cuenta de Mercado Pago? Es gratis — puedes abrirla desde la app de MP o en cualquier OXXO.
-        </div>
-      )}
 
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
       {/* Botón principal */}
-      {mpAccountId ? (
-        <button type="button" onClick={conectarCuentaMP} disabled={conectando}
+      {stripeAccountId ? (
+        <button type="button" onClick={conectarCuenta} disabled={conectando}
           style={{ width: '100%', padding: '14px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-          {conectando ? 'Abriendo Mercado Pago...' : '⚙️ Reconectar mi cuenta de MP'}
+          {conectando ? 'Abriendo Stripe...' : '⚙️ Administrar mi cuenta bancaria'}
         </button>
       ) : (
-        <button type="button" onClick={conectarCuentaMP} disabled={conectando}
-          style={{ width: '100%', padding: '16px', background: conectando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: conectando ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
-          {conectando ? '⏳ Conectando...' : '🏦 Conectar cuenta de Mercado Pago'}
+        <button type="button" onClick={conectarCuenta} disabled={conectando}
+          style={{ width: '100%', padding: '16px', background: conectando ? 'rgba(232,160,48,0.5)' : '#E8A030', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '700', cursor: conectando ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif' }}>
+          {conectando ? '⏳ Abriendo Stripe...' : '🏦 Conectar cuenta bancaria'}
         </button>
       )}
 
       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textAlign: 'center', lineHeight: '1.6' }}>
-        Powered by Mercado Pago · Tus datos están protegidos y encriptados.
+        Powered by Stripe · Tus datos bancarios están encriptados y nunca los vemos nosotros.
       </p>
     </div>
   )
@@ -325,14 +315,14 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
     const file = e.target.files[0]
     if (!file) return
     setSubiendoFoto(true)
-    const ext = file.name.split('.').pop()
-    const path = `${userId}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    const path = `${userId}/perfil.jpg`
+    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true, contentType: file.type })
     if (!uploadError) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      setFotoUrl(data.publicUrl)
+      const urlConCache = `${data.publicUrl}?t=${Date.now()}`
+      setFotoUrl(urlConCache)
       setErrores(p => ({ ...p, foto: null }))
-      await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
+      await supabase.from('usuarios').upsert({ id: userId, foto_url: urlConCache })
     }
     setSubiendoFoto(false)
   }
@@ -342,13 +332,13 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
     const file = e.target.files[0]
     if (!file) return
     setSubiendoFotoVehiculo(true)
-    const ext = file.name.split('.').pop()
-    const path = `vehiculo_${userId}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    const path = `${userId}/vehiculo.jpg`
+    const { error: uploadError } = await supabase.storage.from('avatares').upload(path, file, { upsert: true, contentType: file.type })
     if (!uploadError) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      setVehiculoFotoUrl(data.publicUrl)
-      await supabase.from('usuarios').upsert({ id: userId, vehiculo_foto_url: data.publicUrl })
+      const urlConCache = `${data.publicUrl}?t=${Date.now()}`
+      setVehiculoFotoUrl(urlConCache)
+      await supabase.from('usuarios').upsert({ id: userId, vehiculo_foto_url: urlConCache })
     }
     setSubiendoFotoVehiculo(false)
   }

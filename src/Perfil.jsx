@@ -149,15 +149,15 @@ export default function Perfil({ userId, userEmail, onVolver }) {
     const file = e.target.files[0]
     if (!file) return
     setSubiendoFoto(true)
-    const ext = file.name.split('.').pop()
-    const path = `${userId}.${ext}`
+    const path = `${userId}/perfil.jpg`
     const { error: uploadError } = await supabase.storage
-      .from('avatares').upload(path, file, { upsert: true })
+      .from('avatares').upload(path, file, { upsert: true, contentType: file.type })
     if (!uploadError) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      setFotoUrl(data.publicUrl)
+      const urlConCache = `${data.publicUrl}?t=${Date.now()}`
+      setFotoUrl(urlConCache)
       setErrores(p => ({ ...p, foto: null }))
-      await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
+      await supabase.from('usuarios').upsert({ id: userId, foto_url: urlConCache })
     }
     setSubiendoFoto(false)
   }
