@@ -133,6 +133,13 @@ function Onboarding({ userId, userEmail, onCompletado }) {
     setSubiendoFotoOnb(false)
   }
 
+  function capitalizar(texto) {
+  return texto.trim().split(' ')
+    .filter(p => p.length > 0)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(' ')
+}
+
   function generarUsername(nombre, apellido) {
     const base = `${nombre.trim().split(' ')[0]}_${apellido.trim().split(' ')[0]}`
       .toLowerCase()
@@ -165,8 +172,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
 
     await supabase.from('usuarios').upsert({
       id: userId, email: userEmail,
-      nombre: nombre.trim(), apellido: apellido.trim(), username
-    })
+      nombre: capitalizar(nombre), apellido: capitalizar(apellido), username})
     setGuardando(false)
     setPendienteRol(rol)
     setPaso(4)
