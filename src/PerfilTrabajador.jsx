@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import VerificacionChofer from './VerificacionChofer'
+import VerificacionIdentidad from './VerificacionIdentidad'
 import { sanitizarCampo, sanitizarDescripcion, tieneInyeccionSQL } from './sanitize'
 
 const CATEGORIAS_DISPONIBLES = [
@@ -99,7 +100,6 @@ function PestanaPagos({ userId }) {
         setConectando(false)
         return
       }
-      // Abrir el onboarding de Stripe en la misma ventana
       window.location.href = data.url
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -114,7 +114,6 @@ function PestanaPagos({ userId }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Estado de la cuenta */}
       {stripeAccountId ? (
         <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
           <p style={{ fontSize: '40px', marginBottom: '10px' }}>✅</p>
@@ -133,7 +132,6 @@ function PestanaPagos({ userId }) {
         </div>
       )}
 
-      {/* Cómo funciona */}
       <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cómo funciona?</p>
         {[
@@ -149,7 +147,6 @@ function PestanaPagos({ userId }) {
         ))}
       </div>
 
-      {/* Comisión */}
       <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ejemplo de pago</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -169,7 +166,6 @@ function PestanaPagos({ userId }) {
 
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-      {/* Botón principal */}
       {stripeAccountId ? (
         <button type="button" onClick={conectarCuenta} disabled={conectando}
           style={{ width: '100%', padding: '14px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -204,6 +200,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [pestana, setPestana] = useState('info')
   const [editando, setEditando] = useState(false)
   const [verificandoChofer, setVerificandoChofer] = useState(false)
+  const [verificandoIdentidad, setVerificandoIdentidad] = useState(false)
   const [verificacion, setVerificacion] = useState(null)
   const [ratingReal, setRatingReal] = useState(null)
   const [totalTrabajos, setTotalTrabajos] = useState(0)
@@ -398,7 +395,8 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
     cargarPerfil()
   }
 
-  const necesitaVerificacion = categoriasServicio.some(c => CATEGORIAS_CHOFER.includes(c))
+  const esChofer = categoriasServicio.some(c => CATEGORIAS_CHOFER.includes(c))
+  const necesitaVerificacion = categoriasServicio.length > 0
   const radioActual = RADIOS.find(r => r.valor === radioAlertas)
 
   const iniciales = nombre
@@ -424,11 +422,20 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
     )
   }
 
+  if (verificandoIdentidad) {
+    return (
+      <VerificacionIdentidad userId={userId}
+        onVolver={() => setVerificandoIdentidad(false)}
+        onCompletado={() => { setVerificandoIdentidad(false); cargarVerificacion() }}
+      />
+    )
+  }
+
   // Pestañas dinámicas
   const pestanas = [
     ['info', 'Mi info'],
     ['servicios', 'Servicios'],
-    ...(necesitaVerificacion ? [['vehiculo', '🚗 Vehículo']] : []),
+    ...(esChofer ? [['vehiculo', '🚗 Vehículo']] : []),
     ['pagos', '💰 Pagos'],
     ['stats', '📊 Stats'],
     [`resenas`, `Reseñas${totalTrabajos > 0 ? ` (${totalTrabajos})` : ''}`],
@@ -478,6 +485,9 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
               🔧 Modo trabajador
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
+              {verificacion?.status === 'aprobado' && (
+                <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', fontWeight: '600' }}>🪪 Verificado</span>
+              )}
               {amonestaciones === 0 && totalTrabajos >= 1 && (
                 <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', fontWeight: '600' }}>✅ Sin amonestaciones</span>
               )}
@@ -585,16 +595,16 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                 {necesitaVerificacion && (
                   <div>
                     {!verificacion ? (
-                      <button type="button" onClick={() => setVerificandoChofer(true)} style={{ width: '100%', padding: '14px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        🚗 Verificarme como chofer — requerido
+                      <button type="button" onClick={() => esChofer ? setVerificandoChofer(true) : setVerificandoIdentidad(true)} style={{ width: '100%', padding: '14px', background: 'rgba(55,138,221,0.1)', color: '#378ADD', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        {esChofer ? '🚗 Verificarme como chofer — requerido' : '🪪 Verificar mi identidad — requerido'}
                       </button>
                     ) : verificacion.status === 'rechazado' ? (
-                      <button type="button" onClick={() => setVerificandoChofer(true)} style={{ width: '100%', padding: '14px', background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                      <button type="button" onClick={() => esChofer ? setVerificandoChofer(true) : setVerificandoIdentidad(true)} style={{ width: '100%', padding: '14px', background: 'rgba(240,149,149,0.1)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                         ❌ Verificación rechazada — volver a enviar
                       </button>
                     ) : (
                       <div style={{ padding: '12px 16px', borderRadius: '12px', textAlign: 'center', background: verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.1)' : 'rgba(186,117,23,0.1)', border: `0.5px solid ${verificacion.status === 'aprobado' ? 'rgba(29,158,117,0.3)' : 'rgba(186,117,23,0.3)'}`, fontSize: '13px', color: verificacion.status === 'aprobado' ? '#1D9E75' : '#E8A030', fontWeight: '500' }}>
-                        {verificacion.status === 'aprobado' ? '✅ Chofer verificado' : '⏳ Documentos en revisión — hasta 24 hrs'}
+                        {verificacion.status === 'aprobado' ? (esChofer ? '✅ Chofer verificado' : '✅ Identidad verificada') : '⏳ Documentos en revisión — hasta 24 hrs'}
                       </div>
                     )}
                   </div>
@@ -688,7 +698,6 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
               </div>
             )}
 
-            {/* ── NUEVA PESTAÑA DE PAGOS ── */}
             {pestana === 'pagos' && <PestanaPagos userId={userId} />}
 
             {pestana === 'stats' && (

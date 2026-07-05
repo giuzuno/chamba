@@ -34,11 +34,13 @@ export default function PerfilPublico({ usuarioId, rolVisto, onVolver, onContrat
   const [calificaciones, setCalificaciones] = useState([])
   const [ratingReal, setRatingReal] = useState(null)
   const [totalTrabajos, setTotalTrabajos] = useState(0)
+  const [verificacion, setVerificacion] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     cargarPerfil()
     cargarCalificaciones()
+    cargarVerificacion()
   }, [])
 
   async function cargarPerfil() {
@@ -61,6 +63,15 @@ export default function PerfilPublico({ usuarioId, rolVisto, onVolver, onContrat
       setTotalTrabajos(data.length)
       setCalificaciones(data)
     }
+  }
+
+  async function cargarVerificacion() {
+    const { data } = await supabase
+      .from('verificaciones')
+      .select('status')
+      .eq('usuario_id', usuarioId)
+      .maybeSingle()
+    if (data) setVerificacion(data)
   }
 
   function tiempoTranscurrido(fecha) {
@@ -88,6 +99,7 @@ export default function PerfilPublico({ usuarioId, rolVisto, onVolver, onContrat
     : '?'
 
   const esTrabajador = rolVisto === 'trabajador'
+  const estaVerificado = verificacion?.status === 'aprobado'
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -112,11 +124,16 @@ export default function PerfilPublico({ usuarioId, rolVisto, onVolver, onContrat
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '700' }}>{perfil.nombre || 'Sin nombre'}</h3>
               <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: esTrabajador ? 'rgba(29,158,117,0.2)' : 'rgba(55,138,221,0.2)', color: esTrabajador ? '#1D9E75' : '#378ADD', border: `0.5px solid ${esTrabajador ? 'rgba(29,158,117,0.4)' : 'rgba(55,138,221,0.4)'}`, fontWeight: '600' }}>
                 {esTrabajador ? '🔧 Trabajador' : '🛍️ Cliente'}
               </span>
+              {estaVerificado && (
+                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.4)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  🪪 Identidad verificada
+                </span>
+              )}
             </div>
 
             {/* Rating real */}
