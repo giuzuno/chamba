@@ -176,9 +176,14 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         <h2 style={{ color: '#1D9E75', fontSize: '24px', fontWeight: '800', marginBottom: '10px' }}>¡Trabajo aceptado!</h2>
         <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: '8px', maxWidth: '300px' }}>Precio acordado:</p>
         <p style={{ color: '#1D9E75', fontSize: '32px', fontWeight: '800', marginBottom: '16px' }}>${precioActual} MXN</p>
-        <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '14px 18px', marginBottom: '24px', maxWidth: '300px' }}>
+        <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '14px 18px', marginBottom: '16px', maxWidth: '300px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
-            🔐 El dinero del cliente está retenido en protegido. Se liberará a tu cuenta cuando confirme que el trabajo quedó bien.
+            🔐 El dinero del cliente queda retenido de forma protegida. Se libera a tu cuenta en cuanto confirme que el trabajo quedó bien.
+          </p>
+        </div>
+        <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '14px', padding: '14px 18px', marginBottom: '24px', maxWidth: '300px' }}>
+          <p style={{ fontSize: '13px', color: '#E8A030', lineHeight: '1.5' }}>
+            ⏳ Ahora el cliente tiene que completar su pago. En cuanto lo haga, te avisamos para que puedas empezar.
           </p>
         </div>
         <button type="button" onClick={onAceptado} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>

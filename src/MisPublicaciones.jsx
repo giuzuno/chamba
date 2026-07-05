@@ -489,18 +489,40 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             </div>
           </div>
 
+          {/* ✅ GUÍA — Esperando que acepten (recién publicado) */}
+          {trabajoSeleccionado.status === 'publicado' && !tieneContraoferta && (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: '14px', padding: '18px', textAlign: 'center' }}>
+              <p style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</p>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: 'rgba(255,255,255,0.75)', marginBottom: '6px' }}>Esperando que alguien acepte</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+                Tu publicación ya es visible para los trabajadores cercanos. En cuanto alguien la acepte te avisaremos aquí y por notificación — no necesitas hacer nada más por ahora.
+              </p>
+            </div>
+          )}
+
           {/* ✅ BANNER PAGO PENDIENTE */}
           {pagoPendiente && (
             <div style={{ background: 'rgba(232,160,48,0.1)', border: '1.5px solid #E8A030', borderRadius: '14px', padding: '18px', textAlign: 'center' }}>
               <p style={{ fontSize: '28px', marginBottom: '8px' }}>💳</p>
               <p style={{ fontSize: '15px', fontWeight: '700', color: '#E8A030', marginBottom: '6px' }}>Pago pendiente</p>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginBottom: '14px', lineHeight: '1.5' }}>
-                El trabajador aceptó tu trabajo. Completa el pago para que pueda empezar.
+                El trabajador aceptó tu trabajo. Completa el pago para que pueda empezar — tu dinero quedará protegido y solo se le entregará cuando tú confirmes que todo salió bien.
               </p>
               <button type="button" onClick={() => setPagando(trabajoSeleccionado)}
                 style={{ width: '100%', padding: '14px', background: '#E8A030', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 💳 Pagar ahora — ${trabajoSeleccionado.precio_acordado || trabajoSeleccionado.presupuesto} MXN
               </button>
+            </div>
+          )}
+
+          {/* ✅ GUÍA — Ya pagó, dinero protegido esperando que el trabajador empiece/termine */}
+          {trabajoSeleccionado.status === 'aceptado' && trabajoSeleccionado.pago_status === 'pagado' && !trabajoSeleccionado.trabajo_iniciado && (
+            <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: '26px', marginBottom: '6px' }}>🔒</p>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Tu pago está protegido</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
+                El dinero queda retenido de forma segura. Se le entrega al trabajador solo cuando tú confirmes que el trabajo quedó bien.
+              </p>
             </div>
           )}
 
