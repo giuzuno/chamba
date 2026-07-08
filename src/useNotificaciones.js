@@ -19,6 +19,20 @@ export async function solicitarPermiso() {
 export function escucharNotificaciones(callback) {
   return onMessage(messaging, (payload) => {
     console.log('Notificación recibida:', payload)
+    reproducirSonidoNotificacion()
     if (callback) callback(payload)
   })
+}
+
+function reproducirSonidoNotificacion() {
+  try {
+    const audio = new Audio('/sounds/chamba-notif.wav')
+    audio.volume = 0.85
+    audio.play().catch(() => {
+      // Algunos navegadores bloquean audio si el usuario no ha interactuado
+      // con la página todavía — no es un error crítico, se ignora en silencio.
+    })
+  } catch {
+    // Silencioso: el sonido es un "nice to have", nunca debe romper la notificación
+  }
 }
