@@ -905,6 +905,10 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: '8px' }}>
                       ⏰ El tracking se activa 2 hrs antes · cita a las {trabajo.hora_cita?.slice(0, 5)}
                       {horasParaCita(trabajo) && <span style={{ display: 'block', marginTop: '2px', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>Faltan aprox. {horasParaCita(trabajo)}</span>}
+                      {/* 🐛 DEBUG TEMPORAL — quitar después de diagnosticar */}
+                      <span style={{ display: 'block', marginTop: '4px', color: '#F5A623', fontSize: '10px' }}>
+                        DEBUG: cita={`${trabajo.fecha_cita}T${trabajo.hora_cita?.slice(0,5)}:00`} | ahora={new Date().toString()} | diffHoras={(((new Date(`${trabajo.fecha_cita}T${trabajo.hora_cita?.slice(0,5)}:00`)) - new Date()) / 3600000).toFixed(2)}
+                      </span>
                     </div>
                   )
                 )}
