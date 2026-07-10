@@ -16,6 +16,8 @@ import Terminos from './Terminos'
 import NotFound from './NotFound'
 import MpCallback from './MpCallback'
 import CambiarContrasena from './CambiarContrasena'
+import { verificarHoraDispositivo } from './verificarHora'
+import AvisoHoraIncorrecta from './AvisoHoraIncorrecta'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -425,6 +427,7 @@ function AppContenido() {
   const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
   const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false) // ← NUEVO: detecta el link de "olvidé mi contraseña"
+  const [avisoHoraVisible, setAvisoHoraVisible] = useState(false)
   const [verPassword, setVerPassword] = useState(false)
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
@@ -445,6 +448,13 @@ function AppContenido() {
       if (!session) { setModo(null); setEsNuevo(false) }
     })
   }, [])
+
+  useEffect(() => {
+    if (session) {
+      const { ok } = verificarHoraDispositivo()
+      if (!ok) setAvisoHoraVisible(true)
+    }
+  }, [session])
 
   useEffect(() => {
     if (session) {
@@ -648,6 +658,7 @@ function AppContenido() {
       return (
         <>
           <Toast toast={toastActivo} onClick={alTocarToast} />
+        {avisoHoraVisible && <AvisoHoraIncorrecta onCerrar={() => setAvisoHoraVisible(false)} />}
           <SeleccionModo nombre={nombreUsuario} noLeidas={noLeidas} horaActual={new Date().getHours()}
             onCliente={() => setModo('cliente')} onTrabajador={() => setModo('trabajador')}
             onLogout={handleLogout} onNotificaciones={() => setVerNotificaciones(true)}
@@ -660,6 +671,7 @@ function AppContenido() {
       return (
         <>
           <Toast toast={toastActivo} onClick={alTocarToast} />
+        {avisoHoraVisible && <AvisoHoraIncorrecta onCerrar={() => setAvisoHoraVisible(false)} />}
           <VistaTrabajador
             onLogout={handleLogout} userId={session.user.id} userEmail={session.user.email}
             onCambiarModo={() => setModo(null)} noLeidas={noLeidas}
@@ -676,6 +688,7 @@ function AppContenido() {
     return (
       <>
         <Toast toast={toastActivo} onClick={alTocarToast} />
+        {avisoHoraVisible && <AvisoHoraIncorrecta onCerrar={() => setAvisoHoraVisible(false)} />}
         <MapaChamba
           onLogout={handleLogout} userId={session.user.id} userEmail={session.user.email}
           onCambiarModo={() => setModo(null)} noLeidas={noLeidas}
