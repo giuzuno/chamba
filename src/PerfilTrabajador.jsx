@@ -162,11 +162,18 @@ function PestanaPagos({ userId }) {
           <span style={{ fontSize: '13px', color: '#F09595' }}>Comisión Chamba (12%)</span>
           <span style={{ fontSize: '13px', color: '#F09595' }}>-$60 MXN</span>
         </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <span style={{ fontSize: '13px', color: '#F09595' }}>Comisión de Mercado Pago (aprox.)</span>
+          <span style={{ fontSize: '13px', color: '#F09595' }}>-$25 MXN</span>
+        </div>
         <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>Tú recibes</span>
-          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>$440 MXN</span>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>Tú recibes (aprox.)</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>$415 MXN</span>
         </div>
+        <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', marginTop: '8px', lineHeight: '1.4' }}>
+          La comisión de Mercado Pago varía según el método de pago del cliente y el monto — en trabajos de menor precio, su peso porcentual es mayor.
+        </p>
       </div>
 
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
