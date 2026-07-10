@@ -615,19 +615,13 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             )}
             {trabajoSeleccionado.precio_acordado && (
               <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '10px', padding: '10px 16px', marginTop: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Precio del servicio</span>
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Comisión de plataforma</span>
-                  <span style={{ fontSize: '12px', color: '#F09595' }}>+${Math.round(trabajoSeleccionado.precio_acordado * 0.045 + 3)} MXN</span>
-                </div>
-                <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.08)', margin: '6px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Total a pagar</span>
-                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(trabajoSeleccionado.precio_acordado * 1.045 + 3)} MXN</span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#1D9E75' }}>${trabajoSeleccionado.precio_acordado} MXN</span>
                 </div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '6px', lineHeight: '1.4' }}>
+                  Sin cargos adicionales — pagas exactamente el precio acordado.
+                </p>
               </div>
             )}
           </div>
