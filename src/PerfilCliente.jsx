@@ -316,7 +316,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         {[
                           { label: '✅ Completados', count: completados.length, total: totalCompletado, color: '#1D9E75', bg: 'rgba(29,158,117,0.08)', border: 'rgba(29,158,117,0.2)' },
-                          { label: '🔄 En escrow', count: enProceso.length, total: totalProceso, color: '#378ADD', bg: 'rgba(55,138,221,0.08)', border: 'rgba(55,138,221,0.2)' },
+                          { label: '🔄 Pago retenido', count: enProceso.length, total: totalProceso, color: '#378ADD', bg: 'rgba(55,138,221,0.08)', border: 'rgba(55,138,221,0.2)' },
                           { label: '❌ Cancelados', count: cancelados.length, total: totalCancelado, color: '#F09595', bg: 'rgba(240,149,149,0.06)', border: 'rgba(240,149,149,0.15)' },
                           { label: '⚠️ En disputa', count: enDisputa.length, total: totalDisputa, color: '#E8A030', bg: 'rgba(232,160,48,0.06)', border: 'rgba(232,160,48,0.15)' },
                         ].map(s => (
@@ -342,7 +342,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
                 {[
                   { status: 'completado', label: '✅ Pagados', color: '#1D9E75' },
                   { status: 'en_revision', label: '🔧 Pendiente de confirmar', color: '#378ADD' },
-                  { status: 'aceptado', label: '🔄 En escrow', color: '#378ADD' },
+                  { status: 'aceptado', label: '🔄 Pago retenido', color: '#378ADD' },
                   { status: 'en_disputa', label: '⚠️ En disputa', color: '#E8A030' },
                   { status: 'cancelado', label: '❌ Cancelados / Devueltos', color: '#F09595' },
                 ].map(grupo => {
