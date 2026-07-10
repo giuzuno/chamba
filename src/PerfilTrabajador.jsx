@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import VerificacionChofer from './VerificacionChofer'
 import VerificacionIdentidad from './VerificacionIdentidad'
+import CambiarContrasena from './CambiarContrasena'
 import { sanitizarCampo, sanitizarDescripcion, tieneInyeccionSQL } from './sanitize'
 
 const CATEGORIAS_DISPONIBLES = [
@@ -100,6 +101,7 @@ function PestanaPagos({ userId }) {
         setConectando(false)
         return
       }
+      // Abrir el onboarding de Stripe en la misma ventana
       window.location.href = data.url
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -114,6 +116,7 @@ function PestanaPagos({ userId }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
+      {/* Estado de la cuenta */}
       {stripeAccountId ? (
         <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
           <p style={{ fontSize: '40px', marginBottom: '10px' }}>✅</p>
@@ -132,6 +135,7 @@ function PestanaPagos({ userId }) {
         </div>
       )}
 
+      {/* Cómo funciona */}
       <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cómo funciona?</p>
         {[
@@ -147,6 +151,7 @@ function PestanaPagos({ userId }) {
         ))}
       </div>
 
+      {/* Comisión */}
       <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ejemplo de pago</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -166,6 +171,7 @@ function PestanaPagos({ userId }) {
 
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
+      {/* Botón principal */}
       {stripeAccountId ? (
         <button type="button" onClick={conectarCuenta} disabled={conectando}
           style={{ width: '100%', padding: '14px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -201,6 +207,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [editando, setEditando] = useState(false)
   const [verificandoChofer, setVerificandoChofer] = useState(false)
   const [verificandoIdentidad, setVerificandoIdentidad] = useState(false)
+  const [cambiandoPassword, setCambiandoPassword] = useState(false)
   const [verificacion, setVerificacion] = useState(null)
   const [ratingReal, setRatingReal] = useState(null)
   const [totalTrabajos, setTotalTrabajos] = useState(0)
@@ -427,6 +434,15 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
       <VerificacionIdentidad userId={userId}
         onVolver={() => setVerificandoIdentidad(false)}
         onCompletado={() => { setVerificandoIdentidad(false); cargarVerificacion() }}
+      />
+    )
+  }
+
+  if (cambiandoPassword) {
+    return (
+      <CambiarContrasena
+        onVolver={() => setCambiandoPassword(false)}
+        onCompletado={() => setCambiandoPassword(false)}
       />
     )
   }
@@ -698,6 +714,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
               </div>
             )}
 
+            {/* ── NUEVA PESTAÑA DE PAGOS ── */}
             {pestana === 'pagos' && <PestanaPagos userId={userId} />}
 
             {pestana === 'stats' && (
@@ -828,6 +845,10 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
                 </button>
               </>
             )}
+
+            <button type="button" onClick={() => setCambiandoPassword(true)} style={{ width: '100%', padding: '14px', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              🔒 Cambiar contraseña
+            </button>
 
             <div style={{ textAlign: 'center' }}>
               <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>

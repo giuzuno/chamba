@@ -86,7 +86,7 @@ export default function ReportarCobro({ trabajo, userId, rolReportador, onVolver
             <p style={{ fontSize: '13px', fontWeight: '700', color: '#1D9E75', marginBottom: '4px' }}>Usa siempre los pagos de Chamba</p>
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>
               {rolReportador === 'cliente'
-                ? 'Tu dinero está protegido en protegido. Si pagas fuera de la app y el trabajo sale mal, no podremos recuperarlo. Dentro de Chamba, si hay un problema, te regresamos el dinero.'
+                ? 'Tu dinero está protegido. Si pagas fuera de la app y el trabajo sale mal, no podremos recuperarlo. Dentro de Chamba, si hay un problema, te regresamos el dinero.'
                 : 'Cobrar dentro de Chamba garantiza que recibirás tu pago. Si cobras fuera, pierdes la protección y el cliente puede disputar sin respaldo.'}
             </p>
           </div>

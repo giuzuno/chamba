@@ -215,7 +215,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '18px', flexShrink: 0 }}>🔐</span>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-            El dinero queda retenido en protegido. Cobra siempre dentro de la app para garantizar tu pago.
+            El dinero queda retenido de forma protegida. Cobra siempre dentro de la app para garantizar tu pago.
           </p>
         </div>
 

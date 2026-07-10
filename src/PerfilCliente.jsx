@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { sanitizarCampo, sanitizarDescripcion, tieneInyeccionSQL } from './sanitize'
+import CambiarContrasena from './CambiarContrasena'
 
 function EstrellaRating({ rating }) {
   if (!rating) return <span style={{ fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>Sin calificaciones</span>
@@ -37,6 +38,7 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   const [gastoTotal, setGastoTotal] = useState(0)
   const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('')
   const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
+  const [cambiandoPassword, setCambiandoPassword] = useState(false)
 
   useEffect(() => {
     cargarPerfil()
@@ -147,6 +149,15 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
     fontSize: '15px', fontFamily: 'sans-serif', outline: 'none',
     cursor: editando ? 'text' : 'default',
   })
+
+  if (cambiandoPassword) {
+    return (
+      <CambiarContrasena
+        onVolver={() => setCambiandoPassword(false)}
+        onCompletado={() => setCambiandoPassword(false)}
+      />
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
@@ -413,7 +424,11 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
             )}
 
             <div style={{ textAlign: 'center' }}>
-              <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
+              <button type="button" onClick={() => setCambiandoPassword(true)} style={{ width: '100%', padding: '14px', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              🔒 Cambiar contraseña
+            </button>
+
+            <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
             </div>
 
           </div>

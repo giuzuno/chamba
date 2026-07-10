@@ -15,6 +15,7 @@ import PanelAdmin from './PanelAdmin'
 import Terminos from './Terminos'
 import NotFound from './NotFound'
 import MpCallback from './MpCallback'
+import CambiarContrasena from './CambiarContrasena'
 
 function Toast({ toast, onClick }) {
   if (!toast) return null
@@ -195,7 +196,7 @@ function Onboarding({ userId, userEmail, onCompletado }) {
           {/* Features */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '32px' }}>
             {[
-              { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero protegido en protegido hasta confirmar' },
+              { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero queda protegido hasta confirmar' },
               { icon: '⭐', titulo: 'Trabajadores verificados', desc: 'Con calificaciones reales de tus vecinos' },
               { icon: '⚡', titulo: 'Respuesta inmediata', desc: 'Publica y recibe respuestas en minutos' },
             ].map(f => (
@@ -423,6 +424,7 @@ function AppContenido() {
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
+  const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false) // ← NUEVO: detecta el link de "olvidé mi contraseña"
   const [verPassword, setVerPassword] = useState(false)
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
@@ -439,6 +441,7 @@ function AppContenido() {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session) })
     supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      if (_event === 'PASSWORD_RECOVERY') setEsRecuperacionPassword(true)
       if (!session) { setModo(null); setEsNuevo(false) }
     })
   }, [])
@@ -587,6 +590,17 @@ function AppContenido() {
   )
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
+
+  // ── Link de recuperación de contraseña (correo) — tiene prioridad sobre todo lo demás ──
+  if (esRecuperacionPassword) return (
+    <CambiarContrasena
+      modoRecuperacion
+      onCompletado={() => {
+        window.history.replaceState(null, '', window.location.pathname)
+        setEsRecuperacionPassword(false)
+      }}
+    />
+  )
 
   // ── Recuperar contraseña ──
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
