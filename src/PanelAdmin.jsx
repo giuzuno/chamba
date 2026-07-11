@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [pestana, setPestana] = useState('dashboard')
   const [stats, setStats] = useState({})
   const [trabajos, setTrabajos] = useState([])
   const [disputas, setDisputas] = useState([])
+  const [verificaciones, setVerificaciones] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [busquedaUsuario, setBusquedaUsuario] = useState('')
   const [dispositivosBaneados, setDispositivosBaneados] = useState([])
@@ -21,7 +23,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
 
   async function cargarDatos() {
     setCargando(true)
-    await Promise.all([cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios(), cargarDispositivosBaneados(), cargarTrabajosEnVivo()])
+    await Promise.all([cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios(), cargarDispositivosBaneados(), cargarTrabajosEnVivo(), cargarVerificaciones()])
     setCargando(false)
   }
 
@@ -75,6 +77,35 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
       .select('*, trabajos(categoria, presupuesto, precio_acordado, cliente_id, trabajador_id)')
       .order('creado_en', { ascending: false })
     if (data) setDisputas(data)
+  }
+
+  async function cargarVerificaciones() {
+    const { data } = await supabase.from('verificaciones')
+      .select('*, usuarios(nombre, email, foto_url)')
+      .order('creado_en', { ascending: false })
+    if (data) setVerificaciones(data)
+  }
+
+  async function resolverVerificacion(verificacionId, usuarioId, aprobar, notasRechazo) {
+    setLoadingAccion(verificacionId)
+    const nuevoStatus = aprobar ? 'aprobado' : 'rechazado'
+
+    await supabase.from('verificaciones').update({
+      status: nuevoStatus,
+      ...(notasRechazo ? { notas_admin: notasRechazo } : {}),
+    }).eq('id', verificacionId)
+
+    await enviarNotificacionCompleta({
+      usuarioId,
+      titulo: aprobar ? '✅ Identidad verificada' : '❌ Verificación rechazada',
+      cuerpo: aprobar
+        ? 'Tu identidad fue verificada. Ya tienes la insignia en tu perfil.'
+        : `Tu verificación fue rechazada. ${notasRechazo || 'Revisa que tus documentos sean legibles y estén vigentes, y vuelve a intentarlo.'}`,
+      tipo: 'general',
+    })
+
+    await cargarVerificaciones()
+    setLoadingAccion(null)
   }
 
   async function cargarUsuarios() {
@@ -187,6 +218,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
           ['dashboard', '📊 Dashboard'],
           ['trabajos', `🏁 Trabajos${trabajos.length > 0 ? ` (${trabajos.length})` : ''}`],
           ['disputas', `⚠️ Disputas${stats.disputasAbiertas > 0 ? ` (${stats.disputasAbiertas})` : ''}`],
+          ['verificaciones', `🪪 Verificaciones${verificaciones.filter(v => v.status === 'pendiente').length > 0 ? ` (${verificaciones.filter(v => v.status === 'pendiente').length})` : ''}`],
           ['usuarios', `👥 Usuarios${usuarios.length > 0 ? ` (${usuarios.length})` : ''}`],
           ['en_vivo', `🔴 En vivo${trabajosEnVivo.length > 0 ? ` (${trabajosEnVivo.length})` : ''}`],
           ['baneados', `🚫 Baneados${dispositivosBaneados.length > 0 ? ` (${dispositivosBaneados.length})` : ''}`],
@@ -242,6 +274,18 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
                 </div>
                 <button type="button" onClick={() => setPestana('disputas')} style={{ background: '#F09595', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                   Resolver
+                </button>
+              </div>
+            )}
+
+            {verificaciones.filter(v => v.status === 'pendiente').length > 0 && (
+              <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ fontSize: '15px', fontWeight: '700', color: '#378ADD', marginBottom: '4px' }}>🪪 {verificaciones.filter(v => v.status === 'pendiente').length} verificación{verificaciones.filter(v => v.status === 'pendiente').length > 1 ? 'es' : ''} pendiente{verificaciones.filter(v => v.status === 'pendiente').length > 1 ? 's' : ''}</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Identidad o vehículo por revisar</p>
+                </div>
+                <button type="button" onClick={() => setPestana('verificaciones')} style={{ background: '#378ADD', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  Revisar
                 </button>
               </div>
             )}
@@ -327,6 +371,82 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
                 )}
               </div>
             ))}
+          </>
+        )}
+
+        {/* ── VERIFICACIONES ── */}
+        {!cargando && pestana === 'verificaciones' && (
+          <>
+            {verificaciones.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🪪</div>
+                <p>Sin verificaciones todavía</p>
+              </div>
+            ) : verificaciones.map(v => {
+              const esChofer = v.tipo && v.tipo !== 'identidad'
+              return (
+                <div key={v.id} style={{ background: v.status === 'pendiente' ? 'rgba(55,138,221,0.06)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${v.status === 'pendiente' ? 'rgba(55,138,221,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {v.usuarios?.foto_url ? (
+                        <img src={v.usuarios.foto_url} alt="foto" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>👤</div>
+                      )}
+                      <div>
+                        <p style={{ fontSize: '14px', fontWeight: '600' }}>{v.usuarios?.nombre || 'Sin nombre'}</p>
+                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{esChofer ? `🚗 Chofer (${v.tipo})` : '🪪 Identidad general'}</p>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', fontWeight: '600',
+                      background: v.status === 'pendiente' ? 'rgba(55,138,221,0.15)' : v.status === 'aprobado' ? 'rgba(29,158,117,0.15)' : 'rgba(240,149,149,0.15)',
+                      color: v.status === 'pendiente' ? '#378ADD' : v.status === 'aprobado' ? '#1D9E75' : '#F09595' }}>
+                      {v.status}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px' }}>
+                    {[
+                      { url: v.ine_url, label: 'INE' },
+                      { url: v.selfie_url, label: 'Selfie' },
+                      { url: v.licencia_url, label: 'Licencia' },
+                      { url: v.circulacion_url, label: 'Circulación' },
+                      { url: v.foto_vehiculo_url, label: 'Vehículo' },
+                      { url: v.seguro_url, label: 'Seguro' },
+                    ].filter(d => d.url).map(d => (
+                      <a key={d.label} href={d.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <img src={d.url} alt={d.label} style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)' }} />
+                          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>{d.label}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '10px' }}>{tiempoTranscurrido(v.creado_en)}</p>
+
+                  {v.status === 'pendiente' && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" onClick={() => resolverVerificacion(v.id, v.usuario_id, true)} disabled={loadingAccion === v.id}
+                        style={{ flex: 1, padding: '10px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        ✅ Aprobar
+                      </button>
+                      <button type="button" onClick={() => {
+                        const motivo = prompt('¿Motivo del rechazo? (se le muestra al usuario)')
+                        if (motivo === null) return
+                        resolverVerificacion(v.id, v.usuario_id, false, motivo)
+                      }} disabled={loadingAccion === v.id}
+                        style={{ flex: 1, padding: '10px', background: 'rgba(240,149,149,0.15)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        ❌ Rechazar
+                      </button>
+                    </div>
+                  )}
+                  {v.status !== 'pendiente' && v.notas_admin && (
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Nota: {v.notas_admin}</p>
+                  )}
+                </div>
+              )
+            })}
           </>
         )}
 
