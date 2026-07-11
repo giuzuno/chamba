@@ -50,6 +50,7 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [negociaciones, setNegociaciones] = useState([])
   const [loadingAccion, setLoadingAccion] = useState(false)
   const [exitoAccion, setExitoAccion] = useState('')
+  const [errorLiberacion, setErrorLiberacion] = useState('')
   const [calificando, setCalificando] = useState(null)
   const [chatAbierto, setChatAbierto] = useState(null)
   const [pestana, setPestana] = useState('activos')
@@ -261,7 +262,18 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
 
   async function confirmarCompletado(trabajo) {
     setLoadingAccion(true)
-    await supabase.from('trabajos').update({ status: 'completado' }).eq('id', trabajo.id)
+    setErrorLiberacion('')
+
+    const { data, error: fnError } = await supabase.functions.invoke('liberar-pago', {
+      body: { trabajoId: trabajo.id }
+    })
+
+    if (fnError || !data?.ok) {
+      setErrorLiberacion('No se pudo liberar el pago. Intenta de nuevo en unos segundos, o contacta a soporte si el problema persiste.')
+      setLoadingAccion(false)
+      return
+    }
+
     await enviarNotificacionCompleta({
       usuarioId: trabajo.trabajador_id,
       titulo: '💰 ¡Pago liberado!',
@@ -526,6 +538,19 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
             </div>
           )}
 
+          {/* ✅ NUEVO — El trabajador no llegó / no aparece: disponible en cualquier momento después de pagar */}
+          {trabajoSeleccionado.status === 'aceptado' && trabajoSeleccionado.pago_status === 'pagado' && (
+            <button type="button" onClick={async () => {
+              const { data: msgs } = await supabase.from('mensajes')
+                .select('id').eq('trabajo_id', trabajoSeleccionado.id)
+                .eq('emisor_id', userId).limit(1)
+              if (!msgs || msgs.length === 0) { setChatAbierto(trabajoSeleccionado); return }
+              setAbrirDisputa(trabajoSeleccionado)
+            }} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(240,149,149,0.6)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              🚫 El trabajador no se presentó / hay un problema
+            </button>
+          )}
+
           {/* Fecha */}
           {trabajoSeleccionado.fecha_cita && (
             <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -777,6 +802,9 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
                     <img src={trabajoSeleccionado.foto_trabajo_url} alt="trabajo terminado"
                       style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '14px', border: '1px solid rgba(29,158,117,0.3)' }} />
                   </div>
+                )}
+                {errorLiberacion && (
+                  <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center', marginBottom: '10px' }}>{errorLiberacion}</p>
                 )}
                 <button type="button" onClick={() => confirmarCompletado(trabajoSeleccionado)} disabled={loadingAccion}
                   style={{ width: '100%', padding: '14px', background: loadingAccion ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: loadingAccion ? 'not-allowed' : 'pointer', fontFamily: 'sans-serif', marginBottom: '8px' }}>

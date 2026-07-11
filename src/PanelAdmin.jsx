@@ -86,8 +86,22 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
 
   async function resolverDisputa(disputaId, trabajoId, ganador) {
     setLoadingAccion(disputaId)
-    const nuevoStatus = ganador === 'cliente' ? 'cancelado' : 'completado'
-    await supabase.from('trabajos').update({ status: nuevoStatus, en_disputa: false }).eq('id', trabajoId)
+
+    // Ejecutar la acción real en Mercado Pago según quién ganó la disputa
+    const nombreFuncion = ganador === 'cliente' ? 'cancelar-pago' : 'liberar-pago'
+    const { data, error: fnError } = await supabase.functions.invoke(nombreFuncion, {
+      body: { trabajoId }
+    })
+
+    if (fnError || !data?.ok) {
+      alert(`No se pudo procesar el pago en Mercado Pago: ${data?.error || fnError?.message || 'error desconocido'}. La disputa NO se marcó como resuelta — intenta de nuevo.`)
+      setLoadingAccion(null)
+      return
+    }
+
+    // Las funciones cancelar-pago / liberar-pago ya actualizan pago_status y status.
+    // Aquí solo marcamos en_disputa: false y cerramos el registro de la disputa.
+    await supabase.from('trabajos').update({ en_disputa: false }).eq('id', trabajoId)
     await supabase.from('disputas').update({ status: 'resuelta', resolucion: ganador }).eq('id', disputaId)
 
     // Amonestar al perdedor y banear si llega a 3
