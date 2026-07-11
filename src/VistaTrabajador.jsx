@@ -979,6 +979,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block', background: trabajo.status === 'completado' ? 'rgba(29,158,117,0.2)' : 'rgba(240,149,149,0.1)', color: trabajo.status === 'completado' ? '#1D9E75' : '#F09595', border: `0.5px solid ${trabajo.status === 'completado' ? 'rgba(29,158,117,0.4)' : 'rgba(240,149,149,0.3)'}`, fontWeight: '500' }}>
                       {trabajo.status === 'completado' ? '🏁 Completado' : '❌ Cancelado'}
                     </span>
+                    {trabajo.status === 'completado' && trabajo.pago_status === 'liberado' && (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', display: 'inline-block', marginLeft: '6px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.4)', fontWeight: '600' }}>
+                        💰 Depositado
+                      </span>
+                    )}
                     <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>{tiempoTranscurrido(trabajo.creado_en)}</span>
                   </div>
                 </div>
