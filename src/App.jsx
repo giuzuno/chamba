@@ -132,6 +132,85 @@ function ConfirmarCorreo({ email, onVolver }) {
   )
 }
 
+// ── Crear cuenta (pantalla separada del login) ──
+function CrearCuenta({ onVolver, onExito }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmarPassword, setConfirmarPassword] = useState('')
+  const [verPassword, setVerPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function crearCuenta(e) {
+    e.preventDefault()
+    setError('')
+
+    if (!email.trim()) { setError('Escribe tu correo'); return }
+    if (!password) { setError('Escribe una contraseña'); return }
+    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return }
+    if (password !== confirmarPassword) { setError('Las contraseñas no coinciden'); return }
+
+    setLoading(true)
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(), password,
+      options: { emailRedirectTo: 'https://chamba-delta.vercel.app' }
+    })
+    setLoading(false)
+
+    if (error) {
+      if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already exists')) {
+        setError('Ya existe una cuenta con ese correo — intenta iniciar sesión en vez de crear una nueva.')
+      } else if (error.message?.toLowerCase().includes('rate limit')) {
+        setError('Se alcanzó el límite de correos por ahora. Intenta de nuevo en unos minutos.')
+      } else {
+        setError(error.message)
+      }
+      return
+    }
+
+    onExito(email.trim())
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px' }}>
+      <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '40px 32px', width: '100%', maxWidth: '400px' }}>
+        <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '20px', cursor: 'pointer', marginBottom: '20px' }}>←</button>
+        <div style={{ marginBottom: '24px' }}><LogoChamba size='md' /></div>
+        <h2 style={{ color: 'white', fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>Crear cuenta nueva</h2>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px', lineHeight: '1.5' }}>
+          Escribe un correo real — te mandaremos un enlace de confirmación ahí.
+        </p>
+        <form onSubmit={crearCuenta} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <input type="email" placeholder="Tu correo" value={email}
+            onChange={e => { setEmail(e.target.value); setError('') }} required autoFocus
+            style={{ background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${error ? '#F09595' : 'rgba(255,255,255,0.15)'}`, borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
+          />
+          <div style={{ position: 'relative' }}>
+            <input type={verPassword ? 'text' : 'password'} placeholder="Crea una contraseña" value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }} required
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${error ? '#F09595' : 'rgba(255,255,255,0.15)'}`, borderRadius: '12px', padding: '14px 48px 14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
+            />
+            <button type="button" onClick={() => setVerPassword(!verPassword)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'rgba(255,255,255,0.4)' }}>
+              {verPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+          <input type={verPassword ? 'text' : 'password'} placeholder="Confirma tu contraseña" value={confirmarPassword}
+            onChange={e => { setConfirmarPassword(e.target.value); setError('') }} required
+            style={{ background: 'rgba(255,255,255,0.06)', border: `0.5px solid ${error ? '#F09595' : 'rgba(255,255,255,0.15)'}`, borderRadius: '12px', padding: '14px 16px', color: 'white', fontSize: '15px', outline: 'none' }}
+          />
+          {error && <p style={{ color: '#F09595', fontSize: '13px' }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{ background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginTop: '4px' }}>
+            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+          </button>
+        </form>
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '13px', marginTop: '16px' }}>
+          ¿Ya tienes cuenta? <span onClick={onVolver} style={{ color: '#1D9E75', cursor: 'pointer', fontWeight: '600' }}>Inicia sesión</span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Onboarding ──
 function Onboarding({ userId, userEmail, onCompletado }) {
   const [paso, setPaso] = useState(1)
@@ -448,6 +527,7 @@ function AppContenido() {
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [navegando, setNavegando] = useState(false)
   const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
+  const [verCrearCuenta, setVerCrearCuenta] = useState(false) // ← NUEVO: pantalla separada de registro
   const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false) // ← NUEVO: detecta el link de "olvidé mi contraseña"
   const [avisoHoraVisible, setAvisoHoraVisible] = useState(false)
   const [verPassword, setVerPassword] = useState(false)
@@ -582,23 +662,6 @@ function AppContenido() {
     setLoading(false)
   }
 
-  async function handleRegister(e) {
-    e.preventDefault()
-    if (!email.trim()) { setError('Escribe tu correo'); return }
-    if (!password) { setError('Escribe una contraseña'); return }
-    setLoading(true); setError('')
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: 'https://chamba-delta.vercel.app' }
-    })
-    if (error) {
-      setError(error.message)
-    } else {
-      setRegistroExitoso(true)
-    }
-    setLoading(false)
-  }
-
   async function handleLogout() {
     await supabase.auth.signOut()
     setModo(null); setNombreUsuario(''); setNoLeidas(0); setEsNuevo(false); setEsAdmin(false); setEstaBaneado(false); setDispositivoBaneado(false)
@@ -653,6 +716,18 @@ function AppContenido() {
 
   // ── Recuperar contraseña ──
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
+
+  // ── Crear cuenta (pantalla separada) ──
+  if (verCrearCuenta) return (
+    <CrearCuenta
+      onVolver={() => setVerCrearCuenta(false)}
+      onExito={(correoUsado) => {
+        setEmail(correoUsado)
+        setVerCrearCuenta(false)
+        setRegistroExitoso(true)
+      }}
+    />
+  )
 
   // ── Confirmar correo tras registro ──
   if (registroExitoso) return (
@@ -758,7 +833,7 @@ function AppContenido() {
 </div>
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>{loading ? 'Cargando...' : 'Entrar'}</button>
-          <button type="button" onClick={handleRegister} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
+          <button type="button" onClick={() => setVerCrearCuenta(true)} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
           {/* ← NUEVO: Link recuperar contraseña */}
           <button type="button" onClick={() => setVerRecuperar(true)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'center', padding: '4px' }}>
             ¿Olvidaste tu contraseña?
