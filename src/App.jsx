@@ -110,6 +110,28 @@ function RecuperarPassword({ onVolver }) {
   )
 }
 
+// ── Confirmar correo tras registro ──
+function ConfirmarCorreo({ email, onVolver }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+      <div style={{ fontSize: '60px', marginBottom: '20px' }}>📬</div>
+      <h2 style={{ color: '#1D9E75', fontSize: '22px', fontWeight: '800', marginBottom: '10px' }}>¡Ya casi!</h2>
+      <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: '300px', lineHeight: '1.6', marginBottom: '8px' }}>
+        Te mandamos un correo de confirmación a
+      </p>
+      <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', marginBottom: '20px' }}>{email}</p>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', maxWidth: '300px', lineHeight: '1.6', marginBottom: '32px' }}>
+        Da click en el enlace del correo para activar tu cuenta. Si no lo ves, revisa spam.
+        Si tu correo tiene un error de escritura, no te va a llegar nada — en ese caso,
+        regístrate de nuevo con el correo correcto.
+      </p>
+      <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+        Volver al inicio
+      </button>
+    </div>
+  )
+}
+
 // ── Onboarding ──
 function Onboarding({ userId, userEmail, onCompletado }) {
   const [paso, setPaso] = useState(1)
@@ -429,6 +451,7 @@ function AppContenido() {
   const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false) // ← NUEVO: detecta el link de "olvidé mi contraseña"
   const [avisoHoraVisible, setAvisoHoraVisible] = useState(false)
   const [verPassword, setVerPassword] = useState(false)
+  const [registroExitoso, setRegistroExitoso] = useState(false) // ← NUEVO: pantalla de "revisa tu correo"
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
 
@@ -548,15 +571,31 @@ function AppContenido() {
     e.preventDefault()
     setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
+    if (error) {
+      // Mensaje más claro cuando el bloqueo es por correo sin confirmar
+      if (error.message?.toLowerCase().includes('email not confirmed')) {
+        setError('Confirma tu correo antes de entrar — revisa tu bandeja de entrada (y spam).')
+      } else {
+        setError(error.message)
+      }
+    }
     setLoading(false)
   }
 
   async function handleRegister(e) {
     e.preventDefault()
+    if (!email.trim()) { setError('Escribe tu correo'); return }
+    if (!password) { setError('Escribe una contraseña'); return }
     setLoading(true); setError('')
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) setError(error.message)
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: 'https://chamba-delta.vercel.app' }
+    })
+    if (error) {
+      setError(error.message)
+    } else {
+      setRegistroExitoso(true)
+    }
     setLoading(false)
   }
 
@@ -614,6 +653,11 @@ function AppContenido() {
 
   // ── Recuperar contraseña ──
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
+
+  // ── Confirmar correo tras registro ──
+  if (registroExitoso) return (
+    <ConfirmarCorreo email={email} onVolver={() => { setRegistroExitoso(false); setEmail(''); setPassword('') }} />
+  )
 
   if (session) {
     if (estaBaneado) return (
