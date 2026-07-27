@@ -31,6 +31,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [yaNoDisponible, setYaNoDisponible] = useState(false)
+  const [verificacionStatus, setVerificacionStatus] = useState(undefined) // undefined = aún no se sabe
 
   const MAX_RONDAS = 3
   const rondasUsadas = trabajoActual.rondas_negociacion || 0
@@ -39,6 +40,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
 
   useEffect(() => {
     cargarOfertas()
+    cargarEstadoVerificacion()
 
     // Suscripción en tiempo real: si el cliente acepta, manda otra contraoferta,
     // o el trabajo deja de estar disponible (otro trabajador lo tomó), esta pantalla
@@ -89,6 +91,14 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     setCargando(false)
   }
 
+  // Se consulta una sola vez al abrir la pantalla, y se vuelve a checar justo
+  // antes de aceptar (por si cambió mientras negociaba).
+  async function cargarEstadoVerificacion() {
+    const { data } = await supabase.from('verificaciones')
+      .select('status').eq('usuario_id', userId).maybeSingle()
+    setVerificacionStatus(data?.status || 'ninguna')
+  }
+
   async function hacerContraoferta() {
     if (nuevaOferta === precioActual || rondasRestantes <= 0) return
     setLoading(true)
@@ -109,6 +119,25 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function aceptarPrecio() {
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     setLoading(true)
+    setError('')
+
+    // Verificación de identidad obligatoria — se checa fresco (no el estado en memoria)
+    // para no dejar pasar a nadie que se haya des-verificado o rechazado mientras negociaba.
+    const { data: verificacion } = await supabase
+      .from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle()
+
+    if (!verificacion || verificacion.status !== 'aprobado') {
+      setLoading(false)
+      setVerificacionStatus(verificacion?.status || 'ninguna')
+      if (verificacion?.status === 'pendiente') {
+        setError('Tu verificación de identidad está en revisión. Podrás aceptar trabajos en cuanto sea aprobada (hasta 24 horas).')
+      } else if (verificacion?.status === 'rechazado') {
+        setError('Tu verificación de identidad fue rechazada. Ve a tu perfil para volver a enviar tus documentos antes de aceptar trabajos.')
+      } else {
+        setError('Necesitas verificar tu identidad antes de aceptar trabajos. Ve a tu perfil (Mi info) para completarla — solo toma unos minutos.')
+      }
+      return
+    }
 
     // Verificar que el trabajo siga disponible antes de aceptar
     const { data: trabajoVerificado } = await supabase
@@ -193,6 +222,8 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     )
   }
 
+  const verificacionOk = verificacionStatus === 'aprobado'
+
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
@@ -210,6 +241,20 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>Presupuesto inicial: <span style={{ color: 'white' }}>${trabajo.presupuesto} MXN</span></p>
           </div>
         </div>
+
+        {/* Aviso de verificación pendiente — solo se muestra si NO está aprobada */}
+        {verificacionStatus !== undefined && !verificacionOk && (
+          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '18px', flexShrink: 0 }}>🪪</span>
+            <p style={{ fontSize: '12px', color: '#E8A030', lineHeight: '1.5' }}>
+              {verificacionStatus === 'pendiente'
+                ? 'Tu verificación de identidad está en revisión. Podrás aceptar en cuanto la aprobemos.'
+                : verificacionStatus === 'rechazado'
+                  ? 'Tu verificación fue rechazada. Vuelve a enviarla desde tu perfil para poder aceptar trabajos.'
+                  : 'Necesitas verificar tu identidad desde tu perfil (Mi info) antes de poder aceptar trabajos.'}
+            </p>
+          </div>
+        )}
 
         {/* Banner protegido para trabajador */}
         <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
