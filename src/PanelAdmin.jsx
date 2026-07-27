@@ -194,6 +194,24 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     setLoadingAccion(null)
   }
 
+  async function recordarMercadoPago() {
+    const trabajadoresSinMP = usuarios.filter(u => u.es_trabajador && !u.mp_account_id && !u.baneado)
+    if (trabajadoresSinMP.length === 0) return
+    if (!confirm(`Se enviará un recordatorio push a ${trabajadoresSinMP.length} trabajador(es) sin Mercado Pago conectado. ¿Continuar?`)) return
+
+    setLoadingAccion('recordatorio_mp')
+    for (const u of trabajadoresSinMP) {
+      await enviarNotificacionCompleta({
+        usuarioId: u.id,
+        titulo: '🏦 Conecta tu Mercado Pago',
+        cuerpo: 'Sin tu cuenta de Mercado Pago conectada no puedes recibir el pago de tus trabajos. Ve a tu perfil → Pagos para conectarla — toma menos de 2 minutos.',
+        tipo: 'general',
+      })
+    }
+    setLoadingAccion(null)
+    alert(`Recordatorio enviado a ${trabajadoresSinMP.length} trabajador(es).`)
+  }
+
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
@@ -484,6 +502,20 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
               value={busquedaUsuario} onChange={e => setBusquedaUsuario(e.target.value)}
               style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
             />
+
+            {usuarios.filter(u => u.es_trabajador && !u.mp_account_id && !u.baneado).length > 0 && (
+              <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#E8A030' }}>🏦 {usuarios.filter(u => u.es_trabajador && !u.mp_account_id && !u.baneado).length} trabajador(es) sin Mercado Pago conectado</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>No pueden recibir pagos hasta que lo conecten</p>
+                </div>
+                <button type="button" onClick={recordarMercadoPago} disabled={loadingAccion === 'recordatorio_mp'}
+                  style={{ padding: '8px 14px', background: '#E8A030', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {loadingAccion === 'recordatorio_mp' ? 'Enviando...' : '📣 Recordar'}
+                </button>
+              </div>
+            )}
+
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}</p>
 
             {usuariosFiltrados.map(u => {
@@ -505,6 +537,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
                           {u.es_admin && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.2)', color: '#E8A030', fontWeight: '700' }}>ADMIN</span>}
                           {u.es_trabajador && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', fontWeight: '600' }}>trabajador</span>}
                           {u.baneado && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(240,149,149,0.2)', color: '#F09595', fontWeight: '700' }}>BANEADO</span>}
+                          {u.es_trabajador && !u.mp_account_id && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.2)', color: '#E8A030', fontWeight: '600' }}>🏦 sin MP</span>}
                           {!u.nombre && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', fontWeight: '600' }}>onboarding incompleto</span>}
                         </div>
                         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>

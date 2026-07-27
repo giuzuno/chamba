@@ -40,6 +40,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [yaNoDisponible, setYaNoDisponible] = useState(false)
   const [verificacionStatus, setVerificacionStatus] = useState(undefined) // undefined = aún no se sabe
   const [cuentaCreadaEn, setCuentaCreadaEn] = useState(null)
+  const [mpConectado, setMpConectado] = useState(undefined) // undefined = aún no se sabe
 
   const MAX_RONDAS = 3
   const rondasUsadas = trabajoActual.rondas_negociacion || 0
@@ -104,10 +105,11 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   async function cargarEstadoVerificacion() {
     const [{ data: verificacion }, { data: usuario }] = await Promise.all([
       supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
-      supabase.from('usuarios').select('creado_en').eq('id', userId).maybeSingle(),
+      supabase.from('usuarios').select('creado_en, mp_account_id').eq('id', userId).maybeSingle(),
     ])
     setVerificacionStatus(verificacion?.status || 'ninguna')
     if (usuario?.creado_en) setCuentaCreadaEn(usuario.creado_en)
+    setMpConectado(!!usuario?.mp_account_id)
   }
 
   // true si la cuenta es de antes de la nueva regla Y todavía está dentro de la ventana de gracia
@@ -144,15 +146,17 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     // para no dejar pasar a nadie que se haya des-verificado o rechazado mientras negociaba.
     const [{ data: verificacion }, { data: usuario }] = await Promise.all([
       supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
-      supabase.from('usuarios').select('creado_en').eq('id', userId).maybeSingle(),
+      supabase.from('usuarios').select('creado_en, mp_account_id').eq('id', userId).maybeSingle(),
     ])
+
+    const enGracia = dentroDePeriodoDeGracia(usuario?.creado_en)
 
     if (!verificacion || verificacion.status !== 'aprobado') {
       setVerificacionStatus(verificacion?.status || 'ninguna')
 
       // Cuentas de antes de la nueva regla tienen unos días de gracia para verificarse
       // sin perder la posibilidad de seguir aceptando trabajos mientras tanto.
-      if (dentroDePeriodoDeGracia(usuario?.creado_en)) {
+      if (enGracia) {
         // No se bloquea — se deja continuar con la aceptación normal más abajo.
       } else {
         setLoading(false)
@@ -163,6 +167,18 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         } else {
           setError('Necesitas verificar tu identidad antes de aceptar trabajos. Ve a tu perfil (Mi info) para completarla — solo toma unos minutos.')
         }
+        return
+      }
+    }
+
+    // Mercado Pago conectado obligatorio — sin esto no hay a dónde depositarle su pago.
+    setMpConectado(!!usuario?.mp_account_id)
+    if (!usuario?.mp_account_id) {
+      if (enGracia) {
+        // Igual se le deja continuar dentro del periodo de gracia.
+      } else {
+        setLoading(false)
+        setError('Necesitas conectar tu cuenta de Mercado Pago antes de aceptar trabajos — de lo contrario no podrías recibir el pago. Ve a tu perfil → Pagos.')
         return
       }
     }
@@ -282,6 +298,18 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
                   : verificacionStatus === 'rechazado'
                     ? 'Tu verificación fue rechazada. Vuelve a enviarla desde tu perfil para poder aceptar trabajos.'
                     : 'Necesitas verificar tu identidad desde tu perfil (Mi info) antes de poder aceptar trabajos.'}
+            </p>
+          </div>
+        )}
+
+        {/* Aviso de Mercado Pago no conectado */}
+        {mpConectado === false && (
+          <div style={{ background: dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.08)' : 'rgba(232,160,48,0.08)', border: `0.5px solid ${dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.3)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '18px', flexShrink: 0 }}>🏦</span>
+            <p style={{ fontSize: '12px', color: dentroDePeriodoDeGracia(cuentaCreadaEn) ? '#378ADD' : '#E8A030', lineHeight: '1.5' }}>
+              {dentroDePeriodoDeGracia(cuentaCreadaEn)
+                ? 'Todavía puedes aceptar trabajos, pero conecta tu Mercado Pago antes del 30 de julio o no podrás recibir pagos. Ve a tu perfil → Pagos.'
+                : 'Necesitas conectar tu cuenta de Mercado Pago desde tu perfil → Pagos antes de poder aceptar trabajos.'}
             </p>
           </div>
         )}
