@@ -212,6 +212,25 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     alert(`Recordatorio enviado a ${trabajadoresSinMP.length} trabajador(es).`)
   }
 
+  async function recordarVerificacion() {
+    const idsAprobados = new Set(verificaciones.filter(v => v.status === 'aprobado').map(v => v.usuario_id))
+    const trabajadoresSinVerificar = usuarios.filter(u => u.es_trabajador && !u.baneado && !idsAprobados.has(u.id))
+    if (trabajadoresSinVerificar.length === 0) return
+    if (!confirm(`Se enviará un recordatorio push a ${trabajadoresSinVerificar.length} trabajador(es) sin identidad verificada. ¿Continuar?`)) return
+
+    setLoadingAccion('recordatorio_verificacion')
+    for (const u of trabajadoresSinVerificar) {
+      await enviarNotificacionCompleta({
+        usuarioId: u.id,
+        titulo: '🪪 Verifica tu identidad',
+        cuerpo: 'A partir del 30 de julio necesitas tu identidad verificada para poder seguir aceptando trabajos en Chamba. Ve a tu perfil → Mi info para completarla — solo toma unos minutos.',
+        tipo: 'general',
+      })
+    }
+    setLoadingAccion(null)
+    alert(`Recordatorio enviado a ${trabajadoresSinVerificar.length} trabajador(es).`)
+  }
+
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
@@ -516,6 +535,19 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
               </div>
             )}
 
+            {usuarios.filter(u => u.es_trabajador && !u.baneado && !verificaciones.some(v => v.usuario_id === u.id && v.status === 'aprobado')).length > 0 && (
+              <div style={{ background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#378ADD' }}>🪪 {usuarios.filter(u => u.es_trabajador && !u.baneado && !verificaciones.some(v => v.usuario_id === u.id && v.status === 'aprobado')).length} trabajador(es) sin identidad verificada</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>No podrán aceptar trabajos después del 30 de julio</p>
+                </div>
+                <button type="button" onClick={recordarVerificacion} disabled={loadingAccion === 'recordatorio_verificacion'}
+                  style={{ padding: '8px 14px', background: '#378ADD', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {loadingAccion === 'recordatorio_verificacion' ? 'Enviando...' : '📣 Recordar'}
+                </button>
+              </div>
+            )}
+
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}</p>
 
             {usuariosFiltrados.map(u => {
@@ -538,6 +570,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
                           {u.es_trabajador && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', fontWeight: '600' }}>trabajador</span>}
                           {u.baneado && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(240,149,149,0.2)', color: '#F09595', fontWeight: '700' }}>BANEADO</span>}
                           {u.es_trabajador && !u.mp_account_id && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.2)', color: '#E8A030', fontWeight: '600' }}>🏦 sin MP</span>}
+                          {u.es_trabajador && !verificaciones.some(v => v.usuario_id === u.id && v.status === 'aprobado') && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', fontWeight: '600' }}>🪪 sin verificar</span>}
                           {!u.nombre && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', fontWeight: '600' }}>onboarding incompleto</span>}
                         </div>
                         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
