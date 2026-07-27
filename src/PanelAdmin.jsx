@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
+import { banearDispositivo } from './useFingerprint'
 
 export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [pestana, setPestana] = useState('dashboard')
@@ -14,7 +15,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
   const [trabajosEnVivo, setTrabajosEnVivo] = useState([])
   const [cargando, setCargando] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
-  const [trabajoDetalle, setTrabajoDetalle] = useState(null)
+  const [usuarioExpandido, setUsuarioExpandido] = useState(null)
   const [loadingAccion, setLoadingAccion] = useState(null)
 
   useEffect(() => {
@@ -23,7 +24,10 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
 
   async function cargarDatos() {
     setCargando(true)
-    await Promise.all([cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios(), cargarDispositivosBaneados(), cargarTrabajosEnVivo(), cargarVerificaciones()])
+    await Promise.all([
+      cargarStats(), cargarTrabajos(), cargarDisputas(), cargarUsuarios(),
+      cargarDispositivosBaneados(), cargarTrabajosEnVivo(), cargarVerificaciones()
+    ])
     setCargando(false)
   }
 
@@ -33,10 +37,18 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
   }
 
   async function cargarTrabajosEnVivo() {
-    const { data } = await supabase.from('trabajos').select('id, categoria, status, cliente_id, trabajador_id, precio_acordado, presupuesto, creado_en')
+    const { data } = await supabase.from('trabajos')
+      .select('id, categoria, status, cliente_id, trabajador_id, precio_acordado, presupuesto, creado_en')
       .in('status', ['publicado', 'aceptado', 'en_revision', 'en_disputa'])
       .order('creado_en', { ascending: false })
     if (data) setTrabajosEnVivo(data)
+  }
+
+  async function cargarVerificaciones() {
+    const { data } = await supabase.from('verificaciones')
+      .select('*, usuarios(nombre, email, foto_url)')
+      .order('creado_en', { ascending: false })
+    if (data) setVerificaciones(data)
   }
 
   async function cargarStats() {
@@ -54,14 +66,16 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
       supabase.from('trabajos').select('precio_acordado, presupuesto').eq('status', 'completado'),
     ])
 
-    const volumenTotal = (completados || []).reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
-    const comisionBruta = Math.round(volumenTotal * 0.12)
-    // Conekta cobra aprox 2.9% + $3 MXN por transacción (cuando esté integrado)
-    const numCompletados = completados?.length || 0
-    const costoConekta = Math.round(volumenTotal * 0.029) + (numCompletados * 3)
-    const gananciaNetaChamba = comisionBruta - costoConekta
+    const gananciaTotal = (completados || []).reduce((acc, t) => acc + (t.precio_acordado || t.presupuesto || 0), 0)
+    const comision = Math.round(gananciaTotal * 0.12)
 
-    setStats({ totalUsuarios, totalTrabajos, trabajosActivos, disputasAbiertas, volumenTotal, comisionBruta, costoConekta, gananciaNetaChamba, completados: numCompletados })
+    // Comisión real de Mercado Pago: 3.49% + $4 MXN fijo por transacción, + 16% IVA sobre ese subtotal
+    const numCompletados = completados?.length || 0
+    const subtotalMP = (gananciaTotal * 0.0349) + (numCompletados * 4)
+    const costoMP = Math.round(subtotalMP * 1.16)
+    const gananciaNetaChamba = comision - costoMP
+
+    setStats({ totalUsuarios, totalTrabajos, trabajosActivos, disputasAbiertas, gananciaTotal, comision, costoMP, gananciaNetaChamba, completados: numCompletados })
   }
 
   async function cargarTrabajos() {
@@ -79,11 +93,17 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     if (data) setDisputas(data)
   }
 
-  async function cargarVerificaciones() {
-    const { data } = await supabase.from('verificaciones')
-      .select('*, usuarios(nombre, email, foto_url)')
+  async function cargarUsuarios() {
+    const { data } = await supabase.from('usuarios')
+      .select(`
+        id, nombre, email, es_trabajador, es_admin, rating_promedio, total_trabajos,
+        creado_en, baneado, amonestaciones, foto_url, bio, categorias_servicio,
+        lat, lng, tipo_vehiculo, vehiculo_marca, vehiculo_color, vehiculo_placas,
+        contacto_emergencia_nombre, contacto_emergencia_telefono, mp_account_id,
+        device_fingerprint
+      `)
       .order('creado_en', { ascending: false })
-    if (data) setVerificaciones(data)
+    if (data) setUsuarios(data)
   }
 
   async function resolverVerificacion(verificacionId, usuarioId, aprobar, notasRechazo) {
@@ -108,13 +128,6 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     setLoadingAccion(null)
   }
 
-  async function cargarUsuarios() {
-    const { data } = await supabase.from('usuarios')
-      .select('id, nombre, email, es_trabajador, es_admin, rating_promedio, total_trabajos, creado_en, baneado, amonestaciones')
-      .order('creado_en', { ascending: false })
-    if (data) setUsuarios(data)
-  }
-
   async function resolverDisputa(disputaId, trabajoId, ganador) {
     setLoadingAccion(disputaId)
 
@@ -130,8 +143,6 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
       return
     }
 
-    // Las funciones cancelar-pago / liberar-pago ya actualizan pago_status y status.
-    // Aquí solo marcamos en_disputa: false y cerramos el registro de la disputa.
     await supabase.from('trabajos').update({ en_disputa: false }).eq('id', trabajoId)
     await supabase.from('disputas').update({ status: 'resuelta', resolucion: ganador }).eq('id', disputaId)
 
@@ -144,7 +155,7 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
         const nuevas = (usuario?.amonestaciones || 0) + 1
         const baneado = nuevas >= 3
         await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', perdedorId)
-        if (baneado) console.log(`Usuario ${perdedorId} baneado por 3 amonestaciones`)
+        if (baneado) await banearDispositivo(perdedorId, 'Baneado tras 3 amonestaciones (disputa)')
       }
     }
 
@@ -158,18 +169,28 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     const nuevas = actuales + 1
     const baneado = nuevas >= 3
     await supabase.from('usuarios').update({ amonestaciones: nuevas, ...(baneado ? { baneado: true } : {}) }).eq('id', usuarioId)
+    if (baneado) await banearDispositivo(usuarioId, 'Baneado tras 3 amonestaciones')
     await cargarUsuarios()
+    if (baneado) await cargarDispositivosBaneados()
     setLoadingAccion(null)
   }
 
   async function banearUsuario(usuarioId, baneado) {
+    setLoadingAccion(usuarioId)
     // Si se está baneando (no desbaneando) → banear también el dispositivo
     if (!baneado) {
       await banearDispositivo(usuarioId, 'Baneado por administrador')
     }
-    setLoadingAccion(usuarioId)
     await supabase.from('usuarios').update({ baneado: !baneado }).eq('id', usuarioId)
     await cargarUsuarios()
+    await cargarDispositivosBaneados()
+    setLoadingAccion(null)
+  }
+
+  async function desbanearDispositivo(dispositivoId) {
+    setLoadingAccion(dispositivoId)
+    await supabase.from('dispositivos_baneados').delete().eq('id', dispositivoId)
+    await cargarDispositivosBaneados()
     setLoadingAccion(null)
   }
 
@@ -195,6 +216,8 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
     ? usuarios.filter(u => u.nombre?.toLowerCase().includes(busquedaUsuario.toLowerCase()) || u.email?.toLowerCase().includes(busquedaUsuario.toLowerCase()))
     : usuarios
 
+  const verificacionesPendientes = verificaciones.filter(v => v.status === 'pendiente')
+
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
 
@@ -213,18 +236,18 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '0.5px solid rgba(255,255,255,0.08)', background: '#111' }}>
+      <div style={{ display: 'flex', borderBottom: '0.5px solid rgba(255,255,255,0.08)', background: '#111', overflowX: 'auto' }}>
         {[
           ['dashboard', '📊 Dashboard'],
           ['trabajos', `🏁 Trabajos${trabajos.length > 0 ? ` (${trabajos.length})` : ''}`],
           ['disputas', `⚠️ Disputas${stats.disputasAbiertas > 0 ? ` (${stats.disputasAbiertas})` : ''}`],
-          ['verificaciones', `🪪 Verificaciones${verificaciones.filter(v => v.status === 'pendiente').length > 0 ? ` (${verificaciones.filter(v => v.status === 'pendiente').length})` : ''}`],
+          ['verificaciones', `🪪 Verificaciones${verificacionesPendientes.length > 0 ? ` (${verificacionesPendientes.length})` : ''}`],
           ['usuarios', `👥 Usuarios${usuarios.length > 0 ? ` (${usuarios.length})` : ''}`],
           ['en_vivo', `🔴 En vivo${trabajosEnVivo.length > 0 ? ` (${trabajosEnVivo.length})` : ''}`],
           ['baneados', `🚫 Baneados${dispositivosBaneados.length > 0 ? ` (${dispositivosBaneados.length})` : ''}`],
         ].map(([key, label]) => (
           <button key={key} type="button" onClick={() => setPestana(key)} style={{
-            flex: 1, padding: '12px 4px', border: 'none', background: 'transparent',
+            flex: '1 0 auto', minWidth: '90px', padding: '12px 4px', border: 'none', background: 'transparent',
             color: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.4)',
             fontSize: '12px', fontWeight: pestana === key ? '700' : '400',
             cursor: 'pointer', fontFamily: 'sans-serif',
@@ -245,8 +268,18 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
             {/* Comisión destacada */}
             <div style={{ background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Comisión Chamba (12%)</p>
-              <p style={{ fontSize: '44px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>${stats.comision?.toLocaleString('es-MX')}</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>de ${stats.gananciaTotal?.toLocaleString('es-MX')} MXN en trabajos completados</p>
+              <p style={{ fontSize: '44px', fontWeight: '800', color: '#1D9E75', lineHeight: 1 }}>${(stats.comision || 0).toLocaleString('es-MX')}</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>de ${(stats.gananciaTotal || 0).toLocaleString('es-MX')} MXN en trabajos completados</p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '14px', paddingTop: '14px', borderTop: '0.5px solid rgba(255,255,255,0.1)' }}>
+                <div>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>Costo MP</p>
+                  <p style={{ fontSize: '16px', fontWeight: '700', color: '#F09595' }}>-${(stats.costoMP || 0).toLocaleString('es-MX')}</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>Neto Chamba</p>
+                  <p style={{ fontSize: '16px', fontWeight: '700', color: '#1D9E75' }}>${(stats.gananciaNetaChamba || 0).toLocaleString('es-MX')}</p>
+                </div>
+              </div>
             </div>
 
             {/* Grid de stats */}
@@ -278,10 +311,11 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
               </div>
             )}
 
-            {verificaciones.filter(v => v.status === 'pendiente').length > 0 && (
+            {/* Verificaciones pendientes alert */}
+            {verificacionesPendientes.length > 0 && (
               <div style={{ background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p style={{ fontSize: '15px', fontWeight: '700', color: '#378ADD', marginBottom: '4px' }}>🪪 {verificaciones.filter(v => v.status === 'pendiente').length} verificación{verificaciones.filter(v => v.status === 'pendiente').length > 1 ? 'es' : ''} pendiente{verificaciones.filter(v => v.status === 'pendiente').length > 1 ? 's' : ''}</p>
+                  <p style={{ fontSize: '15px', fontWeight: '700', color: '#378ADD', marginBottom: '4px' }}>🪪 {verificacionesPendientes.length} verificación{verificacionesPendientes.length > 1 ? 'es' : ''} pendiente{verificacionesPendientes.length > 1 ? 's' : ''}</p>
                   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Identidad o vehículo por revisar</p>
                 </div>
                 <button type="button" onClick={() => setPestana('verificaciones')} style={{ background: '#378ADD', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -380,73 +414,66 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
             {verificaciones.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>🪪</div>
-                <p>Sin verificaciones todavía</p>
+                <p>Sin verificaciones enviadas todavía</p>
               </div>
-            ) : verificaciones.map(v => {
-              const esChofer = v.tipo && v.tipo !== 'identidad'
-              return (
-                <div key={v.id} style={{ background: v.status === 'pendiente' ? 'rgba(55,138,221,0.06)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${v.status === 'pendiente' ? 'rgba(55,138,221,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {v.usuarios?.foto_url ? (
-                        <img src={v.usuarios.foto_url} alt="foto" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>👤</div>
-                      )}
-                      <div>
-                        <p style={{ fontSize: '14px', fontWeight: '600' }}>{v.usuarios?.nombre || 'Sin nombre'}</p>
-                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{esChofer ? `🚗 Chofer (${v.tipo})` : '🪪 Identidad general'}</p>
-                      </div>
+            ) : verificaciones.map(v => (
+              <div key={v.id} style={{ background: v.status === 'pendiente' ? 'rgba(55,138,221,0.06)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${v.status === 'pendiente' ? 'rgba(55,138,221,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {v.usuarios?.foto_url && <img src={v.usuarios.foto_url} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />}
+                    <div>
+                      <p style={{ fontSize: '14px', fontWeight: '600' }}>{v.usuarios?.nombre || 'Sin nombre'}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{v.tipo && v.tipo !== 'identidad' ? `🚗 Chofer (${v.tipo})` : '🪪 Identidad general'}</p>
                     </div>
-                    <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', fontWeight: '600',
-                      background: v.status === 'pendiente' ? 'rgba(55,138,221,0.15)' : v.status === 'aprobado' ? 'rgba(29,158,117,0.15)' : 'rgba(240,149,149,0.15)',
-                      color: v.status === 'pendiente' ? '#378ADD' : v.status === 'aprobado' ? '#1D9E75' : '#F09595' }}>
-                      {v.status}
-                    </span>
                   </div>
-
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px' }}>
-                    {[
-                      { url: v.ine_url, label: 'INE' },
-                      { url: v.selfie_url, label: 'Selfie' },
-                      { url: v.licencia_url, label: 'Licencia' },
-                      { url: v.circulacion_url, label: 'Circulación' },
-                      { url: v.foto_vehiculo_url, label: 'Vehículo' },
-                      { url: v.seguro_url, label: 'Seguro' },
-                    ].filter(d => d.url).map(d => (
-                      <a key={d.label} href={d.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <img src={d.url} alt={d.label} style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)' }} />
-                          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>{d.label}</span>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '10px' }}>{tiempoTranscurrido(v.creado_en)}</p>
-
-                  {v.status === 'pendiente' && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button type="button" onClick={() => resolverVerificacion(v.id, v.usuario_id, true)} disabled={loadingAccion === v.id}
-                        style={{ flex: 1, padding: '10px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                        ✅ Aprobar
-                      </button>
-                      <button type="button" onClick={() => {
-                        const motivo = prompt('¿Motivo del rechazo? (se le muestra al usuario)')
-                        if (motivo === null) return
-                        resolverVerificacion(v.id, v.usuario_id, false, motivo)
-                      }} disabled={loadingAccion === v.id}
-                        style={{ flex: 1, padding: '10px', background: 'rgba(240,149,149,0.15)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                        ❌ Rechazar
-                      </button>
-                    </div>
-                  )}
-                  {v.status !== 'pendiente' && v.notas_admin && (
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Nota: {v.notas_admin}</p>
-                  )}
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', fontWeight: '600',
+                    background: v.status === 'pendiente' ? 'rgba(55,138,221,0.15)' : v.status === 'aprobado' ? 'rgba(29,158,117,0.15)' : 'rgba(240,149,149,0.15)',
+                    color: v.status === 'pendiente' ? '#378ADD' : v.status === 'aprobado' ? '#1D9E75' : '#F09595' }}>
+                    {v.status}
+                  </span>
                 </div>
-              )
-            })}
+
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px' }}>
+                  {[
+                    { url: v.ine_url, label: 'INE' },
+                    { url: v.selfie_url, label: 'Selfie' },
+                    { url: v.licencia_url, label: 'Licencia' },
+                    { url: v.circulacion_url, label: 'Circulación' },
+                    { url: v.foto_vehiculo_url, label: 'Vehículo' },
+                    { url: v.seguro_url, label: 'Seguro' },
+                  ].filter(d => d.url).map(d => (
+                    <a key={d.label} href={d.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, textDecoration: 'none' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <img src={d.url} alt={d.label} style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>{d.label}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '10px' }}>{tiempoTranscurrido(v.creado_en)}</p>
+
+                {v.status === 'pendiente' && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => resolverVerificacion(v.id, v.usuario_id, true)} disabled={loadingAccion === v.id}
+                      style={{ flex: 1, padding: '10px', background: 'rgba(29,158,117,0.15)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                      ✅ Aprobar
+                    </button>
+                    <button type="button" onClick={() => {
+                      const motivo = prompt('¿Motivo del rechazo? (se le muestra al usuario)')
+                      if (motivo === null) return
+                      resolverVerificacion(v.id, v.usuario_id, false, motivo)
+                    }} disabled={loadingAccion === v.id}
+                      style={{ flex: 1, padding: '10px', background: 'rgba(240,149,149,0.15)', color: '#F09595', border: '1px solid rgba(240,149,149,0.3)', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                      ❌ Rechazar
+                    </button>
+                  </div>
+                )}
+                {v.status !== 'pendiente' && v.notas_admin && (
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Nota: {v.notas_admin}</p>
+                )}
+              </div>
+            ))}
           </>
         )}
 
@@ -459,39 +486,135 @@ export default function PanelAdmin({ onLogout, nombreAdmin }) {
             />
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{usuariosFiltrados.length} usuario{usuariosFiltrados.length !== 1 ? 's' : ''}</p>
 
-            {usuariosFiltrados.map(u => (
-              <div key={u.id} style={{ background: u.baneado ? 'rgba(240,149,149,0.05)' : 'rgba(255,255,255,0.04)', border: `0.5px solid ${u.baneado ? 'rgba(240,149,149,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                    <p style={{ fontSize: '14px', fontWeight: '600' }}>{u.nombre || 'Sin nombre'}</p>
-                    {u.es_admin && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.2)', color: '#E8A030', fontWeight: '700' }}>ADMIN</span>}
-                    {u.es_trabajador && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', fontWeight: '600' }}>trabajador</span>}
-                    {u.baneado && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(240,149,149,0.2)', color: '#F09595', fontWeight: '700' }}>BANEADO</span>}
-                  </div>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                    {u.rating_promedio && <span style={{ fontSize: '10px', color: '#F5A623' }}>⭐ {u.rating_promedio}</span>}
-                    {u.total_trabajos > 0 && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>{u.total_trabajos} trabajos</span>}
-                    {u.amonestaciones > 0 && <span style={{ fontSize: '10px', color: '#F09595', fontWeight: '700' }}>⚠️ {u.amonestaciones}/3 amonestaciones</span>}
-                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{tiempoTranscurrido(u.creado_en)}</span>
-                  </div>
-                </div>
-                {!u.es_admin && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginLeft: '12px', flexShrink: 0 }}>
-                    <button type="button" onClick={() => banearUsuario(u.id, u.baneado)} disabled={loadingAccion === u.id}
-                      style={{ padding: '5px 10px', background: u.baneado ? 'rgba(29,158,117,0.1)' : 'rgba(240,149,149,0.1)', color: u.baneado ? '#1D9E75' : '#F09595', border: `0.5px solid ${u.baneado ? 'rgba(29,158,117,0.3)' : 'rgba(240,149,149,0.3)'}`, borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                      {u.baneado ? '✅ Desbanear' : '🚫 Banear'}
-                    </button>
-                    {!u.baneado && (
-                      <button type="button" onClick={() => amonestacionManual(u.id, u.amonestaciones || 0)} disabled={loadingAccion === u.id}
-                        style={{ padding: '5px 10px', background: 'rgba(232,160,48,0.1)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                        ⚠️ Amonestar
-                      </button>
+            {usuariosFiltrados.map(u => {
+              const expandido = usuarioExpandido === u.id
+              return (
+                <div key={u.id} style={{ background: u.baneado ? 'rgba(240,149,149,0.05)' : 'rgba(255,255,255,0.04)', border: `0.5px solid ${u.baneado ? 'rgba(240,149,149,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div onClick={() => setUsuarioExpandido(expandido ? null : u.id)} style={{ flex: 1, minWidth: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {u.foto_url ? (
+                        <img src={u.foto_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, color: 'rgba(255,255,255,0.4)' }}>
+                          {(u.nombre || u.email || '?')[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                          <p style={{ fontSize: '14px', fontWeight: '600' }}>{u.nombre || 'Sin nombre'}</p>
+                          {u.es_admin && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.2)', color: '#E8A030', fontWeight: '700' }}>ADMIN</span>}
+                          {u.es_trabajador && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(55,138,221,0.2)', color: '#378ADD', fontWeight: '600' }}>trabajador</span>}
+                          {u.baneado && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(240,149,149,0.2)', color: '#F09595', fontWeight: '700' }}>BANEADO</span>}
+                          {!u.nombre && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', background: 'rgba(232,160,48,0.15)', color: '#E8A030', fontWeight: '600' }}>onboarding incompleto</span>}
+                        </div>
+                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {u.rating_promedio && <span style={{ fontSize: '10px', color: '#F5A623' }}>⭐ {u.rating_promedio}</span>}
+                          {u.total_trabajos > 0 && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>{u.total_trabajos} trabajos</span>}
+                          {u.amonestaciones > 0 && <span style={{ fontSize: '10px', color: '#F09595', fontWeight: '700' }}>⚠️ {u.amonestaciones}/3 amonestaciones</span>}
+                          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{tiempoTranscurrido(u.creado_en)}</span>
+                        </div>
+                      </div>
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', flexShrink: 0 }}>{expandido ? '▲' : '▼'}</span>
+                    </div>
+                    {!u.es_admin && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginLeft: '12px', flexShrink: 0 }}>
+                        <button type="button" onClick={() => banearUsuario(u.id, u.baneado)} disabled={loadingAccion === u.id}
+                          style={{ padding: '5px 10px', background: u.baneado ? 'rgba(29,158,117,0.1)' : 'rgba(240,149,149,0.1)', color: u.baneado ? '#1D9E75' : '#F09595', border: `0.5px solid ${u.baneado ? 'rgba(29,158,117,0.3)' : 'rgba(240,149,149,0.3)'}`, borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                          {u.baneado ? '✅ Desbanear' : '🚫 Banear'}
+                        </button>
+                        {!u.baneado && (
+                          <button type="button" onClick={() => amonestacionManual(u.id, u.amonestaciones || 0)} disabled={loadingAccion === u.id}
+                            style={{ padding: '5px 10px', background: 'rgba(232,160,48,0.1)', color: '#E8A030', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                            ⚠️ Amonestar
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-                {u.es_admin && (<div style={{ marginLeft: '12px', width: '80px' }} />
-    )}
+
+                  {expandido && (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {u.bio && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5' }}>{u.bio}</p>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                        <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>ID: </span><span style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>{u.id.slice(0, 8)}...</span></div>
+                        <div><span style={{ color: 'rgba(255,255,255,0.3)' }}>Ubicación: </span><span style={{ color: 'rgba(255,255,255,0.5)' }}>{u.lat && u.lng ? `${u.lat.toFixed(3)}, ${u.lng.toFixed(3)}` : 'Sin ubicación'}</span></div>
+                        {u.es_trabajador && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>Categorías: </span>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>{u.categorias_servicio?.join(', ') || 'Ninguna'}</span>
+                          </div>
+                        )}
+                        {u.tipo_vehiculo && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>Vehículo: </span>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>{u.vehiculo_marca} {u.vehiculo_color} · placas {u.vehiculo_placas || 'N/A'}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span style={{ color: 'rgba(255,255,255,0.3)' }}>Mercado Pago: </span>
+                          <span style={{ color: u.mp_account_id ? '#1D9E75' : '#E8A030' }}>{u.mp_account_id ? '✅ conectada' : '⚠️ no conectada'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'rgba(255,255,255,0.3)' }}>Contacto emergencia: </span>
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>{u.contacto_emergencia_nombre ? `${u.contacto_emergencia_nombre} (${u.contacto_emergencia_telefono || 'sin tel'})` : 'No registrado'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {/* ── EN VIVO ── */}
+        {!cargando && pestana === 'en_vivo' && (
+          <>
+            {trabajosEnVivo.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🌙</div>
+                <p>Sin trabajos activos ahorita</p>
+              </div>
+            ) : trabajosEnVivo.map(t => (
+              <div key={t.id} style={{ background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${statusColor[t.status]}30`, borderRadius: '14px', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <p style={{ fontSize: '14px', fontWeight: '600' }}>{t.categoria}</p>
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: `${statusColor[t.status]}20`, color: statusColor[t.status], border: `0.5px solid ${statusColor[t.status]}40`, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor[t.status], display: 'inline-block' }} />
+                    {t.status}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{tiempoTranscurrido(t.creado_en)}</p>
+                  <p style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75' }}>${t.precio_acordado || t.presupuesto || 0} MXN</p>
+                </div>
+                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginTop: '6px' }}>#{t.id.slice(0, 8)}</p>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── BANEADOS ── */}
+        {!cargando && pestana === 'baneados' && (
+          <>
+            {dispositivosBaneados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+                <p>Sin dispositivos baneados</p>
+              </div>
+            ) : dispositivosBaneados.map(d => (
+              <div key={d.id} style={{ background: 'rgba(240,149,149,0.05)', border: '0.5px solid rgba(240,149,149,0.2)', borderRadius: '14px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#F09595' }}>{d.email || 'Sin correo'}</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{d.razon || 'Sin razón especificada'}</p>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', marginTop: '4px', fontFamily: 'monospace' }}>fingerprint: {d.fingerprint}</p>
+                  <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{tiempoTranscurrido(d.creado_en)}</p>
+                </div>
+                <button type="button" onClick={() => desbanearDispositivo(d.id)} disabled={loadingAccion === d.id}
+                  style={{ padding: '6px 12px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', flexShrink: 0, marginLeft: '10px' }}>
+                  ✅ Desbanear dispositivo
+                </button>
               </div>
             ))}
           </>
