@@ -17,6 +17,13 @@ const CATEGORIAS_ICONS = {
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
 }
 
+// Periodo de gracia: cuentas de trabajador creadas ANTES de esta fecha (cuando la
+// verificación obligatoria entró en vigor) tienen hasta FECHA_LIMITE_GRACIA para
+// verificarse sin perder la posibilidad de aceptar trabajos. Cuentas creadas
+// DESPUÉS de CUTOFF_NUEVA_REGLA quedan bloqueadas de inmediato si no están verificadas.
+const CUTOFF_NUEVA_REGLA = new Date('2026-07-27T00:00:00-06:00')
+const FECHA_LIMITE_GRACIA = new Date('2026-07-30T23:59:59-06:00')
+
 export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAceptado }) {
   const [trabajoActual, setTrabajoActual] = useState(trabajo)
   const [ofertas, setOfertas] = useState([])
@@ -32,6 +39,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [yaNoDisponible, setYaNoDisponible] = useState(false)
   const [verificacionStatus, setVerificacionStatus] = useState(undefined) // undefined = aún no se sabe
+  const [cuentaCreadaEn, setCuentaCreadaEn] = useState(null)
 
   const MAX_RONDAS = 3
   const rondasUsadas = trabajoActual.rondas_negociacion || 0
@@ -94,9 +102,20 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   // Se consulta una sola vez al abrir la pantalla, y se vuelve a checar justo
   // antes de aceptar (por si cambió mientras negociaba).
   async function cargarEstadoVerificacion() {
-    const { data } = await supabase.from('verificaciones')
-      .select('status').eq('usuario_id', userId).maybeSingle()
-    setVerificacionStatus(data?.status || 'ninguna')
+    const [{ data: verificacion }, { data: usuario }] = await Promise.all([
+      supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
+      supabase.from('usuarios').select('creado_en').eq('id', userId).maybeSingle(),
+    ])
+    setVerificacionStatus(verificacion?.status || 'ninguna')
+    if (usuario?.creado_en) setCuentaCreadaEn(usuario.creado_en)
+  }
+
+  // true si la cuenta es de antes de la nueva regla Y todavía está dentro de la ventana de gracia
+  function dentroDePeriodoDeGracia(fechaCreacion) {
+    if (!fechaCreacion) return false
+    const esCuentaAntigua = new Date(fechaCreacion) < CUTOFF_NUEVA_REGLA
+    const siguoEnGracia = Date.now() < FECHA_LIMITE_GRACIA.getTime()
+    return esCuentaAntigua && siguoEnGracia
   }
 
   async function hacerContraoferta() {
@@ -123,20 +142,29 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
 
     // Verificación de identidad obligatoria — se checa fresco (no el estado en memoria)
     // para no dejar pasar a nadie que se haya des-verificado o rechazado mientras negociaba.
-    const { data: verificacion } = await supabase
-      .from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle()
+    const [{ data: verificacion }, { data: usuario }] = await Promise.all([
+      supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
+      supabase.from('usuarios').select('creado_en').eq('id', userId).maybeSingle(),
+    ])
 
     if (!verificacion || verificacion.status !== 'aprobado') {
-      setLoading(false)
       setVerificacionStatus(verificacion?.status || 'ninguna')
-      if (verificacion?.status === 'pendiente') {
-        setError('Tu verificación de identidad está en revisión. Podrás aceptar trabajos en cuanto sea aprobada (hasta 24 horas).')
-      } else if (verificacion?.status === 'rechazado') {
-        setError('Tu verificación de identidad fue rechazada. Ve a tu perfil para volver a enviar tus documentos antes de aceptar trabajos.')
+
+      // Cuentas de antes de la nueva regla tienen unos días de gracia para verificarse
+      // sin perder la posibilidad de seguir aceptando trabajos mientras tanto.
+      if (dentroDePeriodoDeGracia(usuario?.creado_en)) {
+        // No se bloquea — se deja continuar con la aceptación normal más abajo.
       } else {
-        setError('Necesitas verificar tu identidad antes de aceptar trabajos. Ve a tu perfil (Mi info) para completarla — solo toma unos minutos.')
+        setLoading(false)
+        if (verificacion?.status === 'pendiente') {
+          setError('Tu verificación de identidad está en revisión. Podrás aceptar trabajos en cuanto sea aprobada (hasta 24 horas).')
+        } else if (verificacion?.status === 'rechazado') {
+          setError('Tu verificación de identidad fue rechazada. Ve a tu perfil para volver a enviar tus documentos antes de aceptar trabajos.')
+        } else {
+          setError('Necesitas verificar tu identidad antes de aceptar trabajos. Ve a tu perfil (Mi info) para completarla — solo toma unos minutos.')
+        }
+        return
       }
-      return
     }
 
     // Verificar que el trabajo siga disponible antes de aceptar
@@ -244,14 +272,16 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
 
         {/* Aviso de verificación pendiente — solo se muestra si NO está aprobada */}
         {verificacionStatus !== undefined && !verificacionOk && (
-          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <div style={{ background: dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.08)' : 'rgba(232,160,48,0.08)', border: `0.5px solid ${dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.3)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '18px', flexShrink: 0 }}>🪪</span>
-            <p style={{ fontSize: '12px', color: '#E8A030', lineHeight: '1.5' }}>
-              {verificacionStatus === 'pendiente'
-                ? 'Tu verificación de identidad está en revisión. Podrás aceptar en cuanto la aprobemos.'
-                : verificacionStatus === 'rechazado'
-                  ? 'Tu verificación fue rechazada. Vuelve a enviarla desde tu perfil para poder aceptar trabajos.'
-                  : 'Necesitas verificar tu identidad desde tu perfil (Mi info) antes de poder aceptar trabajos.'}
+            <p style={{ fontSize: '12px', color: dentroDePeriodoDeGracia(cuentaCreadaEn) ? '#378ADD' : '#E8A030', lineHeight: '1.5' }}>
+              {dentroDePeriodoDeGracia(cuentaCreadaEn)
+                ? 'Todavía puedes aceptar trabajos, pero verifica tu identidad antes del 30 de julio o no podrás seguir aceptando. Ve a tu perfil (Mi info).'
+                : verificacionStatus === 'pendiente'
+                  ? 'Tu verificación de identidad está en revisión. Podrás aceptar en cuanto la aprobemos.'
+                  : verificacionStatus === 'rechazado'
+                    ? 'Tu verificación fue rechazada. Vuelve a enviarla desde tu perfil para poder aceptar trabajos.'
+                    : 'Necesitas verificar tu identidad desde tu perfil (Mi info) antes de poder aceptar trabajos.'}
             </p>
           </div>
         )}
