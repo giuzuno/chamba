@@ -231,8 +231,10 @@ function Onboarding({ userId, userEmail, onCompletado }) {
     const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
     if (!error) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
+      // Solo se guarda en memoria — el registro en la base de datos se crea hasta
+      // guardarNombreYRol(), para no dejar cuentas huérfanas "Sin nombre" si alguien
+      // sube su foto y abandona el registro antes de terminar.
       setFotoOnboarding(data.publicUrl)
-      await supabase.from('usuarios').upsert({ id: userId, foto_url: data.publicUrl })
     }
     setSubiendoFotoOnb(false)
   }
@@ -274,9 +276,13 @@ function Onboarding({ userId, userEmail, onCompletado }) {
       }
     }
 
+    // Se guarda todo junto (nombre, apellido, username y foto) en un solo upsert —
+    // así no queda ningún registro parcial si el usuario abandona antes de este paso.
     await supabase.from('usuarios').upsert({
       id: userId, email: userEmail,
-      nombre: capitalizar(nombre), apellido: capitalizar(apellido), username})
+      nombre: capitalizar(nombre), apellido: capitalizar(apellido), username,
+      ...(fotoOnboarding ? { foto_url: fotoOnboarding } : {}),
+    })
     setGuardando(false)
     setPendienteRol(rol)
     setPaso(4)
