@@ -1,9 +1,24 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
 import { sanitizarDescripcion, sanitizarCampo, tieneInyeccionSQL } from './sanitize'
 import { esZonaIstmo } from './zonaIstmo'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+delete L.Icon.Default.prototype._getIconUrl
+
+const iconoServicio = L.divIcon({
+  html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏠</div>`,
+  className: '', iconSize: [38, 38], iconAnchor: [19, 19],
+})
+
+function SeleccionarPunto({ onSeleccionar }) {
+  useMapEvents({ click(e) { onSeleccionar([e.latlng.lat, e.latlng.lng]) } })
+  return null
+}
 
 const CATEGORIAS = [
   { icon: '⚡', nombre: 'Electricista' },
@@ -82,6 +97,29 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   const [subiendoFotos, setSubiendoFotos] = useState(false)
   const [fueraDeZona, setFueraDeZona] = useState(false)
 
+  // ── Selector de ubicación del servicio ──
+  const [pasoUbicacion, setPasoUbicacion] = useState(false)
+  const [ubicacionActualGPS, setUbicacionActualGPS] = useState(null)
+  const [ubicacionEsActual, setUbicacionEsActual] = useState(true)
+  const [puntoElegido, setPuntoElegido] = useState(null)
+  const [busquedaDireccion, setBusquedaDireccion] = useState('')
+  const [resultadosDireccion, setResultadosDireccion] = useState([])
+  const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+  const [mapaListo, setMapaListo] = useState(false)
+  const [errorUbicacion, setErrorUbicacion] = useState('')
+  const debounceDireccion = useRef(null)
+
+  useEffect(() => {
+    if (!pasoUbicacion) return
+    setMapaListo(false)
+    const t = setTimeout(() => setMapaListo(true), 250)
+    return () => clearTimeout(t)
+  }, [pasoUbicacion])
+
+  useEffect(() => {
+    if (ubicacionEsActual && ubicacionActualGPS) setPuntoElegido(ubicacionActualGPS)
+  }, [ubicacionEsActual, ubicacionActualGPS])
+
   const hoy = getHoyLocal()
   const categoriaFinal = categoria === 'Otros' ? otroServicio : categoria
   const iconCategoria = CATEGORIAS.find(c => c.nombre === categoria)?.icon || '✳️'
@@ -130,22 +168,69 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
     if (!reglasAceptadas) { setMostrarReglas(true); return }
 
+    // Obtener el GPS del dispositivo solo como referencia inicial (centrar el mapa
+    // y ofrecer "mi ubicación actual" como opción) — ya NO se usa directo como
+    // la ubicación del trabajo, para dejar que el cliente elija dónde lo necesita.
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-        if (!esZonaIstmo(lat, lng)) {
-          setFueraDeZona(true)
-          return
-        }
-        setUbicacion({ lat, lng, texto: 'Tu ubicación actual (GPS)' })
-        setConfirmando(true)
+        const gps = [pos.coords.latitude, pos.coords.longitude]
+        setUbicacionActualGPS(gps)
+        setPuntoElegido(gps)
+        setPasoUbicacion(true)
       },
       () => {
-        setUbicacion({ lat: 16.1833, lng: -95.2000, texto: 'Centro de Salina Cruz (sin GPS)' })
-        setConfirmando(true)
+        const fallback = [16.1833, -95.2000]
+        setUbicacionActualGPS(fallback)
+        setPuntoElegido(fallback)
+        setUbicacionEsActual(false)
+        setPasoUbicacion(true)
       }
     )
+  }
+
+  async function buscarDireccion(texto) {
+    setBusquedaDireccion(texto)
+    setResultadosDireccion([])
+    if (texto.trim().length < 3) { setBuscandoDireccion(false); return }
+    setBuscandoDireccion(true)
+    if (debounceDireccion.current) clearTimeout(debounceDireccion.current)
+    debounceDireccion.current = setTimeout(async () => {
+      try {
+        const base = ubicacionActualGPS || [16.1833, -95.2000]
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(texto)}&lat=${base[0]}&lon=${base[1]}&limit=6`)
+        const json = await res.json()
+        const data = (json.features || []).map(f => ({
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+          display_name: [
+            f.properties.name, f.properties.street,
+            f.properties.city || f.properties.town || f.properties.village,
+            f.properties.state,
+          ].filter(Boolean).join(', '),
+        }))
+        setResultadosDireccion(data)
+      } catch (e) {
+        console.log('Error búsqueda dirección:', e)
+      } finally {
+        setBuscandoDireccion(false)
+      }
+    }, 400)
+  }
+
+  function confirmarUbicacionElegida() {
+    if (!puntoElegido) return
+    const [lat, lng] = puntoElegido
+    if (!esZonaIstmo(lat, lng)) {
+      setFueraDeZona(true)
+      return
+    }
+    setErrorUbicacion('')
+    setUbicacion({
+      lat, lng,
+      texto: ubicacionEsActual ? 'Tu ubicación actual (GPS)' : (busquedaDireccion || 'Ubicación elegida en el mapa'),
+    })
+    setPasoUbicacion(false)
+    setConfirmando(true)
   }
 
   async function publicarTrabajo() {
@@ -274,6 +359,80 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
         <button type="button" onClick={onVolver} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px 32px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Ver mapa
         </button>
+      </div>
+    )
+  }
+
+  if (pasoUbicacion) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+          <button type="button" onClick={() => setPasoUbicacion(false)} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <h2 style={{ fontSize: '18px', fontWeight: '700' }}>¿Dónde necesitas el servicio?</h2>
+        </div>
+
+        <div style={{ padding: '14px 16px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button type="button" onClick={() => setUbicacionEsActual(true)}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', background: ubicacionEsActual ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '12px', borderLeft: `3px solid ${ubicacionEsActual ? '#1D9E75' : 'transparent'}` }}>
+            <span style={{ fontSize: '18px' }}>📍</span>
+            <div style={{ textAlign: 'left', flex: 1 }}>
+              <p style={{ fontSize: '14px', fontWeight: '600', color: ubicacionEsActual ? '#1D9E75' : 'white' }}>Mi ubicación actual</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Donde estás parado ahorita</p>
+            </div>
+            {ubicacionEsActual && <span style={{ color: '#1D9E75', fontWeight: '700' }}>✓</span>}
+          </button>
+
+          <button type="button" onClick={() => setUbicacionEsActual(false)}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'left', background: !ubicacionEsActual ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '12px', borderLeft: `3px solid ${!ubicacionEsActual ? '#1D9E75' : 'transparent'}` }}>
+            <span style={{ fontSize: '18px' }}>🗺️</span>
+            <div style={{ textAlign: 'left', flex: 1 }}>
+              <p style={{ fontSize: '14px', fontWeight: '600', color: !ubicacionEsActual ? '#1D9E75' : 'white' }}>Otra ubicación</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{!ubicacionEsActual && puntoElegido !== ubicacionActualGPS ? '✅ Toca el mapa o busca una dirección' : 'Ej. tu casa, aunque estés en otro lado'}</p>
+            </div>
+          </button>
+
+          {!ubicacionEsActual && (
+            <div>
+              <div style={{ position: 'relative' }}>
+                <input type="text" placeholder="🔍 Buscar dirección o colonia..." value={busquedaDireccion}
+                  onChange={e => buscarDireccion(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '11px 14px', color: 'white', fontSize: '14px', fontFamily: 'sans-serif', outline: 'none' }}
+                />
+                {buscandoDireccion && <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>⏳</span>}
+              </div>
+              {resultadosDireccion.length > 0 && (
+                <div style={{ background: '#1A1A1A', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', marginTop: '6px', overflow: 'hidden' }}>
+                  {resultadosDireccion.map((r, i) => (
+                    <button key={i} type="button" onClick={() => { setPuntoElegido([r.lat, r.lon]); setBusquedaDireccion(r.display_name); setResultadosDireccion([]) }}
+                      style={{ width: '100%', padding: '10px 14px', background: 'transparent', border: i < resultadosDireccion.length - 1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none', color: 'white', fontFamily: 'sans-serif', textAlign: 'left', cursor: 'pointer', fontSize: '13px' }}>
+                      📍 {r.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1, position: 'relative' }}>
+          {ubicacionActualGPS && mapaListo ? (
+            <MapContainer center={puntoElegido || ubicacionActualGPS} zoom={15} style={{ height: '100%', width: '100%' }}>
+              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {!ubicacionEsActual && <SeleccionarPunto onSeleccionar={pos => { setPuntoElegido(pos); setBusquedaDireccion('') }} />}
+              {puntoElegido && <Marker position={puntoElegido} icon={iconoServicio}><Popup>🏠 Aquí necesito el servicio</Popup></Marker>}
+            </MapContainer>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '14px', fontFamily: 'sans-serif' }}>Cargando mapa...</div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 16px', flexShrink: 0, background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
+          {errorUbicacion && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center', marginBottom: '8px' }}>{errorUbicacion}</p>}
+          <button type="button" onClick={confirmarUbicacionElegida} disabled={!puntoElegido}
+            style={{ width: '100%', padding: '15px', background: puntoElegido ? '#1D9E75' : 'rgba(255,255,255,0.08)', color: puntoElegido ? 'white' : 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: puntoElegido ? 'pointer' : 'not-allowed', fontFamily: 'sans-serif' }}>
+            Continuar →
+          </button>
+        </div>
       </div>
     )
   }
