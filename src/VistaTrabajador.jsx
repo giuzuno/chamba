@@ -143,6 +143,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     cargarPerfilUsuario()
     cargarMisTrabajos()
     cargarHistorial()
+    actualizarUbicacionEnVivo()
 
     const channel = supabase.channel('trabajos-disponibles')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trabajos' }, (payload) => {
@@ -221,6 +222,23 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       ])
       setInfoViaje({ zonaOrigen, zonaDestino, distancia: distancia.toFixed(1), eta })
     }
+  }
+
+  // Cada vez que el trabajador abre esta pantalla, se actualiza su ubicación
+  // en la base de datos con el GPS real del dispositivo. Así el radio de
+  // alertas (radio_alertas) siempre se calcula desde donde está de verdad,
+  // no desde un punto fijo que haya guardado alguna vez en su perfil.
+  function actualizarUbicacionEnVivo() {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+        await supabase.from('usuarios').update({ lat: latitude, lng: longitude }).eq('id', userId)
+        setPerfilUsuario(prev => prev ? { ...prev, lat: latitude, lng: longitude } : prev)
+      },
+      (err) => console.log('No se pudo actualizar la ubicación en vivo:', err.message),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    )
   }
 
   async function cargarPerfilUsuario() {
