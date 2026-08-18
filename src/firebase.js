@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage } from 'firebase/messaging'
+import { Capacitor } from '@capacitor/core'
 
 const firebaseConfig = {
   apiKey: "AIzaSyD_-qlmwC4oGqBsj9TGg1PdJKsYiATmizk",
@@ -11,6 +12,12 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-const messaging = getMessaging(app)
+
+// getMessaging() depende de Service Workers, que no existen en el WebView nativo
+// de Capacitor (sobre todo en iOS, donde WKWebView no los soporta en absoluto).
+// Las apps nativas usan @capacitor/push-notifications en su lugar (ver
+// useNotificaciones.js), así que aquí solo se inicializa Firebase Messaging
+// cuando de verdad estamos corriendo en un navegador normal.
+const messaging = Capacitor.isNativePlatform() ? null : getMessaging(app)
 
 export { messaging, getToken, onMessage }
