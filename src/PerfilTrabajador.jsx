@@ -198,7 +198,7 @@ function PestanaPagos({ userId }) {
   )
 }
 
-export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
+export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaInicial = 'info' }) {
   const [nombre, setNombre] = useState('')
   const [bio, setBio] = useState('')
   const [categoriasServicio, setCategoriasServicio] = useState([])
@@ -210,7 +210,7 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver }) {
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const [exito, setExito] = useState(false)
   const [errores, setErrores] = useState({})
-  const [pestana, setPestana] = useState('info')
+  const [pestana, setPestana] = useState(pestanaInicial)
   const [editando, setEditando] = useState(false)
   const [verificandoChofer, setVerificandoChofer] = useState(false)
   const [verificandoIdentidad, setVerificandoIdentidad] = useState(false)

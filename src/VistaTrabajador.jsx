@@ -129,6 +129,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [mensajeNoPuedoLlegar, setMensajeNoPuedoLlegar] = useState(null)
   const [modalOpciones, setModalOpciones] = useState(false)
   const [verPerfil, setVerPerfil] = useState(false)
+  const [pestanaPerfilInicial, setPestanaPerfilInicial] = useState('info')
   const [perfilIncompleto, setPerfilIncompleto] = useState(false)
   const [reportando, setReportando] = useState(null)
   const [camposFaltantes, setCamposFaltantes] = useState([])
@@ -138,11 +139,13 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [modalFotoTrabajo, setModalFotoTrabajo] = useState(null)
   const [fotosTrabajoUrls, setFotosTrabajoUrls] = useState([])
   const [subiendoFotoTrabajo, setSubiendoFotoTrabajo] = useState(false)
+  const [identidadVerificada, setIdentidadVerificada] = useState(null) // null = aún no se sabe
 
   useEffect(() => {
     cargarPerfilUsuario()
     cargarMisTrabajos()
     cargarHistorial()
+    cargarEstadoVerificacion()
     actualizarUbicacionEnVivo()
 
     const channel = supabase.channel('trabajos-disponibles')
@@ -187,6 +190,15 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
         })
     }
   }, [trabajoIdInicial, misTrabajos])
+
+  // Se checa una vez al abrir la pantalla si la identidad ya está aprobada —
+  // usado solo para mostrar el banner de aviso, no bloquea nada aquí (el
+  // bloqueo real ya vive en NegociacionTrabajo.jsx al momento de aceptar).
+  async function cargarEstadoVerificacion() {
+    const { data } = await supabase.from('verificaciones')
+      .select('status').eq('usuario_id', userId).maybeSingle()
+    setIdentidadVerificada(data?.status === 'aprobado')
+  }
 
   function validarPerfilCompleto(perfil, trabajo) {
     const faltantes = []
@@ -243,7 +255,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   async function cargarPerfilUsuario() {
     const { data } = await supabase.from('usuarios')
-      .select('categorias_servicio, radio_alertas, lat, lng, nombre, foto_url, vehiculo_marca, vehiculo_color, vehiculo_placas, vehiculo_foto_url')
+      .select('categorias_servicio, radio_alertas, lat, lng, nombre, foto_url, vehiculo_marca, vehiculo_color, vehiculo_placas, vehiculo_foto_url, mp_account_id')
       .eq('id', userId).maybeSingle()
     if (data) setPerfilUsuario(data)
     cargarTrabajos(data)
@@ -404,6 +416,11 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
 
   const esViaje = (trabajo) => trabajo.es_viaje || CATEGORIAS_VIAJE.includes(trabajo.categoria)
 
+  function abrirPerfilEn(pestanaDestino) {
+    setPestanaPerfilInicial(pestanaDestino)
+    setVerPerfil(true)
+  }
+
   const HeaderBotones = () => (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       <button type="button" onClick={onNotificaciones} style={{
@@ -444,6 +461,39 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     </div>
   )
 
+  // Banner persistente: se ve en TODAS las pestañas (no solo cuando intenta
+  // aceptar un trabajo) para que nadie deje pasar sin darse cuenta que le
+  // falta verificarse o conectar Mercado Pago.
+  const BannerPendientes = () => {
+    if (!perfilUsuario) return null
+    const faltaMP = !perfilUsuario.mp_account_id
+    const faltaVerificacion = identidadVerificada === false
+    if (!faltaMP && !faltaVerificacion) return null
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {faltaVerificacion && (
+          <div style={{ background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>🪪</span>
+            <p style={{ flex: 1, fontSize: '12px', color: '#378ADD', lineHeight: '1.4' }}>Verifica tu identidad para poder seguir aceptando trabajos.</p>
+            <button type="button" onClick={() => abrirPerfilEn('info')} style={{ flexShrink: 0, padding: '7px 12px', background: '#378ADD', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Verificarme
+            </button>
+          </div>
+        )}
+        {faltaMP && (
+          <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.3)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>🏦</span>
+            <p style={{ flex: 1, fontSize: '12px', color: '#E8A030', lineHeight: '1.4' }}>Conecta tu Mercado Pago o no podrás recibir el pago de tus trabajos.</p>
+            <button type="button" onClick={() => abrirPerfilEn('pagos')} style={{ flexShrink: 0, padding: '7px 12px', background: '#E8A030', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Conectar
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (perfilIncompleto) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -467,7 +517,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
               🚗 Para aceptar viajes necesitas tener los datos de tu vehículo completos en la pestaña <strong style={{ color: '#378ADD' }}>Vehículo</strong> de tu perfil.
             </div>
           )}
-          <button type="button" onClick={() => { setPerfilIncompleto(false); setVerPerfil(true) }} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '10px' }}>
+          <button type="button" onClick={() => { setPerfilIncompleto(false); abrirPerfilEn('info') }} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '10px' }}>
             ✏️ Completar mi perfil
           </button>
           <button type="button" onClick={() => setPerfilIncompleto(false)} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -479,7 +529,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   if (reportando) return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="trabajador" onVolver={() => setReportando(null)} />
-  if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} onVolver={() => { setVerPerfil(false); cargarPerfilUsuario() }} />
+  if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} pestanaInicial={pestanaPerfilInicial} onVolver={() => { setVerPerfil(false); setPestanaPerfilInicial('info'); cargarPerfilUsuario(); cargarEstadoVerificacion() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
   if (calificando) return <Calificacion trabajo={calificando} userId={userId} rolCalificador="trabajador" onCompletado={() => { setCalificando(null); cargarMisTrabajos(); cargarHistorial() }} />
@@ -793,7 +843,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           ['perfil', '👤', 'Perfil', 0],
         ].map(([key, icon, label, count]) => (
           <button key={key} type="button" onClick={() => {
-            if (key === 'perfil') { setVerPerfil(true); return }
+            if (key === 'perfil') { abrirPerfilEn('info'); return }
             setPestana(key)
           }} style={{ flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {icon} {label} {count > 0 && `(${count})`}
@@ -802,6 +852,8 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+        <BannerPendientes />
 
         {pestana === 'disponibles' && (
           <>
