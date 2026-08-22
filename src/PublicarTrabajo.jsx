@@ -168,6 +168,15 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
 
     if (!reglasAceptadas) { setMostrarReglas(true); return }
 
+    irAElegirUbicacion()
+  }
+
+  // Separado de verConfirmacion() a propósito: cuando se aceptan las reglas,
+  // React todavía no actualizó "reglasAceptadas" en este mismo instante (closure
+  // obsoleto), así que llamar de nuevo a verConfirmacion() volvía a creer que
+  // faltaba aceptarlas. Esta función salta directo al siguiente paso sin volver
+  // a preguntar.
+  function irAElegirUbicacion() {
     // Obtener el GPS del dispositivo solo como referencia inicial (centrar el mapa
     // y ofrecer "mi ubicación actual" como opción) — ya NO se usa directo como
     // la ubicación del trabajo, para dejar que el cliente elija dónde lo necesita.
@@ -337,7 +346,7 @@ export default function PublicarTrabajo({ onVolver, userId, fotoUrl }) {
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="cliente"
-      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); verConfirmacion() }}
+      onAceptar={() => { setMostrarReglas(false); setReglasAceptadas(true); irAElegirUbicacion() }}
       onCerrar={() => setMostrarReglas(false)}
     />
   )

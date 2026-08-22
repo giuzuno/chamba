@@ -117,3 +117,8 @@ code {
   background: rgba(255,255,255,0.12) !important;
   border: 1px solid rgba(255,255,255,0.25) !important;
 }
+/* Espacio de seguridad para el notch/Dynamic Island en iOS (apps nativas vía Capacitor) */
+#root {
+  padding-top: env(safe-area-inset-top);
+  background-color: #0D0D0D;
+}
