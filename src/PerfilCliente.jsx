@@ -39,6 +39,8 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
   const [contactoEmergenciaNombre, setContactoEmergenciaNombre] = useState('')
   const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState('')
   const [cambiandoPassword, setCambiandoPassword] = useState(false)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
 
   useEffect(() => {
     cargarPerfil()
@@ -134,6 +136,23 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
     setEditando(false)
     setErrores({})
     cargarPerfil()
+  }
+
+  async function eliminarCuenta() {
+    setEliminando(true)
+    try {
+      const { error } = await supabase.functions.invoke('eliminar-cuenta')
+      if (error) {
+        alert('Hubo un problema al eliminar tu cuenta. Intenta de nuevo o escríbenos a chambaapp.soporte@gmail.com')
+        setEliminando(false)
+        return
+      }
+      await supabase.auth.signOut()
+      window.location.href = '/'
+    } catch (e) {
+      alert('Hubo un problema al eliminar tu cuenta. Intenta de nuevo o escríbenos a chambaapp.soporte@gmail.com')
+      setEliminando(false)
+    }
   }
 
   const iniciales = nombre
@@ -429,6 +448,42 @@ export default function PerfilCliente({ userId, userEmail, onVolver }) {
             </button>
 
             <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '4px' }}>
+              {!confirmandoEliminar ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoEliminar(true)}
+                  style={{ background: 'none', border: 'none', color: 'rgba(240,149,149,0.5)', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                >
+                  Eliminar mi cuenta
+                </button>
+              ) : (
+                <div style={{ background: 'rgba(240,149,149,0.08)', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '14px', padding: '16px', marginTop: '10px' }}>
+                  <p style={{ fontSize: '13px', color: '#F09595', marginBottom: '12px', lineHeight: '1.5' }}>
+                    Esto borrará tu perfil, fotos y documentos de verificación de forma permanente. No se puede deshacer. ¿Seguro que quieres continuar?
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={eliminarCuenta}
+                      disabled={eliminando}
+                      style={{ padding: '10px 18px', background: '#F09595', color: '#1a0a0a', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                    >
+                      {eliminando ? 'Eliminando...' : 'Sí, eliminar definitivamente'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoEliminar(false)}
+                      disabled={eliminando}
+                      style={{ padding: '10px 18px', background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

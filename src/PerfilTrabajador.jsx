@@ -101,7 +101,6 @@ function PestanaPagos({ userId }) {
         setConectando(false)
         return
       }
-      // Abrir la autorización de Mercado Pago en la misma ventana
       window.location.href = data.url
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
@@ -116,7 +115,6 @@ function PestanaPagos({ userId }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Estado de la cuenta */}
       {mpAccountId ? (
         <div style={{ background: 'rgba(29,158,117,0.1)', border: '1.5px solid rgba(29,158,117,0.4)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
           <p style={{ fontSize: '40px', marginBottom: '10px' }}>✅</p>
@@ -135,7 +133,6 @@ function PestanaPagos({ userId }) {
         </div>
       )}
 
-      {/* Cómo funciona */}
       <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cómo funciona?</p>
         {[
@@ -151,7 +148,6 @@ function PestanaPagos({ userId }) {
         ))}
       </div>
 
-      {/* Comisión */}
       <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '14px 16px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ejemplo de pago</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -178,7 +174,6 @@ function PestanaPagos({ userId }) {
 
       {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
 
-      {/* Botón principal */}
       {mpAccountId ? (
         <button type="button" onClick={conectarCuenta} disabled={conectando}
           style={{ width: '100%', padding: '14px', background: 'rgba(29,158,117,0.1)', color: '#1D9E75', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '14px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
@@ -232,6 +227,8 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
   const [vehiculoPlacas, setVehiculoPlacas] = useState('')
   const [vehiculoFotoUrl, setVehiculoFotoUrl] = useState(null)
   const [subiendoFotoVehiculo, setSubiendoFotoVehiculo] = useState(false)
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
 
   useEffect(() => {
     cargarPerfil()
@@ -409,6 +406,23 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
     cargarPerfil()
   }
 
+  async function eliminarCuenta() {
+    setEliminando(true)
+    try {
+      const { error } = await supabase.functions.invoke('eliminar-cuenta')
+      if (error) {
+        alert('Hubo un problema al eliminar tu cuenta. Intenta de nuevo o escríbenos a chambaapp.soporte@gmail.com')
+        setEliminando(false)
+        return
+      }
+      await supabase.auth.signOut()
+      window.location.href = '/'
+    } catch (e) {
+      alert('Hubo un problema al eliminar tu cuenta. Intenta de nuevo o escríbenos a chambaapp.soporte@gmail.com')
+      setEliminando(false)
+    }
+  }
+
   const esChofer = categoriasServicio.some(c => CATEGORIAS_CHOFER.includes(c))
   const necesitaVerificacion = categoriasServicio.length > 0
   const radioActual = RADIOS.find(r => r.valor === radioAlertas)
@@ -454,7 +468,6 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
     )
   }
 
-  // Pestañas dinámicas
   const pestanas = [
     ['info', 'Mi info'],
     ['servicios', 'Servicios'],
@@ -482,7 +495,6 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
         <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.3)' }}>Cargando...</div>
       ) : (
         <>
-          {/* Avatar */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '24px 20px 0' }}>
             <div style={{ position: 'relative' }}>
               {fotoUrl ? (
@@ -526,7 +538,6 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
             </div>
           </div>
 
-          {/* Pestañas */}
           <div style={{ display: 'flex', gap: '4px', padding: '16px 20px 0', overflowX: 'auto' }}>
             {pestanas.map(([key, label]) => (
               <button key={key} type="button" onClick={() => setPestana(key)} style={{
@@ -721,7 +732,6 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
               </div>
             )}
 
-            {/* ── NUEVA PESTAÑA DE PAGOS ── */}
             {pestana === 'pagos' && <PestanaPagos userId={userId} />}
 
             {pestana === 'stats' && (
@@ -859,6 +869,42 @@ export default function PerfilTrabajador({ userId, userEmail, onVolver, pestanaI
 
             <div style={{ textAlign: 'center' }}>
               <a href="/privacidad" style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textDecoration: 'none' }}>Política de privacidad</a>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '4px' }}>
+              {!confirmandoEliminar ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoEliminar(true)}
+                  style={{ background: 'none', border: 'none', color: 'rgba(240,149,149,0.5)', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                >
+                  Eliminar mi cuenta
+                </button>
+              ) : (
+                <div style={{ background: 'rgba(240,149,149,0.08)', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '14px', padding: '16px', marginTop: '10px' }}>
+                  <p style={{ fontSize: '13px', color: '#F09595', marginBottom: '12px', lineHeight: '1.5' }}>
+                    Esto borrará tu perfil, fotos y documentos de verificación de forma permanente. No se puede deshacer. ¿Seguro que quieres continuar?
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={eliminarCuenta}
+                      disabled={eliminando}
+                      style={{ padding: '10px 18px', background: '#F09595', color: '#1a0a0a', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                    >
+                      {eliminando ? 'Eliminando...' : 'Sí, eliminar definitivamente'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoEliminar(false)}
+                      disabled={eliminando}
+                      style={{ padding: '10px 18px', background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
