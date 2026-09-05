@@ -6,6 +6,7 @@ import VistaTrabajador from './VistaTrabajador'
 import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
 import Descargar from './Descargar'
+import RegistrarNegocio from './RegistrarNegocio'
 import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
@@ -853,12 +854,25 @@ function AppContenido() {
     </div>
   )
 }
+function TestRegistrarNegocio() {
+  const [userId, setUserId] = useState(null)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user?.id || null))
+  }, [])
+  if (!userId) return (
+    <div style={{ color: 'white', background: '#0D0D0D', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+      Primero inicia sesión en la app normal (con cualquier cuenta), luego regresa a esta misma URL.
+    </div>
+  )
+  return <RegistrarNegocio userId={userId} onVolver={() => window.history.back()} onCompletado={() => alert('¡Negocio registrado! Ve a Supabase > Table Editor > negocios para verlo.')} />
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/privacidad" element={<Privacidad />} />
+        <Route path="/test-negocio" element={<TestRegistrarNegocio />} />
         <Route path="/descargar" element={<Descargar />} />
         <Route path="/terminos" element={<Terminos />} />
         <Route path="/mp-callback" element={<MpCallback />} />
