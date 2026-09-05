@@ -5,6 +5,7 @@ import MapaChamba from './MapaChamba'
 import VistaTrabajador from './VistaTrabajador'
 import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
+import Descargar from './Descargar'
 import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
@@ -858,6 +859,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/privacidad" element={<Privacidad />} />
+        <Route path="/descargar" element={<Descargar />} />
         <Route path="/terminos" element={<Terminos />} />
         <Route path="/mp-callback" element={<MpCallback />} />
         <Route path="/*" element={<AppContenido />} />
