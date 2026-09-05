@@ -140,6 +140,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [fotosTrabajoUrls, setFotosTrabajoUrls] = useState([])
   const [subiendoFotoTrabajo, setSubiendoFotoTrabajo] = useState(false)
   const [identidadVerificada, setIdentidadVerificada] = useState(null) // null = aún no se sabe
+  const [promptVerificacionCerrado, setPromptVerificacionCerrado] = useState(false)
 
   useEffect(() => {
     cargarPerfilUsuario()
@@ -494,6 +495,28 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     )
   }
 
+  // Ventana emergente que aparece EN MEDIO de la pantalla al abrir la app,
+  // solo si ya sabemos que la identidad NO está verificada. Se puede cerrar
+  // ("Más tarde") o ir directo a verificarse. Una vez cerrada, no vuelve a
+  // salir hasta que se abra la app de nuevo (se resetea al recargar/entrar).
+  const ModalVerificacion = () => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ background: '#161616', border: '1px solid rgba(55,138,221,0.3)', borderRadius: '20px', padding: '28px 24px', maxWidth: '360px', width: '100%', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '14px' }}>🪪</div>
+        <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '10px', color: 'white' }}>Verifica tu identidad</h3>
+        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.6', marginBottom: '22px' }}>
+          Los clientes confían más en trabajadores verificados, y algunos trabajos lo requieren para poder aceptarlos. Solo toma unos minutos.
+        </p>
+        <button type="button" onClick={() => { setPromptVerificacionCerrado(true); abrirPerfilEn('servicios') }} style={{ width: '100%', padding: '14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif', marginBottom: '10px' }}>
+          Verificar ahora
+        </button>
+        <button type="button" onClick={() => setPromptVerificacionCerrado(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          Más tarde
+        </button>
+      </div>
+    </div>
+  )
+
   if (perfilIncompleto) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -830,6 +853,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       {modalOpciones && <ModalOpciones />}
+      {identidadVerificada === false && !promptVerificacionCerrado && <ModalVerificacion />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <div><LogoChamba size='sm' /></div>
         <HeaderBotones />
