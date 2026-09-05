@@ -109,7 +109,7 @@ export default function Descargar() {
           <LogoChamba size="lg" />
         </div>
 
-        <h1 style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.25', marginBottom: '14px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.25', marginBottom: '14px', color: 'white' }}>
           Lo que necesitas,<br />cerca de ti.
         </h1>
         <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', maxWidth: '380px', marginLeft: 'auto', marginRight: 'auto' }}>
@@ -128,7 +128,7 @@ export default function Descargar() {
 
       {/* QUÉ PUEDES HACER */}
       <div style={{ padding: '48px 24px', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: '800', textAlign: 'center', marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', textAlign: 'center', marginBottom: '32px', color: 'white' }}>
           ¿Qué puedes hacer con Chamba?
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '480px', margin: '0 auto' }}>
@@ -154,7 +154,7 @@ export default function Descargar() {
 
       {/* PARA TRABAJADORES */}
       <div style={{ padding: '48px 24px', background: 'rgba(55,138,221,0.05)', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: '800', textAlign: 'center', marginBottom: '10px' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', textAlign: 'center', marginBottom: '10px', color: 'white' }}>
           ¿Quieres trabajar con Chamba?
         </h2>
         <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: '420px', margin: '0 auto 24px', lineHeight: '1.6' }}>
