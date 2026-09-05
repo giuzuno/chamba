@@ -23,6 +23,7 @@ function MarcarEnMapa({ posicion, onMover }) {
 export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [esCasa, setEsCasa] = useState(false)
   const [descripcion, setDescripcion] = useState('')
   const [telefonoContacto, setTelefonoContacto] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -33,6 +34,7 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
   const [errores, setErrores] = useState({})
   const [guardando, setGuardando] = useState(false)
   const [exito, setExito] = useState(false)
+  const [aceptoReglas, setAceptoReglas] = useState(false)
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -74,6 +76,7 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
     if (!descripcion.trim()) e.descripcion = 'Cuéntales a los clientes qué ofreces'
     if (!fotoPortadaUrl) e.foto = 'La foto de tu negocio es obligatoria'
     if (!ubicacion) e.ubicacion = 'Marca la ubicación de tu negocio en el mapa'
+    if (!aceptoReglas) e.reglas = 'Debes confirmar esto para continuar'
     setErrores(e)
     return Object.keys(e).length === 0
   }
@@ -96,6 +99,7 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
       direccion: sanitizarCampo(direccion, 150),
       telefono_contacto: telefonoContacto.trim() || null,
       abierto_ahora: false,
+      es_casa: esCasa,
     })
     setGuardando(false)
     if (!error) {
@@ -127,7 +131,7 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Registrar mi negocio</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'white' }}>Registrar mi negocio</h2>
       </div>
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -182,6 +186,16 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
           {errores.categoria && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>{errores.categoria}</p>}
         </div>
 
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '14px 16px' }}>
+          <input type="checkbox" checked={esCasa} onChange={e => setEsCasa(e.target.checked)}
+            style={{ width: '16px', height: '16px', flexShrink: 0 }}
+          />
+          <div>
+            <p style={{ fontSize: '13px', color: 'white', fontWeight: '600' }}>🏠 Vendo desde mi casa (sin local comercial)</p>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>Los clientes verán la insignia "Negocio en casa" en tu perfil.</p>
+          </div>
+        </label>
+
         <div>
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Descripción *</p>
           <textarea placeholder="¿Qué vendes? ¿Qué te hace especial?" value={descripcion}
@@ -221,6 +235,19 @@ export default function RegistrarNegocio({ userId, onVolver, onCompletado }) {
             <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>⚠️ Ese punto queda fuera del Istmo de Tehuantepec — Chamba solo opera dentro de esa zona.</p>
           )}
           {errores.ubicacion && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>{errores.ubicacion}</p>}
+        </div>
+
+        <div style={{ background: 'rgba(240,149,149,0.06)', border: '0.5px solid rgba(240,149,149,0.25)', borderRadius: '12px', padding: '14px 16px' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={aceptoReglas}
+              onChange={e => { setAceptoReglas(e.target.checked); setErrores(p => ({ ...p, reglas: null })) }}
+              style={{ marginTop: '3px', flexShrink: 0, width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}>
+              Confirmo que mi negocio no vende ni promueve productos ilegales, robados, bebidas alcohólicas sin permiso, sustancias controladas ni ningún artículo prohibido por la ley. Entiendo que Chamba reportará a las autoridades cualquier actividad ilícita detectada, y que mi cuenta será suspendida de inmediato.
+            </span>
+          </label>
+          {errores.reglas && <p style={{ color: '#F09595', fontSize: '11px', marginTop: '6px', marginLeft: '26px' }}>{errores.reglas}</p>}
         </div>
 
         <button type="button" onClick={registrarNegocio} disabled={guardando}
