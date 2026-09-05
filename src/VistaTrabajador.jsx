@@ -850,6 +850,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
     )
   }
 
+
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       {modalOpciones && <ModalOpciones />}
