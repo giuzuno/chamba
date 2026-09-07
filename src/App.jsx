@@ -7,6 +7,7 @@ import SplashScreen from './SplashScreen'
 import Privacidad from './Privacidad'
 import Descargar from './Descargar'
 import RegistrarNegocio from './RegistrarNegocio'
+import PanelNegocio from './PanelNegocio'
 import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
@@ -233,9 +234,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
     const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
     if (!error) {
       const { data } = supabase.storage.from('avatares').getPublicUrl(path)
-      // Solo se guarda en memoria — el registro en la base de datos se crea hasta
-      // guardarNombreYRol(), para no dejar cuentas huérfanas "Sin nombre" si alguien
-      // sube su foto y abandona el registro antes de terminar.
       setFotoOnboarding(data.publicUrl)
     }
     setSubiendoFotoOnb(false)
@@ -266,7 +264,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
     if (!apellido.trim()) { setError('Escribe tu apellido'); return }
     setGuardando(true)
 
-    // Generar username único
     let username = generarUsername(nombre, apellido)
     let disponible = await usernameDisponible(username)
     if (!disponible) {
@@ -278,8 +275,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
       }
     }
 
-    // Se guarda todo junto (nombre, apellido, username y foto) en un solo upsert —
-    // así no queda ningún registro parcial si el usuario abandona antes de este paso.
     await supabase.from('usuarios').upsert({
       id: userId, email: userEmail,
       nombre: capitalizar(nombre), apellido: capitalizar(apellido), username,
@@ -293,7 +288,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
   if (paso === 1) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', padding: '0' }}>
-        {/* Hero visual */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px 24px', textAlign: 'center' }}>
           <LogoChamba size='lg' />
           <h1 style={{ color: 'white', fontSize: '30px', fontWeight: '900', marginBottom: '10px', marginTop: '20px', lineHeight: '1.2' }}>
@@ -304,7 +298,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
             Conectamos a clientes con trabajadores locales en Salina Cruz, Oaxaca.
           </p>
 
-          {/* Features */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '32px' }}>
             {[
               { icon: '🔐', titulo: 'Pago seguro', desc: 'Tu dinero queda protegido hasta confirmar' },
@@ -321,7 +314,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
             ))}
           </div>
 
-          {/* Servicios disponibles */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '8px' }}>
             {['⚡ Electricistas', '🔧 Plomeros', '🚕 Taxis', '🍳 Cocineras', '🌿 Jardineros', '🛵 Repartidores'].map(s => (
               <span key={s} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', background: 'rgba(29,158,117,0.08)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.2)' }}>{s}</span>
@@ -330,7 +322,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
           </div>
         </div>
 
-        {/* CTA fijo abajo */}
         <div style={{ padding: '20px 32px 32px', background: 'linear-gradient(to top, #0D0D0D 80%, transparent)' }}>
           <button type="button" onClick={() => setPaso(2)} style={{ width: '100%', padding: '18px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '16px', fontSize: '17px', fontWeight: '800', cursor: 'pointer', fontFamily: 'sans-serif', letterSpacing: '0.02em' }}>
             Comenzar gratis →
@@ -387,7 +378,6 @@ function Onboarding({ userId, userEmail, onCompletado }) {
             Los trabajadores y clientes necesitan ver tu foto para confiar en ti.
           </p>
 
-          {/* Foto */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '28px' }}>
             {fotoOnboarding ? (
               <img src={fotoOnboarding} alt="foto" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #1D9E75' }} />
@@ -534,12 +524,12 @@ function AppContenido() {
   const [navegarAHistorial, setNavegarAHistorial] = useState(false)
   const [trabajoIdInicial, setTrabajoIdInicial] = useState(null)
   const [navegando, setNavegando] = useState(false)
-  const [verRecuperar, setVerRecuperar] = useState(false) // ← NUEVO
-  const [verCrearCuenta, setVerCrearCuenta] = useState(false) // ← NUEVO: pantalla separada de registro
-  const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false) // ← NUEVO: detecta el link de "olvidé mi contraseña"
+  const [verRecuperar, setVerRecuperar] = useState(false)
+  const [verCrearCuenta, setVerCrearCuenta] = useState(false)
+  const [esRecuperacionPassword, setEsRecuperacionPassword] = useState(false)
   const [avisoHoraVisible, setAvisoHoraVisible] = useState(false)
   const [verPassword, setVerPassword] = useState(false)
-  const [registroExitoso, setRegistroExitoso] = useState(false) // ← NUEVO: pantalla de "revisa tu correo"
+  const [registroExitoso, setRegistroExitoso] = useState(false)
   const toastTimer = useRef(null)
   const [sinInternet, setSinInternet] = useState(!navigator.onLine)
 
@@ -569,12 +559,10 @@ function AppContenido() {
 
   useEffect(() => {
     if (session) {
-      // Verificar fingerprint del dispositivo primero
       verificarDispositivoBaneado().then(({ baneado }) => {
         if (baneado) { setDispositivoBaneado(true); return }
       })
 
-      // Guardar fingerprint y cargar perfil
       guardarFingerprint(session.user.id)
 
       supabase.from('usuarios').select('nombre, es_admin, baneado').eq('id', session.user.id).maybeSingle()
@@ -633,7 +621,6 @@ function AppContenido() {
     const tiposCliente = ['trabajo_aceptado', 'trabajo_completado', 'llegada', 'en_camino', 'recordatorio', 'contraoferta', 'disputa']
     const tiposTrabajador = ['pago_liberado', 'nuevo_trabajo']
 
-    // Mostrar pantalla de carga brevemente
     setNavegando(true)
     setTimeout(() => {
       setNavegando(false)
@@ -660,7 +647,6 @@ function AppContenido() {
     setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      // Mensaje más claro cuando el bloqueo es por correo sin confirmar
       if (error.message?.toLowerCase().includes('email not confirmed')) {
         setError('Confirma tu correo antes de entrar — revisa tu bandeja de entrada (y spam).')
       } else {
@@ -711,7 +697,6 @@ function AppContenido() {
 
   if (mostrarSplash) return <SplashScreen onTerminado={() => setMostrarSplash(false)} />
 
-  // ── Link de recuperación de contraseña (correo) — tiene prioridad sobre todo lo demás ──
   if (esRecuperacionPassword) return (
     <CambiarContrasena
       modoRecuperacion
@@ -722,10 +707,8 @@ function AppContenido() {
     />
   )
 
-  // ── Recuperar contraseña ──
   if (verRecuperar) return <RecuperarPassword onVolver={() => setVerRecuperar(false)} />
 
-  // ── Crear cuenta (pantalla separada) ──
   if (verCrearCuenta) return (
     <CrearCuenta
       onVolver={() => setVerCrearCuenta(false)}
@@ -737,7 +720,6 @@ function AppContenido() {
     />
   )
 
-  // ── Confirmar correo tras registro ──
   if (registroExitoso) return (
     <ConfirmarCorreo email={email} onVolver={() => { setRegistroExitoso(false); setEmail(''); setPassword('') }} />
   )
@@ -842,7 +824,6 @@ function AppContenido() {
           {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
           <button type="submit" disabled={loading} style={{ background: '#1D9E75', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer', marginTop: '4px' }}>{loading ? 'Cargando...' : 'Entrar'}</button>
           <button type="button" onClick={() => setVerCrearCuenta(true)} disabled={loading} style={{ background: 'transparent', color: '#1D9E75', border: '1px solid #1D9E75', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: '500', cursor: 'pointer' }}>Crear cuenta</button>
-          {/* ← NUEVO: Link recuperar contraseña */}
           <button type="button" onClick={() => setVerRecuperar(true)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif', textAlign: 'center', padding: '4px' }}>
             ¿Olvidaste tu contraseña?
           </button>
@@ -854,6 +835,7 @@ function AppContenido() {
     </div>
   )
 }
+
 function TestRegistrarNegocio() {
   const [userId, setUserId] = useState(null)
   useEffect(() => {
@@ -864,7 +846,26 @@ function TestRegistrarNegocio() {
       Primero inicia sesión en la app normal (con cualquier cuenta), luego regresa a esta misma URL.
     </div>
   )
-  return <RegistrarNegocio userId={userId} onVolver={() => window.history.back()} onCompletado={() => alert('¡Negocio registrado! Ve a Supabase > Table Editor > negocios para verlo.')} />
+  return <TestNegocioRouter userId={userId} />
+}
+
+function TestNegocioRouter({ userId }) {
+  const [tieneNegocio, setTieneNegocio] = useState(null)
+
+  useEffect(() => {
+    supabase.from('negocios').select('id').eq('usuario_id', userId).maybeSingle()
+      .then(({ data }) => setTieneNegocio(!!data))
+  }, [userId])
+
+  if (tieneNegocio === null) return (
+    <div style={{ color: 'white', background: '#0D0D0D', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+      Cargando...
+    </div>
+  )
+
+  if (tieneNegocio) return <PanelNegocio userId={userId} onVolver={() => window.history.back()} />
+
+  return <RegistrarNegocio userId={userId} onVolver={() => window.history.back()} onCompletado={() => window.location.reload()} />
 }
 
 export default function App() {
