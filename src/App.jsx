@@ -838,15 +838,26 @@ function AppContenido() {
 
 function TestRegistrarNegocio() {
   const [userId, setUserId] = useState(null)
+  const [userEmail, setUserEmail] = useState(null)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user?.id || null))
+    supabase.auth.getSession().then(({ data }) => {
+      setUserId(data.session?.user?.id || null)
+      setUserEmail(data.session?.user?.email || null)
+    })
   }, [])
   if (!userId) return (
     <div style={{ color: 'white', background: '#0D0D0D', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
       Primero inicia sesión en la app normal (con cualquier cuenta), luego regresa a esta misma URL.
     </div>
   )
-  return <TestNegocioRouter userId={userId} />
+  return (
+    <div>
+      <div style={{ background: '#1D9E75', color: 'white', padding: '10px 16px', fontSize: '13px', textAlign: 'center', fontFamily: 'sans-serif', fontWeight: '700' }}>
+        🔍 Sesión activa: {userEmail}
+      </div>
+      <TestNegocioRouter userId={userId} />
+    </div>
+  )
 }
 
 function TestNegocioRouter({ userId }) {
