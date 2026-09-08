@@ -8,6 +8,7 @@ import Privacidad from './Privacidad'
 import Descargar from './Descargar'
 import RegistrarNegocio from './RegistrarNegocio'
 import PanelNegocio from './PanelNegocio'
+import VerNegocios from './VerNegocios'
 import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
@@ -885,6 +886,7 @@ export default function App() {
       <Routes>
         <Route path="/privacidad" element={<Privacidad />} />
         <Route path="/test-negocio" element={<TestRegistrarNegocio />} />
+        <Route path="/test-ver-negocios" element={<VerNegocios onVolver={() => window.history.back()} />} />
         <Route path="/descargar" element={<Descargar />} />
         <Route path="/terminos" element={<Terminos />} />
         <Route path="/mp-callback" element={<MpCallback />} />
