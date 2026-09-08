@@ -9,6 +9,7 @@ import Descargar from './Descargar'
 import RegistrarNegocio from './RegistrarNegocio'
 import PanelNegocio from './PanelNegocio'
 import VerNegocios from './VerNegocios'
+import PanelRepartidor from './PanelRepartidor'
 import Notificaciones from './Notificaciones'
 import PerfilTrabajador from './PerfilTrabajador'
 import PerfilCliente from './PerfilCliente'
@@ -893,6 +894,19 @@ function TestVerNegocios() {
   return <VerNegocios userId={userId} onVolver={() => window.history.back()} />
 }
 
+function TestPanelRepartidor() {
+  const [userId, setUserId] = useState(null)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user?.id || null))
+  }, [])
+  if (!userId) return (
+    <div style={{ color: 'white', background: '#0D0D0D', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
+      Primero inicia sesión en la app normal (con cualquier cuenta), luego regresa a esta misma URL.
+    </div>
+  )
+  return <PanelRepartidor userId={userId} onVolver={() => window.history.back()} />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -900,6 +914,7 @@ export default function App() {
         <Route path="/privacidad" element={<Privacidad />} />
         <Route path="/test-negocio" element={<TestRegistrarNegocio />} />
         <Route path="/test-ver-negocios" element={<TestVerNegocios />} />
+        <Route path="/test-repartidor" element={<TestPanelRepartidor />} />
         <Route path="/descargar" element={<Descargar />} />
         <Route path="/terminos" element={<Terminos />} />
         <Route path="/mp-callback" element={<MpCallback />} />
