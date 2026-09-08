@@ -9,6 +9,7 @@ import PerfilTrabajador from './PerfilTrabajador'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import LogoChamba from './LogoChamba'
 import ReportarCobro from './ReportarCobro'
+import NegocioRouter from './NegocioRouter'
 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
@@ -130,6 +131,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   const [modalOpciones, setModalOpciones] = useState(false)
   const [verPerfil, setVerPerfil] = useState(false)
   const [pestanaPerfilInicial, setPestanaPerfilInicial] = useState('info')
+  const [verNegocio, setVerNegocio] = useState(false)
   const [perfilIncompleto, setPerfilIncompleto] = useState(false)
   const [reportando, setReportando] = useState(null)
   const [camposFaltantes, setCamposFaltantes] = useState([])
@@ -552,6 +554,7 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
   }
 
   if (reportando) return <ReportarCobro trabajo={reportando} userId={userId} rolReportador="trabajador" onVolver={() => setReportando(null)} />
+  if (verNegocio) return <NegocioRouter userId={userId} onVolver={() => setVerNegocio(false)} />
   if (verPerfil) return <PerfilTrabajador userId={userId} userEmail={userEmail} pestanaInicial={pestanaPerfilInicial} onVolver={() => { setVerPerfil(false); setPestanaPerfilInicial('info'); cargarPerfilUsuario(); cargarEstadoVerificacion() }} />
   if (chatAbierto) return <ChatTrabajo trabajo={chatAbierto} userId={userId} onVolver={() => setChatAbierto(null)} />
   if (verPerfilCliente) return <PerfilPublico usuarioId={verPerfilCliente} rolVisto="cliente" onVolver={() => setVerPerfilCliente(null)} />
@@ -865,10 +868,12 @@ export default function VistaTrabajador({ onLogout, userEmail, userId, onCambiar
           ['disponibles', '🔍', 'Disponibles', trabajos.length],
           ['mis', '✅', 'Activos', misTrabajos.length],
           ['historial', '🏁', 'Historial', historial.length],
+          ['negocio', '🏪', 'Negocio', 0],
           ['perfil', '👤', 'Perfil', 0],
         ].map(([key, icon, label, count]) => (
           <button key={key} type="button" onClick={() => {
             if (key === 'perfil') { abrirPerfilEn('info'); return }
+            if (key === 'negocio') { setVerNegocio(true); return }
             setPestana(key)
           }} style={{ flex: 1, padding: '9px 4px', border: 'none', borderRadius: '10px', background: pestana === key ? '#1D9E75' : 'rgba(255,255,255,0.06)', color: pestana === key ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: pestana === key ? '600' : '400', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {icon} {label} {count > 0 && `(${count})`}
