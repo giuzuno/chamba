@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { sanitizarCampo, tieneInyeccionSQL } from './sanitize'
+import { enviarNotificacionCompleta } from './guardarNotificacion'
 
 const CATEGORIAS_PRODUCTO = ['Platillos', 'Bebidas', 'Antojitos', 'Postres', 'Abarrotes', 'Otro']
+
+const ETIQUETAS_STATUS = {
+  pendiente: { texto: '🆕 Nuevo', color: '#E8A030' },
+  confirmado_negocio: { texto: '✅ Aceptado', color: '#378ADD' },
+  preparando: { texto: '🔥 Preparando', color: '#E8A030' },
+  listo_recoger: { texto: '📦 Listo', color: '#1D9E75' },
+  entregado: { texto: '✅ Entregado', color: '#1D9E75' },
+  cancelado: { texto: '❌ Cancelado', color: '#F09595' },
+}
 
 export default function PanelNegocio({ userId, onVolver }) {
   const [negocio, setNegocio] = useState(null)
   const [productos, setProductos] = useState([])
+  const [pedidos, setPedidos] = useState([])
+  const [pestanaActiva, setPestanaActiva] = useState('pedidos')
+  const [avanzandoPedido, setAvanzandoPedido] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cambiandoEstado, setCambiandoEstado] = useState(false)
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -21,16 +34,42 @@ export default function PanelNegocio({ userId, onVolver }) {
 
   useEffect(() => { cargarNegocio() }, [])
 
+  useEffect(() => {
+    if (!negocio) return
+    const channel = supabase.channel('pedidos-negocio-' + negocio.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` }, () => {
+        cargarPedidos(negocio.id)
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [negocio])
+
   async function cargarNegocio() {
     const { data } = await supabase.from('negocios').select('*').eq('usuario_id', userId).maybeSingle()
     setNegocio(data)
-    if (data) await cargarProductos(data.id)
+    if (data) {
+      await cargarProductos(data.id)
+      await cargarPedidos(data.id)
+    }
     setLoading(false)
   }
 
   async function cargarProductos(negocioId) {
     const { data } = await supabase.from('productos_menu').select('*').eq('negocio_id', negocioId).order('creado_en', { ascending: false })
     if (data) setProductos(data)
+  }
+
+  async function cargarPedidos(negocioId) {
+    const { data } = await supabase.from('pedidos').select('*').eq('negocio_id', negocioId).order('creado_en', { ascending: false })
+    if (data) setPedidos(data)
+  }
+
+  async function avanzarPedido(pedido, nuevoStatus, notifTitulo, notifCuerpo) {
+    setAvanzandoPedido(pedido.id)
+    await supabase.from('pedidos').update({ status: nuevoStatus }).eq('id', pedido.id)
+    setPedidos(prev => prev.map(p => p.id === pedido.id ? { ...p, status: nuevoStatus } : p))
+    await enviarNotificacionCompleta({ usuarioId: pedido.cliente_id, titulo: notifTitulo, cuerpo: notifCuerpo, tipo: 'general' })
+    setAvanzandoPedido(null)
   }
 
   async function toggleAbierto() {
@@ -140,7 +179,93 @@ export default function PanelNegocio({ userId, onVolver }) {
         </button>
       </div>
 
-      {/* Lista de productos */}
+      {/* Selector de pestañas */}
+      <div style={{ display: 'flex', gap: '6px', padding: '14px 20px 0' }}>
+        {[['pedidos', '📋', 'Pedidos', pedidos.filter(p => !['entregado', 'cancelado'].includes(p.status)).length], ['menu', '🍽️', 'Menú', 0]].map(([key, icon, label, count]) => (
+          <button key={key} type="button" onClick={() => setPestanaActiva(key)} style={{
+            flex: 1, padding: '10px 4px', border: 'none', borderRadius: '10px',
+            background: pestanaActiva === key ? '#1D9E75' : 'rgba(255,255,255,0.06)',
+            color: pestanaActiva === key ? 'white' : 'rgba(255,255,255,0.5)',
+            fontSize: '12px', fontWeight: pestanaActiva === key ? '700' : '400', cursor: 'pointer', fontFamily: 'sans-serif',
+          }}>
+            {icon} {label} {count > 0 && `(${count})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Pestaña: Pedidos */}
+      {pestanaActiva === 'pedidos' && (
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {pedidos.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+              <p>Todavía no te ha llegado ningún pedido.</p>
+            </div>
+          )}
+
+          {pedidos.map(pedido => {
+            const etiqueta = ETIQUETAS_STATUS[pedido.status] || ETIQUETAS_STATUS.pendiente
+            return (
+              <div key={pedido.id} style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: etiqueta.color, background: `${etiqueta.color}22`, padding: '4px 10px', borderRadius: '100px' }}>
+                    {etiqueta.texto}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                    {pedido.tipo_entrega === 'domicilio' ? '🛵 A domicilio' : '🚶 Recoge el cliente'}
+                  </span>
+                </div>
+
+                {pedido.items.map((it, i) => (
+                  <p key={i} style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '2px' }}>
+                    {it.cantidad}x {it.nombre} — ${it.precio * it.cantidad}
+                  </p>
+                ))}
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#1D9E75', marginTop: '6px' }}>Total: ${pedido.subtotal} MXN</p>
+
+                {pedido.status === 'pendiente' && (
+                  <button type="button" disabled={avanzandoPedido === pedido.id}
+                    onClick={() => avanzarPedido(pedido, 'confirmado_negocio', '✅ Pedido aceptado', 'Tu pedido fue aceptado, en breve lo empezamos a preparar.')}
+                    style={{ width: '100%', marginTop: '12px', padding: '12px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    ✅ Aceptar pedido
+                  </button>
+                )}
+                {pedido.status === 'confirmado_negocio' && (
+                  <button type="button" disabled={avanzandoPedido === pedido.id}
+                    onClick={() => avanzarPedido(pedido, 'preparando', '🔥 Preparando tu pedido', 'Ya nos pusimos a cocinar tu pedido.')}
+                    style={{ width: '100%', marginTop: '12px', padding: '12px', background: '#E8A030', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    🔥 Empezar a preparar
+                  </button>
+                )}
+                {pedido.status === 'preparando' && (
+                  <button type="button" disabled={avanzandoPedido === pedido.id}
+                    onClick={() => avanzarPedido(pedido, 'listo_recoger',
+                      '📦 ¡Tu pedido está listo!',
+                      pedido.tipo_entrega === 'domicilio' ? 'Tu pedido está listo, esperando repartidor.' : 'Tu pedido está listo, ya puedes pasar por él.')}
+                    style={{ width: '100%', marginTop: '12px', padding: '12px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    📦 Ya está listo
+                  </button>
+                )}
+                {pedido.status === 'listo_recoger' && pedido.tipo_entrega === 'recoge_cliente' && (
+                  <button type="button" disabled={avanzandoPedido === pedido.id}
+                    onClick={() => avanzarPedido(pedido, 'entregado', '🎉 ¡Gracias por tu compra!', 'Esperamos que lo disfrutes.')}
+                    style={{ width: '100%', marginTop: '12px', padding: '12px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    📦 Ya lo recogió el cliente
+                  </button>
+                )}
+                {pedido.status === 'listo_recoger' && pedido.tipo_entrega === 'domicilio' && (
+                  <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.25)', borderRadius: '10px', fontSize: '12px', color: '#378ADD', textAlign: 'center' }}>
+                    🛵 Esperando que un repartidor lo recoja...
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pestaña: Menú */}
+      {pestanaActiva === 'menu' && (
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -177,6 +302,7 @@ export default function PanelNegocio({ userId, onVolver }) {
           </div>
         ))}
       </div>
+      )}
 
       {/* Modal para agregar producto */}
       {mostrarForm && (
