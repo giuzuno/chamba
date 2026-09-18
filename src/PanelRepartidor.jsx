@@ -81,7 +81,11 @@ export default function PanelRepartidor({ userId, onVolver }) {
     await enviarNotificacionCompleta({ usuarioId: viaje.cliente_id, titulo: notifTitulo, cuerpo: notifCuerpo, tipo: nuevoStatus === 'entregado' ? 'llegada' : 'en_camino' })
 
     setAvanzando(null)
-    setDetalleViaje(null)
+    if (nuevoStatus === 'entregado') {
+      setDetalleViaje(null)
+    } else {
+      setDetalleViaje(prev => prev ? { ...prev, ...updateData } : prev)
+    }
     await cargarTodo()
   }
 
