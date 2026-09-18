@@ -64,14 +64,14 @@ serve(async (req) => {
     const monto = Number(trabajo.precio_acordado || trabajo.presupuesto)
     const comisionChamba = Math.round(monto * 0.12 * 100) / 100
  
-    // 4. Crear el pago en MP con cobro inmediato (capture: true).
-    //    NOTA: antes se intentaba primero con capture:false (retención/captura diferida)
-    //    y solo se reintentaba con capture:true si MP la rechazaba. Se quitó ese reintento:
-    //    el token de tarjeta de MP es de un solo uso (se invalida aunque el primer intento
-    //    sea rechazado), así que reintentar con el mismo token nunca iba a funcionar.
-    //    Cobrar siempre de inmediato es más simple y evita ese problema por completo — el
-    //    "retenido hasta confirmar el trabajo" se sigue manejando como regla interna de
-    //    Chamba (ver liberar-pago / cancelar-pago), no como retención real en Mercado Pago.
+    // 4. Crear el pago en MP en modo retención real (capture: false).
+    //    Esto es lo único que cumple la promesa de Chamba: el dinero del cliente queda
+    //    retenido de verdad en Mercado Pago (no se mueve a la cuenta del trabajador) hasta
+    //    que se libera con liberar-pago. NO se reintenta con capture:true si esto falla —
+    //    el token de tarjeta de MP es de un solo uso, así que un reintento con el mismo
+    //    token nunca funcionaría, y cobrar de inmediato como respaldo silencioso rompería
+    //    la protección real que se le ofrece al cliente. Si la tarjeta no soporta retención,
+    //    se le pide que use otra.
     const pagoBody: Record<string, unknown> = {
       transaction_amount: monto,
       token,
@@ -80,7 +80,7 @@ serve(async (req) => {
       payment_method_id: paymentMethodId,
       issuer_id: issuerId ? Number(issuerId) : undefined,
       application_fee: comisionChamba,
-      capture: true,
+      capture: false,
       statement_descriptor: 'CHAMBA',
       payer: {
         email: emailCliente,
@@ -127,26 +127,31 @@ serve(async (req) => {
  
     const pago = await resPago.json()
  
+    function esErrorCapturaDiferida(p: Record<string, unknown>) {
+      const cause = (p?.cause as Array<Record<string, unknown>>) || []
+      const texto = `${p?.message || ''} ${cause.map(c => c?.description || c?.code || '').join(' ')}`.toLowerCase()
+      return texto.includes('deferred capture')
+    }
+ 
     if (pago.status === 'rejected' || pago.error) {
       const detalle = pago.status_detail || pago.message || ''
       const esTextoIngles = typeof detalle === 'string' && /[a-zA-Z]{4,}/.test(detalle) && !/^[a-z_]+$/i.test(detalle)
-      const mensajeAmigable = esTextoIngles
-        ? 'El pago fue rechazado. Verifica tu tarjeta o intenta con otra.'
-        : (detalle || 'Pago rechazado')
+      const mensajeAmigable = esErrorCapturaDiferida(pago)
+        ? 'Esta tarjeta no permite que Chamba retenga tu pago de forma protegida hasta que confirmes el trabajo. Por favor intenta con otra tarjeta (de preferencia crédito de un banco tradicional).'
+        : esTextoIngles
+          ? 'El pago fue rechazado. Verifica tu tarjeta o intenta con otra.'
+          : (detalle || 'Pago rechazado')
       return new Response(JSON.stringify({
         error: mensajeAmigable,
         debug: pago,
       }), { status: 400, headers: corsHeaders })
     }
  
-    // 5. Guardar mp_payment_id en la BD.
-    //    captura_diferida: false porque este pago se cobró de inmediato — así liberar-pago
-    //    y cancelar-pago saben que no hay nada que capturar/cancelar en MP más adelante,
-    //    y que una cancelación debe hacerse como reembolso.
+    // 5. Guardar mp_payment_id en la BD (captura_diferida se queda en su default: true —
+    //    este pago sí está en modo retención real).
     await supabase.from('trabajos').update({
       mp_payment_id: String(pago.id),
       pago_status: 'pagado',
-      captura_diferida: false,
     }).eq('id', trabajoId)
  
     // 6. Si quiere guardar tarjeta, asociarla al customer
