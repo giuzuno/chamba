@@ -191,6 +191,14 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
             <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${config.totalCliente} MXN</p>
           </div>
         )}
+        {!cargando && !error && (
+          <div style={{ background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.25)', borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>ℹ️</span>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>
+              Para poder retener tu pago de forma protegida hasta que confirmes el trabajo, aceptamos <strong style={{ color: 'rgba(255,255,255,0.8)' }}>tarjetas de crédito de bancos tradicionales</strong> (BBVA, Santander, Banorte, HSBC, Citibanamex, Banregio, etc.). Tarjetas de débito o de bancos 100% digitales (como Openbank, Nu, etc.) pueden no ser compatibles.
+            </p>
+          </div>
+        )}
         {cargando && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.3)' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
