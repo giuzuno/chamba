@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -79,6 +79,14 @@ function SeleccionarTipoPublicacion({ onServicio, onViaje, onVolver }) {
   )
 }
 
+function MapaDragListener({ onDragStart, onDragEnd }) {
+  useMapEvents({
+    dragstart: () => onDragStart(),
+    dragend: () => onDragEnd(),
+  })
+  return null
+}
+
 export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo, noLeidas = 0, onNotificaciones, irAMisPublicaciones, trabajoIdInicial, onNavegacionCompletada }) {
   const [fotoUrlCliente, setFotoUrlCliente] = useState(null)
   const [fotoVerificada, setFotoVerificada] = useState(false)
@@ -86,6 +94,23 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
   const [cargando, setCargando] = useState(false)
   const [pantalla, setPantalla] = useState('mapa')
+  const [barVisible, setBarVisible] = useState(true)
+  const barraTimeoutRef = useRef(null)
+
+  // Red de seguridad: si el evento "dragend" del mapa nunca llega (pasa en
+  // celulares cuando el dedo se sale de la pantalla o se interrumpe el toque),
+  // el menú de abajo se quedaba escondido para siempre. Ahora, pase lo que
+  // pase, reaparece solo después de 3 segundos.
+  function ocultarBarra() {
+    setBarVisible(false)
+    if (barraTimeoutRef.current) clearTimeout(barraTimeoutRef.current)
+    barraTimeoutRef.current = setTimeout(() => setBarVisible(true), 3000)
+  }
+
+  function mostrarBarra() {
+    setBarVisible(true)
+    if (barraTimeoutRef.current) clearTimeout(barraTimeoutRef.current)
+  }
   const [ciudad, setCiudad] = useState('...')
   const [modalOpciones, setModalOpciones] = useState(false)
   const [centroMapa, setCentroMapa] = useState([16.1833, -95.2000])
@@ -193,6 +218,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer center={centroMapa} zoom={14} style={{ height: '100%', width: '100%' }}>
           <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapaDragListener onDragStart={ocultarBarra} onDragEnd={mostrarBarra} />
           {trabajosFiltrados.map(t => {
             const icono = L.divIcon({
               html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">${CATEGORIAS_ICONS_MAPA[t.categoria] || '✳️'}</div>`,
@@ -231,7 +257,7 @@ export default function MapaChamba({ onLogout, userEmail, userId, onCambiarModo,
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0', background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.1)', position: 'relative', zIndex: 1000 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0 calc(12px + env(safe-area-inset-bottom))', background: '#0D0D0D', borderTop: '0.5px solid rgba(255,255,255,0.1)', transform: barVisible ? 'translateY(0)' : 'translateY(100%)', transition: 'transform 0.3s ease', position: 'relative', zIndex: 1000 }}>
         {[['🗺️', 'Mapa'], ['➕', 'Publicar'], ['🔍', 'Buscar'], ['📋', 'Mis trabajos'], ['👤', 'Perfil']].map(([icon, label]) => (
           <button key={label} type="button"
             onClick={() => {
