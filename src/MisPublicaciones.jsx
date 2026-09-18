@@ -50,6 +50,8 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
   const [negociaciones, setNegociaciones] = useState([])
   const [loadingAccion, setLoadingAccion] = useState(false)
   const [exitoAccion, setExitoAccion] = useState('')
+  const [mostrarContraofertaCliente, setMostrarContraofertaCliente] = useState(false)
+  const [nuevoMontoCliente, setNuevoMontoCliente] = useState('')
   const [errorLiberacion, setErrorLiberacion] = useState('')
   const [calificando, setCalificando] = useState(null)
   const [chatAbierto, setChatAbierto] = useState(null)
@@ -216,6 +218,41 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
     await cargarMisTrabajos()
     await cargarNegociaciones(trabajo.id)
     setTrabajoSeleccionado(prev => ({ ...prev, ultima_oferta: null, quien_oferto: null }))
+    setLoadingAccion(false)
+  }
+
+  async function enviarContraofertaCliente(trabajo) {
+    const monto = parseFloat(nuevoMontoCliente)
+    if (!monto || monto <= 0) return
+    setLoadingAccion(true)
+    const trabajadorId = negociaciones[negociaciones.length - 1]?.usuario_id
+
+    await supabase.from('negociaciones').insert({
+      trabajo_id: trabajo.id,
+      ofertado_por: 'cliente',
+      monto,
+      usuario_id: userId,
+    })
+    await supabase.from('trabajos').update({
+      ultima_oferta: monto, quien_oferto: 'cliente',
+      rondas_negociacion: (trabajo.rondas_negociacion || 0) + 1,
+    }).eq('id', trabajo.id)
+
+    if (trabajadorId) {
+      await enviarNotificacionCompleta({
+        usuarioId: trabajadorId,
+        titulo: '💬 Nueva contraoferta del cliente',
+        cuerpo: `El cliente ofrece $${monto} MXN por tu ${trabajo.categoria}`,
+        tipo: 'general',
+        trabajoId: trabajo.id,
+      })
+    }
+
+    setMostrarContraofertaCliente(false)
+    setNuevoMontoCliente('')
+    await cargarMisTrabajos()
+    await cargarNegociaciones(trabajo.id)
+    setTrabajoSeleccionado(prev => ({ ...prev, ultima_oferta: monto, quien_oferto: 'cliente' }))
     setLoadingAccion(false)
   }
 
@@ -685,9 +722,50 @@ export default function MisPublicaciones({ onVolver, userId, trabajoIdInicial })
               <button type="button" onClick={() => aceptarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '15px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 ✅ Aceptar ${trabajoSeleccionado.ultima_oferta} MXN — y pagar
               </button>
-              <button type="button" onClick={() => rechazarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#E8A030', border: '1px solid rgba(186,117,23,0.4)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                ↩ Rechazar y pedir otro precio
+
+              {(trabajoSeleccionado.rondas_negociacion || 0) < 3 ? (
+                mostrarContraofertaCliente ? (
+                  <div style={{ background: 'rgba(55,138,221,0.06)', border: '1px solid rgba(55,138,221,0.25)', borderRadius: '14px', padding: '14px' }}>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px' }}>¿Cuánto quieres ofrecer tú?</p>
+                    <input type="number" inputMode="decimal" placeholder="Ej: 50" value={nuevoMontoCliente}
+                      onChange={e => setNuevoMontoCliente(e.target.value)} autoFocus
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '12px 14px', color: 'white', fontSize: '16px', fontFamily: 'sans-serif', outline: 'none', marginBottom: '10px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" onClick={() => enviarContraofertaCliente(trabajoSeleccionado)} disabled={loadingAccion || !nuevoMontoCliente}
+                        style={{ flex: 1, padding: '12px', background: '#378ADD', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        💬 Mandar mi oferta
+                      </button>
+                      <button type="button" onClick={() => { setMostrarContraofertaCliente(false); setNuevoMontoCliente('') }}
+                        style={{ padding: '12px 16px', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setMostrarContraofertaCliente(true)} disabled={loadingAccion} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#378ADD', border: '1px solid rgba(55,138,221,0.4)', borderRadius: '14px', fontSize: '15px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    💬 Ofrecer otro precio
+                  </button>
+                )
+              ) : (
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Se agotaron las rondas de negociación para este trabajo.</p>
+              )}
+
+              <button type="button" onClick={() => rechazarContraoferta(trabajoSeleccionado)} disabled={loadingAccion} style={{ width: '100%', padding: '13px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: 'none', fontSize: '13px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                Ya no me interesa este precio
               </button>
+            </div>
+          )}
+
+          {/* El cliente ya mandó su propia contraoferta — esperando que el trabajador responda */}
+          {trabajoSeleccionado.quien_oferto === 'cliente' && trabajoSeleccionado.status === 'publicado' && !exitoAccion && (
+            <div style={{ background: 'rgba(55,138,221,0.08)', border: '0.5px solid rgba(55,138,221,0.3)', borderRadius: '14px', padding: '16px', textAlign: 'center' }}>
+              <p style={{ fontSize: '13px', color: '#378ADD', fontWeight: '600', marginBottom: '4px' }}>
+                💬 Ofreciste ${trabajoSeleccionado.ultima_oferta} MXN
+              </p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                Esperando que el trabajador acepte o responda.
+              </p>
             </div>
           )}
 
