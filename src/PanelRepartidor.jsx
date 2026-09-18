@@ -37,8 +37,12 @@ export default function PanelRepartidor({ userId, onVolver }) {
   }
 
   async function cargarPedidosDelViaje(viajeId) {
-    const { data } = await supabase.from('pedidos').select('*, negocios(nombre, foto_portada_url, direccion, lat, lng)').eq('viaje_entrega_id', viajeId)
-    if (data) setPedidosDelViaje(data)
+    const { data: pedidos } = await supabase.from('pedidos').select('*').eq('viaje_entrega_id', viajeId)
+    if (!pedidos) { setPedidosDelViaje([]); return }
+    const negocioIds = [...new Set(pedidos.map(p => p.negocio_id))]
+    const { data: negocios } = await supabase.from('negocios_publico').select('*').in('id', negocioIds)
+    const pedidosConNegocio = pedidos.map(p => ({ ...p, negocios: negocios?.find(n => n.id === p.negocio_id) }))
+    setPedidosDelViaje(pedidosConNegocio)
   }
 
   async function tomarEntrega(viaje) {
