@@ -5,9 +5,9 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
-
+ 
 delete L.Icon.Default.prototype._getIconUrl
-
+ 
 const iconoOrigen = L.divIcon({
   html: `<div style="background:#1D9E75;border:3px solid white;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">📍</div>`,
   className: '', iconSize: [38,38], iconAnchor: [19,19],
@@ -20,24 +20,27 @@ const iconoParada = L.divIcon({
   html: `<div style="background:#E8A030;border:3px solid white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🔶</div>`,
   className: '', iconSize: [34,34], iconAnchor: [17,17],
 })
-
+ 
+// ✅ Tarifas actualizadas (antes: raite 15/50, moto_raite 8/30, tuk_tuk 6/25, moto_mandados 10/35, flete 25/150).
+// Se subieron ~13-15% para compensar la comisión de Chamba (12%), ya que los viajes ahora
+// tienen precio fijo y el trabajador no puede negociarlo hacia arriba si le queda corto.
 const TIPOS_VIAJE = [
-  { id: 'raite', icon: '🚕', label: 'Raite', desc: 'Traslado en auto', precioPorKm: 15, minimo: 50, categoria: 'Taxi / Chofer' },
-  { id: 'moto_raite', icon: '🏍️', label: 'Moto Raite', desc: 'Rápido y económico en moto', precioPorKm: 8, minimo: 30, categoria: 'Moto taxi' },
-  { id: 'tuk_tuk', icon: '🛺', label: 'Tuk Tuk', desc: 'Mototaxi de 3 ruedas', precioPorKm: 6, minimo: 25, categoria: 'Moto taxi' },
-  { id: 'moto_mandados', icon: '🛵', label: 'Moto Mandados', desc: 'Entregas y paquetes', precioPorKm: 10, minimo: 35, categoria: 'Repartidor moto' },
-  { id: 'flete', icon: '🚛', label: 'Flete', desc: 'Mudanza o carga pesada', precioPorKm: 25, minimo: 150, categoria: 'Fletes' },
+  { id: 'raite', icon: '🚕', label: 'Raite', desc: 'Traslado en auto', precioPorKm: 17, minimo: 60, categoria: 'Taxi / Chofer' },
+  { id: 'moto_raite', icon: '🏍️', label: 'Moto Raite', desc: 'Rápido y económico en moto', precioPorKm: 9, minimo: 35, categoria: 'Moto taxi' },
+  { id: 'tuk_tuk', icon: '🛺', label: 'Tuk Tuk', desc: 'Mototaxi de 3 ruedas', precioPorKm: 7, minimo: 30, categoria: 'Moto taxi' },
+  { id: 'moto_mandados', icon: '🛵', label: 'Moto Mandados', desc: 'Entregas y paquetes', precioPorKm: 11, minimo: 40, categoria: 'Repartidor moto' },
+  { id: 'flete', icon: '🚛', label: 'Flete', desc: 'Mudanza o carga pesada', precioPorKm: 28, minimo: 170, categoria: 'Fletes' },
 ]
-
-
+ 
+ 
 const OPCIONES_ESPERA = [15, 30, 45, 60, 90, 120]
 const COSTO_ESPERA_POR_MIN = 3
-
+ 
 function SeleccionarPunto({ onSeleccionar }) {
   useMapEvents({ click(e) { onSeleccionar([e.latlng.lat, e.latlng.lng]) } })
   return null
 }
-
+ 
 function calcularDistancia(lat1, lng1, lat2, lng2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -45,7 +48,7 @@ function calcularDistancia(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
-
+ 
 function calcularETA(distanciaKm, tipo) {
   const velocidades = { raite: 25, moto_raite: 30, moto_mandados: 25, flete: 18 }
   const vel = velocidades[tipo] || 25
@@ -54,17 +57,17 @@ function calcularETA(distanciaKm, tipo) {
   if (minutos < 60) return `aprox. ${minutos} min`
   return `aprox. ${Math.floor(minutos/60)}h ${minutos%60}min`
 }
-
+ 
 function getAhoraHora() {
   const hoy = new Date()
   return `${String(hoy.getHours()).padStart(2,'0')}:${String(hoy.getMinutes()).padStart(2,'0')}`
 }
-
+ 
 function getHoyLocal() {
   const hoy = new Date()
   return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`
 }
-
+ 
 export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPublicaciones }) {
   const [tipo, setTipo] = useState(null)
   const [paso, setPaso] = useState(1)
@@ -98,15 +101,15 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
   const [mapaListo, setMapaListo] = useState(false)
   const [distanciaReal, setDistanciaReal] = useState(null)
   const [calculandoRuta, setCalculandoRuta] = useState(false)
-
+ 
   // ✅ NUEVO — estados de pago
   const [trabajoCreado, setTrabajoCreado] = useState(null)
   const [pagando, setPagando] = useState(false)
-
+ 
   const debounceDestino = useRef(null)
   const debounceOrigen = useRef(null)
   const debounceParada = useRef(null)
-
+ 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -123,19 +126,19 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     setFechaCita(getHoyLocal())
     setHoraCita(getAhoraHora())
   }, [])
-
+ 
   useEffect(() => {
     if (origenEsActual && ubicacionActual) setOrigen(ubicacionActual)
   }, [origenEsActual, ubicacionActual])
-
+ 
   useEffect(() => {
     setMapaListo(false)
     const t = setTimeout(() => setMapaListo(true), 250)
     return () => clearTimeout(t)
   }, [paso])
-
+ 
   const tipoSeleccionado = TIPOS_VIAJE.find(t => t.id === tipo)
-
+ 
   // Calcular distancia real por calles con OSRM
   useEffect(() => {
     if (!origen || !destino) { setDistanciaReal(null); return }
@@ -160,7 +163,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     }
     calcularRutaReal()
   }, [origen, destino, paradas, tipoViaje])
-
+ 
   function calcularDistanciaTotal() {
     if (!origen || !destino) return 0
     let puntos = [origen, ...paradas.map(p => [p.lat, p.lng]), destino]
@@ -171,7 +174,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     if (tipoViaje === 'redondo') total *= 2
     return total
   }
-
+ 
   function calcularPrecioTotal() {
     if (!tipoSeleccionado) return 0
     const dist = calcularDistanciaTotal()
@@ -180,13 +183,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     if (paradas.length > 0) precio += paradas.length * 20
     return precio
   }
-
+ 
   const distanciaTotal = distanciaReal !== null ? distanciaReal : calcularDistanciaTotal()
   const precioTotal = calcularPrecioTotal()
   const eta = tipoSeleccionado ? calcularETA(distanciaTotal, tipo) : ''
   const centro = ubicacionActual || [16.1833, -95.2000]
   const puntosRuta = origen && destino ? [origen, ...paradas.map(p => [p.lat, p.lng]), destino] : []
-
+ 
   function limpiarResultados(tipoBusqueda) {
     setTimeout(() => {
       if (tipoBusqueda === 'destino') setResultadosBusqueda([])
@@ -194,7 +197,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       else setResultadosParada([])
     }, 200)
   }
-
+ 
   async function ejecutarBusqueda(texto, tipoBusqueda) {
     try {
       const base = origen || ubicacionActual || [16.1833, -95.2000]
@@ -224,13 +227,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       else setBuscandoParada(false)
     }
   }
-
+ 
   function buscarDireccion(texto, tipoBusqueda) {
     // Limpiar resultados anteriores inmediatamente al cambiar texto
     if (tipoBusqueda === 'destino') setResultadosBusqueda([])
     else if (tipoBusqueda === 'origen') setResultadosOrigen([])
     else setResultadosParada([])
-
+ 
     if (texto.trim().length < 3) {
       if (tipoBusqueda === 'destino') setBuscando(false)
       else if (tipoBusqueda === 'origen') setBuscandoOrigen(false)
@@ -244,11 +247,11 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     if (ref.current) clearTimeout(ref.current)
     ref.current = setTimeout(() => { ejecutarBusqueda(texto, tipoBusqueda) }, 400)
   }
-
+ 
   function eliminarParada(idx) {
     setParadas(prev => prev.filter((_, i) => i !== idx))
   }
-
+ 
   function validarFecha() {
     if (esAhora) return true
     if (!fechaCita || !horaCita) { setErrorFecha('Selecciona fecha y hora'); return false }
@@ -262,11 +265,11 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     setErrorFecha('')
     return true
   }
-
+ 
   // ✅ Publicar viaje directo — el pago se hace cuando un chofer acepta
   async function _publicar() {
     setPublicando(true)
-
+ 
     const fCita = esAhora ? getHoyLocal() : fechaCita
     function getHoraConMargen() {
       const ahora = new Date()
@@ -275,7 +278,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
     }
     const hCita = esAhora ? getHoraConMargen() : horaCita
     const precioEspera = tipoViaje === 'redondo' ? tiempoEspera * COSTO_ESPERA_POR_MIN : 0
-
+ 
     const { data: trabajo, error: insertError } = await supabase.from('trabajos').insert({
       cliente_id: userId,
       categoria: tipoSeleccionado.categoria,
@@ -297,13 +300,13 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       status: 'publicado',
       pago_status: 'pendiente',
     }).select().single()
-
+ 
     if (insertError || !trabajo) {
       console.log('Error creando viaje:', insertError)
       setPublicando(false)
       return
     }
-
+ 
     // Notificar a los choferes disponibles
     try {
       const { data: choferes } = await supabase.from('usuarios').select('id')
@@ -321,15 +324,15 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
         }
       }
     } catch (e) { console.log('Error notificando:', e) }
-
+ 
     setPublicando(false)
     setExito(true)
   }
-
+ 
   async function crearViaje() {
     if (!origen || !destino || !tipo) return
     if (!validarFecha()) return
-
+ 
     // Verificar duplicados — solo 1 viaje activo en total
     const { data: duplicados } = await supabase.from('trabajos')
       .select('id').eq('cliente_id', userId).eq('status', 'publicado').eq('es_viaje', true)
@@ -337,11 +340,11 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       setErrorFecha('Ya tienes un viaje publicado activo. Cancélalo antes de publicar otro.')
       return
     }
-
+ 
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     await _publicar()
   }
-
+ 
   if (fotoUrl !== 'cargando' && !fotoUrl) return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', textAlign: 'center' }}>
       <div style={{ fontSize: '64px', marginBottom: '20px' }}>📷</div>
@@ -354,7 +357,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       </button>
     </div>
   )
-
+ 
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="cliente"
@@ -362,7 +365,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       onCerrar={() => setMostrarReglas(false)}
     />
   )
-
+ 
   if (exito) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
@@ -382,7 +385,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
       </div>
     )
   }
-
+ 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
@@ -397,7 +400,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
           {[1,2,3,4,5].map(n => <div key={n} style={{ width: n <= paso ? '20px' : '8px', height: '8px', borderRadius: '4px', background: n <= paso ? '#1D9E75' : 'rgba(255,255,255,0.15)', transition: 'all 0.3s' }} />)}
         </div>
       </div>
-
+ 
       {paso === 1 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Selecciona el tipo de servicio</p>
@@ -417,7 +420,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
           ))}
         </div>
       )}
-
+ 
       {paso === 2 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
@@ -477,7 +480,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
           </div>
         </div>
       )}
-
+ 
       {paso === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)' }}>
           <div style={{ padding: '14px 16px', flexShrink: 0 }}>
@@ -539,7 +542,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
           </div>
         </div>
       )}
-
+ 
       {paso === 4 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>¿Cómo será tu viaje?</p>
@@ -561,7 +564,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               </button>
             ))}
           </div>
-
+ 
           {tipoViaje === 'redondo' && (
             <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '14px', padding: '16px' }}>
               <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '12px' }}>⏱️ ¿Cuánto tiempo esperará el chofer?</p>
@@ -579,7 +582,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               </div>
             </div>
           )}
-
+ 
           {tipoViaje === 'paradas' && (
             <div style={{ background: 'rgba(232,160,48,0.08)', border: '0.5px solid rgba(232,160,48,0.25)', borderRadius: '14px', padding: '16px' }}>
               <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '10px' }}>🔶 Paradas en la ruta (+$20 por parada)</p>
@@ -620,20 +623,20 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               )}
             </div>
           )}
-
+ 
           <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '14px', padding: '14px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800', color: '#1D9E75' }}>
               <span>Total estimado</span>
               <span>${precioTotal} MXN</span>
             </div>
           </div>
-
+ 
           <button type="button" onClick={() => setPaso(5)} style={{ width: '100%', padding: '15px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             Continuar →
           </button>
         </div>
       )}
-
+ 
       {paso === 5 && (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {origen && destino && (
@@ -647,7 +650,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               </MapContainer>
             </div>
           )}
-
+ 
           <div style={{ background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.3)', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontSize: '28px', fontWeight: '800', color: '#1D9E75' }}>${precioTotal} MXN</p>
@@ -659,7 +662,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               {paradas.length > 0 && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '4px' }}>🔶 {paradas.length} parada(s)</p>}
             </div>
           </div>
-
+ 
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>¿Cuándo?</p>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -684,7 +687,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
             )}
             {errorFecha && <p style={{ color: '#F09595', fontSize: '12px', marginTop: '6px' }}>{errorFecha}</p>}
           </div>
-
+ 
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>👥 ¿Cuántas personas van?</p>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -697,7 +700,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
             </div>
             {personas >= 4 && <p style={{ fontSize: '11px', color: '#E8A030', marginTop: '6px' }}>⚠️ {personas} personas — verifica capacidad del vehículo.</p>}
           </div>
-
+ 
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>📝 ¿Cómo te identificas? (opcional)</p>
             <input type="text" placeholder='Ej: "Camisa roja en la entrada"...'
@@ -705,7 +708,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: notaCliente ? '1.5px solid #1D9E75' : '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', outline: 'none' }}
             />
           </div>
-
+ 
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💬 Nota adicional (opcional)</p>
             <textarea placeholder="Ej: Voy con niños, son 3 cajas..."
@@ -713,7 +716,7 @@ export default function PublicarViaje({ onVolver, userId, fotoUrl, onIrAMisPubli
               style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '13px', fontFamily: 'sans-serif', resize: 'none', outline: 'none' }}
             />
           </div>
-
+ 
           <button type="button" onClick={crearViaje} disabled={publicando}
             style={{ width: '100%', padding: '16px', background: publicando ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             {publicando ? 'Publicando...' : `${tipoSeleccionado?.icon} Publicar viaje — $${precioTotal} MXN`}

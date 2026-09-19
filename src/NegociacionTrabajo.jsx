@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 import PerfilPublico from './PerfilPublico'
 import { enviarNotificacionCompleta } from './guardarNotificacion'
 import ReglasChambaModal from './ReglasChambaModal'
-
+ 
 const CATEGORIAS_ICONS = {
   'Electricista': '⚡', 'Plomero': '🔧', 'Cocinera': '🍳',
   'Limpieza': '🧹', 'Planchado': '👔', 'Pintor': '🖌️',
@@ -16,14 +16,7 @@ const CATEGORIAS_ICONS = {
   'Músico': '🎵', 'Téc. refrigeración': '❄️', 'Enfermera': '💉',
   'Barra de eventos': '🎪', 'Topógrafo': '📐', 'Albañil': '🧱',
 }
-
-// Periodo de gracia: cuentas de trabajador creadas ANTES de esta fecha (cuando la
-// verificación obligatoria entró en vigor) tienen hasta FECHA_LIMITE_GRACIA para
-// verificarse sin perder la posibilidad de aceptar trabajos. Cuentas creadas
-// DESPUÉS de CUTOFF_NUEVA_REGLA quedan bloqueadas de inmediato si no están verificadas.
-const CUTOFF_NUEVA_REGLA = new Date('2026-07-27T00:00:00-06:00')
-const FECHA_LIMITE_GRACIA = new Date('2026-07-30T23:59:59-06:00')
-
+ 
 export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAceptado }) {
   const [trabajoActual, setTrabajoActual] = useState(trabajo)
   const [ofertas, setOfertas] = useState([])
@@ -38,19 +31,16 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
   const [mostrarReglas, setMostrarReglas] = useState(false)
   const [reglasAceptadas, setReglasAceptadas] = useState(false)
   const [yaNoDisponible, setYaNoDisponible] = useState(false)
-  const [verificacionStatus, setVerificacionStatus] = useState(undefined) // undefined = aún no se sabe
-  const [cuentaCreadaEn, setCuentaCreadaEn] = useState(null)
-  const [mpConectado, setMpConectado] = useState(undefined) // undefined = aún no se sabe
-
+ 
   const MAX_RONDAS = 3
+  const esViaje = !!trabajoActual.es_viaje
   const rondasUsadas = trabajoActual.rondas_negociacion || 0
   const rondasRestantes = MAX_RONDAS - rondasUsadas
   const precioActual = trabajoActual.ultima_oferta || trabajoActual.presupuesto
-
+ 
   useEffect(() => {
     cargarOfertas()
-    cargarEstadoVerificacion()
-
+ 
     // Suscripción en tiempo real: si el cliente acepta, manda otra contraoferta,
     // o el trabajo deja de estar disponible (otro trabajador lo tomó), esta pantalla
     // se actualiza sola sin que el usuario tenga que salir y volver a entrar.
@@ -64,7 +54,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       }, (payload) => {
         const actualizado = payload.new
         setTrabajoActual(actualizado)
-
+ 
         if (actualizado.status === 'aceptado' && actualizado.trabajador_id === userId) {
           setExito(true)
         } else if (actualizado.status !== 'publicado') {
@@ -73,7 +63,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         }
       })
       .subscribe()
-
+ 
     const canalNegociaciones = supabase
       .channel(`negociaciones-trabajo-${trabajo.id}`)
       .on('postgres_changes', {
@@ -85,13 +75,13 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
         cargarOfertas()
       })
       .subscribe()
-
+ 
     return () => {
       supabase.removeChannel(canalTrabajo)
       supabase.removeChannel(canalNegociaciones)
     }
   }, [trabajo.id])
-
+ 
   async function cargarOfertas() {
     setCargando(true)
     const { data } = await supabase.from('negociaciones').select('*')
@@ -99,34 +89,15 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     if (data) setOfertas(data)
     setCargando(false)
   }
-
-  // Se consulta una sola vez al abrir la pantalla, y se vuelve a checar justo
-  // antes de aceptar (por si cambió mientras negociaba).
-  async function cargarEstadoVerificacion() {
-    const [{ data: verificacion }, { data: usuario }] = await Promise.all([
-      supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
-      supabase.from('usuarios').select('creado_en, mp_account_id').eq('id', userId).maybeSingle(),
-    ])
-    setVerificacionStatus(verificacion?.status || 'ninguna')
-    if (usuario?.creado_en) setCuentaCreadaEn(usuario.creado_en)
-    setMpConectado(!!usuario?.mp_account_id)
-  }
-
-  // true si la cuenta es de antes de la nueva regla Y todavía está dentro de la ventana de gracia
-  function dentroDePeriodoDeGracia(fechaCreacion) {
-    if (!fechaCreacion) return false
-    const esCuentaAntigua = new Date(fechaCreacion) < CUTOFF_NUEVA_REGLA
-    const siguoEnGracia = Date.now() < FECHA_LIMITE_GRACIA.getTime()
-    return esCuentaAntigua && siguoEnGracia
-  }
-
+ 
   async function hacerContraoferta() {
+    if (esViaje) return // los viajes tienen precio fijo, no se negocian
     if (nuevaOferta === precioActual || rondasRestantes <= 0) return
     setLoading(true)
-    await supabase.from('negociaciones').insert({ 
-      trabajo_id: trabajo.id, 
-      ofertado_por: 'trabajador', 
-      monto: nuevaOferta, 
+    await supabase.from('negociaciones').insert({
+      trabajo_id: trabajo.id,
+      ofertado_por: 'trabajador',
+      monto: nuevaOferta,
       usuario_id: userId,
       costo_materiales: costoMateriales || 0,
       nota_materiales: notaMateriales || null,
@@ -136,87 +107,45 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
     await cargarOfertas()
     setLoading(false)
   }
-
+ 
   async function aceptarPrecio() {
     if (!reglasAceptadas) { setMostrarReglas(true); return }
     setLoading(true)
-    setError('')
-
-    // Verificación de identidad obligatoria — se checa fresco (no el estado en memoria)
-    // para no dejar pasar a nadie que se haya des-verificado o rechazado mientras negociaba.
-    const [{ data: verificacion }, { data: usuario }] = await Promise.all([
-      supabase.from('verificaciones').select('status').eq('usuario_id', userId).maybeSingle(),
-      supabase.from('usuarios').select('creado_en, mp_account_id').eq('id', userId).maybeSingle(),
-    ])
-
-    const enGracia = dentroDePeriodoDeGracia(usuario?.creado_en)
-
-    if (!verificacion || verificacion.status !== 'aprobado') {
-      setVerificacionStatus(verificacion?.status || 'ninguna')
-
-      // Cuentas de antes de la nueva regla tienen unos días de gracia para verificarse
-      // sin perder la posibilidad de seguir aceptando trabajos mientras tanto.
-      if (enGracia) {
-        // No se bloquea — se deja continuar con la aceptación normal más abajo.
-      } else {
-        setLoading(false)
-        if (verificacion?.status === 'pendiente') {
-          setError('Tu verificación de identidad está en revisión. Podrás aceptar trabajos en cuanto sea aprobada (hasta 24 horas).')
-        } else if (verificacion?.status === 'rechazado') {
-          setError('Tu verificación de identidad fue rechazada. Ve a tu perfil para volver a enviar tus documentos antes de aceptar trabajos.')
-        } else {
-          setError('Necesitas verificar tu identidad antes de aceptar trabajos. Ve a tu perfil (Mi info) para completarla — solo toma unos minutos.')
-        }
-        return
-      }
-    }
-
-    // Mercado Pago conectado obligatorio — sin esto no hay a dónde depositarle su pago.
-    setMpConectado(!!usuario?.mp_account_id)
-    if (!usuario?.mp_account_id) {
-      if (enGracia) {
-        // Igual se le deja continuar dentro del periodo de gracia.
-      } else {
-        setLoading(false)
-        setError('Necesitas conectar tu cuenta de Mercado Pago antes de aceptar trabajos — de lo contrario no podrías recibir el pago. Ve a tu perfil → Pagos.')
-        return
-      }
-    }
-
+ 
     // Verificar que el trabajo siga disponible antes de aceptar
     const { data: trabajoVerificado } = await supabase
       .from('trabajos').select('status, trabajador_id').eq('id', trabajo.id).maybeSingle()
-
+ 
     if (!trabajoVerificado || trabajoVerificado.status !== 'publicado') {
       setLoading(false)
       setError('Lo sentimos — este trabajo ya fue aceptado por otro trabajador. Busca otros disponibles.')
       return
     }
-
+ 
     // Aceptar el trabajo
     const { error: updateError } = await supabase.from('trabajos')
       .update({ status: 'aceptado', precio_acordado: precioActual, trabajador_id: userId })
       .eq('id', trabajo.id)
-
+ 
     if (updateError) {
       console.log('Error aceptando:', updateError)
       setLoading(false)
       setError('Error al aceptar el trabajo. Intenta de nuevo.')
       return
     }
-
+ 
     await enviarNotificacionCompleta({ usuarioId: trabajo.cliente_id, titulo: '✅ ¡Trabajo aceptado!', cuerpo: `Un trabajador aceptó tu ${trabajo.categoria} por $${precioActual} MXN`, tipo: 'trabajo_aceptado', trabajoId: trabajo.id })
     setExito(true)
     setLoading(false)
   }
-
+ 
   function tiempoTranscurrido(fecha) {
     const diff = Date.now() - new Date(fecha).getTime()
     const min = Math.floor(diff / 60000)
     if (min < 60) return `hace ${min} min`
     return `hace ${Math.floor(min / 60)} hrs`
   }
-
+ 
   if (mostrarReglas) return (
     <ReglasChambaModal
       tipo="trabajador"
@@ -224,9 +153,9 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       onCerrar={() => setMostrarReglas(false)}
     />
   )
-
+ 
   if (verPerfilTrabajador) return <PerfilPublico usuarioId={userId} rolVisto="trabajador" onVolver={() => setVerPerfilTrabajador(false)} />
-
+ 
   if (yaNoDisponible) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
@@ -241,7 +170,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       </div>
     )
   }
-
+ 
   if (exito) {
     return (
       <div style={{ minHeight: '100vh', background: '#0D0D0D', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '24px', textAlign: 'center' }}>
@@ -265,18 +194,16 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
       </div>
     )
   }
-
-  const verificacionOk = verificacionStatus === 'aprobado'
-
+ 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
         <button type="button" onClick={onVolver} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Negociar trabajo</h2>
       </div>
-
+ 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
+ 
         <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
           <span style={{ fontSize: '40px' }}>{CATEGORIAS_ICONS[trabajo.categoria] || '✳️'}</span>
           <div>
@@ -285,35 +212,7 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>Presupuesto inicial: <span style={{ color: 'white' }}>${trabajo.presupuesto} MXN</span></p>
           </div>
         </div>
-
-        {/* Aviso de verificación pendiente — solo se muestra si NO está aprobada */}
-        {verificacionStatus !== undefined && !verificacionOk && (
-          <div style={{ background: dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.08)' : 'rgba(232,160,48,0.08)', border: `0.5px solid ${dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.3)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '18px', flexShrink: 0 }}>🪪</span>
-            <p style={{ fontSize: '12px', color: dentroDePeriodoDeGracia(cuentaCreadaEn) ? '#378ADD' : '#E8A030', lineHeight: '1.5' }}>
-              {dentroDePeriodoDeGracia(cuentaCreadaEn)
-                ? 'Todavía puedes aceptar trabajos, pero verifica tu identidad antes del 30 de julio o no podrás seguir aceptando. Ve a tu perfil (Mi info).'
-                : verificacionStatus === 'pendiente'
-                  ? 'Tu verificación de identidad está en revisión. Podrás aceptar en cuanto la aprobemos.'
-                  : verificacionStatus === 'rechazado'
-                    ? 'Tu verificación fue rechazada. Vuelve a enviarla desde tu perfil para poder aceptar trabajos.'
-                    : 'Necesitas verificar tu identidad desde tu perfil (Mi info) antes de poder aceptar trabajos.'}
-            </p>
-          </div>
-        )}
-
-        {/* Aviso de Mercado Pago no conectado */}
-        {mpConectado === false && (
-          <div style={{ background: dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.08)' : 'rgba(232,160,48,0.08)', border: `0.5px solid ${dentroDePeriodoDeGracia(cuentaCreadaEn) ? 'rgba(55,138,221,0.3)' : 'rgba(232,160,48,0.3)'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '18px', flexShrink: 0 }}>🏦</span>
-            <p style={{ fontSize: '12px', color: dentroDePeriodoDeGracia(cuentaCreadaEn) ? '#378ADD' : '#E8A030', lineHeight: '1.5' }}>
-              {dentroDePeriodoDeGracia(cuentaCreadaEn)
-                ? 'Todavía puedes aceptar trabajos, pero conecta tu Mercado Pago antes del 30 de julio o no podrás recibir pagos. Ve a tu perfil → Pagos.'
-                : 'Necesitas conectar tu cuenta de Mercado Pago desde tu perfil → Pagos antes de poder aceptar trabajos.'}
-            </p>
-          </div>
-        )}
-
+ 
         {/* Banner protegido para trabajador */}
         <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '18px', flexShrink: 0 }}>🔐</span>
@@ -321,12 +220,12 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             El dinero queda retenido de forma protegida. Cobra siempre dentro de la app para garantizar tu pago.
           </p>
         </div>
-
+ 
         <button type="button" onClick={() => setVerPerfilTrabajador(true)} style={{ width: '100%', padding: '11px', background: 'rgba(29,158,117,0.08)', color: '#1D9E75', border: '0.5px solid rgba(29,158,117,0.3)', borderRadius: '10px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           ⭐ Ver cómo te ve el cliente — tu perfil público
         </button>
-
-        {!cargando && ofertas.length > 0 && (
+ 
+        {!cargando && !esViaje && ofertas.length > 0 && (
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Historial de negociación</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -347,22 +246,36 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             </div>
           </div>
         )}
-
+ 
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>Precio actual</p>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '2px' }}>Precio {esViaje ? 'del viaje' : 'actual'}</p>
             <p style={{ fontSize: '24px', fontWeight: '800', color: '#1D9E75' }}>${precioActual} MXN</p>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Rondas restantes</p>
-            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-              {Array.from({ length: MAX_RONDAS }).map((_, i) => <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i < rondasRestantes ? '#1D9E75' : 'rgba(255,255,255,0.15)' }} />)}
+          {esViaje ? (
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '100px', background: 'rgba(55,138,221,0.15)', color: '#378ADD', border: '0.5px solid rgba(55,138,221,0.3)', fontWeight: '600' }}>
+                🔒 Precio fijo
+              </span>
             </div>
-            <p style={{ fontSize: '11px', color: rondasRestantes === 0 ? '#F09595' : 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{rondasRestantes === 0 ? 'Sin más rondas' : `${rondasRestantes} de ${MAX_RONDAS}`}</p>
-          </div>
+          ) : (
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Rondas restantes</p>
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                {Array.from({ length: MAX_RONDAS }).map((_, i) => <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i < rondasRestantes ? '#1D9E75' : 'rgba(255,255,255,0.15)' }} />)}
+              </div>
+              <p style={{ fontSize: '11px', color: rondasRestantes === 0 ? '#F09595' : 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{rondasRestantes === 0 ? 'Sin más rondas' : `${rondasRestantes} de ${MAX_RONDAS}`}</p>
+            </div>
+          )}
         </div>
-
-        {rondasRestantes > 0 && (
+ 
+        {esViaje && (
+          <div style={{ background: 'rgba(55,138,221,0.06)', border: '0.5px solid rgba(55,138,221,0.2)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: '1.5' }}>
+            💵 Los viajes tienen precio fijo calculado por distancia — no se pueden negociar. Solo puedes aceptar o rechazar.
+          </div>
+        )}
+ 
+        {!esViaje && rondasRestantes > 0 && (
           <div>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tu contraoferta</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
@@ -373,19 +286,19 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             {nuevaOferta < precioActual && <div style={{ background: 'rgba(29,158,117,0.08)', border: '0.5px solid rgba(29,158,117,0.2)', borderRadius: '10px', padding: '8px 12px', fontSize: '12px', color: '#5DCAA5' }}>↓ Estás aceptando ${precioActual - nuevaOferta} MXN menos</div>}
           </div>
         )}
-
-        {rondasRestantes === 0 && (
+ 
+        {!esViaje && rondasRestantes === 0 && (
           <div style={{ background: 'rgba(240,149,149,0.1)', border: '0.5px solid rgba(240,149,149,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#F09595', textAlign: 'center' }}>
             Se agotaron las rondas de negociación. Solo puedes aceptar o rechazar el precio actual.
           </div>
         )}
-
+ 
         {error && <p style={{ color: '#F09595', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
-
+ 
         <button type="button" onClick={aceptarPrecio} disabled={loading} style={{ width: '100%', padding: '16px', background: loading ? 'rgba(29,158,117,0.5)' : '#1D9E75', color: 'white', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           {loading ? 'Procesando...' : `✅ Aceptar $${precioActual} MXN`}
         </button>
-        
+ 
         {/* Desglose de comisión para el trabajador */}
         <div style={{ background: 'rgba(29,158,117,0.06)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: '12px', padding: '12px 16px' }}>
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>💰 Tu ganancia</p>
@@ -403,9 +316,9 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             <span style={{ fontSize: '16px', fontWeight: '800', color: '#1D9E75' }}>${Math.round(precioActual * 0.88)} MXN</span>
           </div>
         </div>
-
+ 
         {/* Desglose de materiales — solo si el trabajo requiere que el trabajador los consiga */}
-        {trabajo.materiales === 'trabajador' && (
+        {!esViaje && trabajo.materiales === 'trabajador' && (
           <div style={{ background: 'rgba(232,160,48,0.06)', border: '0.5px solid rgba(232,160,48,0.2)', borderRadius: '14px', padding: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: '600', color: '#E8A030', marginBottom: '10px' }}>🛒 Desglose de materiales</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -449,17 +362,17 @@ export default function NegociacionTrabajo({ trabajo, userId, onVolver, onAcepta
             </div>
           </div>
         )}
-
-        {rondasRestantes > 0 && nuevaOferta !== precioActual && (
+ 
+        {!esViaje && rondasRestantes > 0 && nuevaOferta !== precioActual && (
           <button type="button" onClick={hacerContraoferta} disabled={loading} style={{ width: '100%', padding: '14px', background: 'transparent', color: '#1D9E75', border: '1.5px solid #1D9E75', borderRadius: '14px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', fontFamily: 'sans-serif' }}>
             💬 Enviar contraoferta de ${nuevaOferta} MXN
           </button>
         )}
-
+ 
         <button type="button" onClick={onVolver} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'rgba(255,255,255,0.3)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'sans-serif' }}>
           Rechazar trabajo
         </button>
-
+ 
       </div>
     </div>
   )
