@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
-
+ 
 export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
   const [cargando, setCargando] = useState(true)
   const [procesando, setProcesando] = useState(false)
@@ -12,7 +12,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
   const [cvv, setCvv] = useState('')
   const [guardarTarjeta, setGuardarTarjeta] = useState(true)
   const formRef = useRef(null)
-
+ 
   useEffect(() => {
     iniciarPago()
     return () => {
@@ -22,7 +22,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       }
     }
   }, [])
-
+ 
   async function iniciarPago() {
     if (formRef.current) {
       try { formRef.current.unmount() } catch (e) { console.log('unmount previo:', e) }
@@ -51,7 +51,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       setCargando(false)
     }
   }
-
+ 
   async function cargarTarjetaGuardada(customerId, accessToken) {
     try {
       const res = await fetch(`https://api.mercadopago.com/v1/customers/${customerId}/cards`, {
@@ -64,7 +64,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       }
     } catch { }
   }
-
+ 
   function cargarSDKMercadoPago(data) {
     return new Promise((resolve) => {
       if (window.MercadoPago) { inicializarForm(data); resolve(); return }
@@ -75,7 +75,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       document.body.appendChild(script)
     })
   }
-
+ 
   function inicializarForm(data) {
     setTimeout(() => {
       try {
@@ -118,7 +118,7 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       }
     }, 150)
   }
-
+ 
   async function procesarPago(formData) {
     setProcesando(true)
     setError('')
@@ -149,13 +149,14 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       setProcesando(false)
     }
   }
-
+ 
   async function pagarConGuardada() {
     if (!cvv || cvv.length < 3) { setError('Ingresa el CVV de tu tarjeta.'); return }
     setProcesando(true)
     setError('')
     try {
-      const mp = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'es-MX' })
+      const publicKey = config?.trabajadorPublicKey || import.meta.env.VITE_MP_PUBLIC_KEY
+      const mp = new window.MercadoPago(publicKey, { locale: 'es-MX' })
       const { id: token } = await mp.createCardToken({ cardId: tarjetaGuardada.id, securityCode: cvv })
       const { data: userData } = await supabase.auth.getUser()
       const { data, error: fnError } = await supabase.functions.invoke('crear-pago-mp', {
@@ -168,13 +169,13 @@ export default function MetodoPago({ trabajo, onPagoExitoso, onCancelar }) {
       setProcesando(false)
     }
   }
-
+ 
   const inputStyle = {
     width: '100%', height: '48px', background: 'rgba(255,255,255,0.06)',
     border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: '12px',
     padding: '0 14px', color: 'white', fontSize: '15px', fontFamily: 'sans-serif', boxSizing: 'border-box',
   }
-
+ 
   return (
     <div style={{ minHeight: '100vh', background: '#0D0D0D', fontFamily: 'sans-serif', color: 'white' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderBottom: '0.5px solid rgba(255,255,255,0.1)' }}>
